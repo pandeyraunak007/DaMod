@@ -48,6 +48,16 @@ export interface Relationship {
   label?: string;
   description?: string;
   cardinality: Cardinality;
+  /**
+   * Identifying relationship (IDEF1X): the foreign key is part of the child's
+   * primary key, drawn as a solid line. Non-identifying (default) is dashed.
+   */
+  identifying?: boolean;
+  /**
+   * Subtype/category relationship: parent is the supertype, child a subtype that
+   * shares the supertype's primary key. Rendered with a category symbol.
+   */
+  subtype?: boolean;
   /** The side that holds the primary key. */
   parentEntity: string;
   /** The side that holds the foreign key. */

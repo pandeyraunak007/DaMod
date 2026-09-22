@@ -49,6 +49,8 @@ function serializeRelationship(r: Relationship): Record<string, unknown> {
   if (r.label) out.label = r.label;
   if (r.description) out.description = r.description;
   out.cardinality = r.cardinality;
+  if (r.identifying) out.identifying = true;
+  if (r.subtype) out.subtype = true;
   out.parentEntity = r.parentEntity;
   out.childEntity = r.childEntity;
   out.parentOptional = r.parentOptional;

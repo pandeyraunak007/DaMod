@@ -169,6 +169,10 @@ export interface CreateRelationshipInput {
   foreignKeyFieldName?: string;
   existingForeignKeyFieldId?: string;
   junctionName?: string;
+  /** Identifying relationship: the FK becomes part of the child's primary key. */
+  identifying?: boolean;
+  /** Subtype/category: the child shares the parent (supertype) primary key. */
+  subtype?: boolean;
 }
 
 export interface CreateRelationshipResult {
@@ -263,27 +267,40 @@ export function createRelationship(
   }
 
   // one-to-one / one-to-many
+  // Identifying (or subtype) relationships put the foreign key into the child's
+  // primary key; non-identifying keep it as a plain (optionally unique) column.
+  const identifying = params.subtype ? true : params.identifying ?? false;
+  if (params.subtype) rel.subtype = true;
+  if (identifying) rel.identifying = true;
+
   if (!isConceptual(level)) {
     const parentPks = primaryKeyFields(parent);
-    const unique = params.cardinality === "one-to-one";
+    const unique = params.cardinality === "one-to-one" && !identifying;
     if (params.existingForeignKeyFieldId) {
       const existing = findField(child, params.existingForeignKeyFieldId);
       if (existing) {
         applyTypeProps(existing, fkTypeProps(parentPks[0], level));
+        if (identifying) {
+          existing.primaryKey = true;
+          existing.nullable = false;
+        }
         existing.unique = unique || existing.unique;
         rel.foreignKeyFields.push(existing.id);
       }
     } else {
       const pks = parentPks.length ? parentPks : [undefined];
       pks.forEach((pk) => {
-        const name =
-          params.foreignKeyFieldName && pks.length === 1
+        // A subtype's key mirrors the supertype key name (e.g. id); otherwise use
+        // the offered or generated foreign-key name.
+        const name = params.subtype
+          ? pk?.name ?? suggestForeignKeyName(parent.name, pk)
+          : params.foreignKeyFieldName && pks.length === 1
             ? params.foreignKeyFieldName
             : suggestForeignKeyName(parent.name, pk);
         const field = newField(name, undefined, {
           ...fkTypeProps(pk, level),
-          nullable: parentOptional,
-          primaryKey: false,
+          nullable: identifying ? false : parentOptional,
+          primaryKey: identifying,
           unique,
         });
         child.fields.push(field);

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useModelStore } from "../store/modelStore";
 import { useWorkspaceStore } from "../store/workspaceStore";
 import {
@@ -18,6 +18,55 @@ import { validateIdentifier } from "../model/identifiers";
 import type { Entity, Field } from "../model/model";
 import { componentFor, entityKey, linksTouching } from "../links/links";
 import { newId } from "../lib/ids";
+
+// An input for identifier-valued names (entity/field). Keeps a local draft so the
+// field can be freely erased and retyped; commits to the store only when the value
+// is a valid identifier, and reverts to the last committed value on blur if the
+// current draft is invalid. Reports the current error to the parent for display.
+function IdentifierInput({
+  value,
+  onCommit,
+  onError,
+  className,
+}: {
+  value: string;
+  onCommit: (v: string) => void;
+  onError?: (err: string | null) => void;
+  className?: string;
+}) {
+  const [draft, setDraft] = useState(value);
+  const [err, setErr] = useState<string | null>(null);
+
+  // Resync when the committed value changes (undo/redo, external edit).
+  useEffect(() => {
+    setDraft(value);
+    setErr(null);
+    onError?.(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  return (
+    <input
+      className={`${className ?? ""} ${err ? "is-error" : ""}`}
+      value={draft}
+      onChange={(e) => {
+        const v = e.target.value;
+        setDraft(v);
+        const error = validateIdentifier(v);
+        setErr(error);
+        onError?.(error);
+        if (!error) onCommit(v);
+      }}
+      onBlur={() => {
+        if (err) {
+          setDraft(value);
+          setErr(null);
+          onError?.(null);
+        }
+      }}
+    />
+  );
+}
 
 export function SidePanel() {
   const selection = useModelStore((s) => s.selection);
@@ -71,13 +120,11 @@ function EntityEditor({ entity }: { entity: Entity }) {
     <div className="editor">
       <div className="editor__section">
         <label className="editor__label">Entity name</label>
-        <input
-          className={`editor__input ${nameError ? "is-error" : ""}`}
+        <IdentifierInput
+          className="editor__input"
           value={entity.name}
-          onChange={(e) => {
-            const err = renameEntity(entity.id, e.target.value);
-            setNameError(err);
-          }}
+          onCommit={(v) => renameEntity(entity.id, v)}
+          onError={setNameError}
         />
         {nameError && <p className="editor__error">{nameError}</p>}
         {!nameError && duplicateName && (
@@ -312,14 +359,11 @@ function FieldRow({
   return (
     <div className="field-row">
       <div className="field-row__line">
-        <input
-          className={`field-row__name ${nameError ? "is-error" : ""}`}
+        <IdentifierInput
+          className="field-row__name"
           value={field.name}
-          onChange={(e) => {
-            const err = validateIdentifier(e.target.value);
-            setNameError(err);
-            if (!err) updateField(entity.id, field.id, { name: e.target.value });
-          }}
+          onCommit={(v) => updateField(entity.id, field.id, { name: v })}
+          onError={setNameError}
         />
         {showPhysical && (
           <select
@@ -542,6 +586,15 @@ function RelationshipEditor({ relId }: { relId: string }) {
         <p className="editor__rel-summary">
           <strong>{parent?.name ?? "?"}</strong> {rel.cardinality}{" "}
           <strong>{child?.name ?? "?"}</strong>
+        </p>
+        <p className="field__hint">
+          {rel.subtype
+            ? "Subtype / category"
+            : rel.cardinality === "many-to-many"
+              ? "Junction relationship"
+              : rel.identifying
+                ? "Identifying (FK in primary key, solid line)"
+                : "Non-identifying (dashed line)"}
         </p>
       </div>
 

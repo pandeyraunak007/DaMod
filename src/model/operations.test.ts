@@ -150,3 +150,52 @@ describe("deleteEntity cascade (FR-2.7 / AT-1.6)", () => {
     expect(model.entities.find((e) => e.id === order)).toBeDefined();
   });
 });
+
+describe("identifying and subtype relationships (ERwin/IDEF1X)", () => {
+  it("identifying relationship makes the FK part of the child's primary key", () => {
+    const base = sampleModel();
+    const { customer, order } = ids(base);
+    const { model } = createRelationship(base, {
+      cardinality: "one-to-many",
+      parentEntity: customer,
+      childEntity: order,
+      foreignKeyFieldName: "customer_id",
+      identifying: true,
+    });
+    const fk = findEntity(model, order)!.fields.find((f) => f.name === "customer_id")!;
+    expect(fk.primaryKey).toBe(true);
+    expect(fk.nullable).toBe(false);
+    expect(model.relationships[model.relationships.length - 1].identifying).toBe(true);
+  });
+
+  it("non-identifying (default) keeps the FK out of the primary key", () => {
+    const base = sampleModel();
+    const { customer, order } = ids(base);
+    const { model } = createRelationship(base, {
+      cardinality: "one-to-many",
+      parentEntity: customer,
+      childEntity: order,
+      foreignKeyFieldName: "customer_id",
+    });
+    const fk = findEntity(model, order)!.fields.find((f) => f.name === "customer_id")!;
+    expect(fk.primaryKey).toBe(false);
+    expect(model.relationships[model.relationships.length - 1].identifying).toBeUndefined();
+  });
+
+  it("subtype makes the child inherit the supertype's primary key", () => {
+    const base = sampleModel();
+    const { customer, order } = ids(base);
+    const { model } = createRelationship(base, {
+      cardinality: "one-to-one",
+      parentEntity: customer,
+      childEntity: order,
+      subtype: true,
+    });
+    const inherited = findEntity(model, order)!.fields.find((f) => f.name === "id" && f.primaryKey);
+    // Order already had an `id`; the inherited supertype key is also `id` + PK.
+    expect(inherited).toBeDefined();
+    const rel = model.relationships[model.relationships.length - 1];
+    expect(rel.subtype).toBe(true);
+    expect(rel.identifying).toBe(true);
+  });
+});

@@ -17,7 +17,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useModelStore } from "../store/modelStore";
 import { EntityNode } from "./EntityNode";
-import { EdgeMarkers, MARKER_MANY, MARKER_ONE } from "./EdgeMarkers";
+import { EdgeMarkers, MARKER_MANY, MARKER_ONE, MARKER_SUBTYPE } from "./EdgeMarkers";
 import { FloatingToolbar } from "./FloatingToolbar";
 import type { Model, Relationship } from "../model/model";
 
@@ -34,15 +34,23 @@ function buildEdges(model: Model, selectedRelId: string | null): Edge[] {
   for (const rel of model.relationships) {
     if (rel.cardinality !== "many-to-many") {
       const childMarker = rel.cardinality === "one-to-many" ? MARKER_MANY : MARKER_ONE;
+      const parentMarker = rel.subtype ? MARKER_SUBTYPE : MARKER_ONE;
+      // Identifying (and subtype) relationships are solid; non-identifying dashed.
+      const style: React.CSSProperties = {};
+      if (selected(rel)) {
+        style.stroke = "#2563eb";
+        style.strokeWidth = 2;
+      }
+      if (!rel.identifying && !rel.subtype) style.strokeDasharray = "6 4";
       edges.push({
         id: rel.id,
         source: rel.parentEntity,
         target: rel.childEntity,
         label: rel.label,
-        markerStart: MARKER_ONE,
+        markerStart: parentMarker,
         markerEnd: childMarker,
         selected: selected(rel),
-        style: selected(rel) ? { stroke: "#2563eb", strokeWidth: 2 } : undefined,
+        style,
       });
     } else if (rel.junctionEntity) {
       // Two lines: each original entity (one) to the junction (many).

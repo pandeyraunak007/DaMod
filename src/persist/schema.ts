@@ -42,6 +42,8 @@ const zRelationship = z.object({
   label: z.string().optional(),
   description: z.string().optional(),
   cardinality: z.enum(["one-to-one", "one-to-many", "many-to-many"]),
+  identifying: z.boolean().optional(),
+  subtype: z.boolean().optional(),
   parentEntity: z.string(),
   childEntity: z.string(),
   parentOptional: z.boolean(),
