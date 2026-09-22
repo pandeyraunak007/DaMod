@@ -7,7 +7,16 @@
 // The in-memory `junction` flag on entities is derived from relationships, so it
 // is NOT written to disk — the file format has no such key.
 
-import type { Entity, Field, Model, Relationship } from "../model/model";
+import type {
+  Entity,
+  Field,
+  Index,
+  Model,
+  RawObject,
+  Relationship,
+  Sequence,
+  View,
+} from "../model/model";
 import { paramShape } from "../model/dataTypes";
 
 // A field is serialized with whatever type information it carries, regardless of
@@ -61,6 +70,35 @@ function serializeRelationship(r: Relationship): Record<string, unknown> {
   return out;
 }
 
+function serializeView(v: View): Record<string, unknown> {
+  const out: Record<string, unknown> = { id: v.id, name: v.name, definition: v.definition };
+  if (v.materialized) out.materialized = true;
+  if (v.sources && v.sources.length) out.sources = [...v.sources];
+  out.position = { x: v.position.x, y: v.position.y };
+  return out;
+}
+
+function serializeIndex(i: Index): Record<string, unknown> {
+  const out: Record<string, unknown> = { id: i.id, name: i.name, entity: i.entity };
+  if (i.unique) out.unique = true;
+  out.fields = [...i.fields];
+  return out;
+}
+
+function serializeSequence(s: Sequence): Record<string, unknown> {
+  const out: Record<string, unknown> = { id: s.id, name: s.name };
+  if (s.start !== undefined) out.start = s.start;
+  if (s.increment !== undefined) out.increment = s.increment;
+  return out;
+}
+
+function serializeRawObject(o: RawObject): Record<string, unknown> {
+  const out: Record<string, unknown> = { id: o.id, name: o.name, dialect: o.dialect };
+  if (o.kind) out.kind = o.kind;
+  out.sql = o.sql;
+  return out;
+}
+
 /** Build the canonical plain object for a model (used by serializeModel). */
 export function modelToPlain(model: Model): Record<string, unknown> {
   const out: Record<string, unknown> = {
@@ -76,6 +114,14 @@ export function modelToPlain(model: Model): Record<string, unknown> {
   out.updatedAt = model.updatedAt;
   out.entities = model.entities.map(serializeEntity);
   out.relationships = model.relationships.map(serializeRelationship);
+  if (model.views && model.views.length) out.views = model.views.map(serializeView);
+  if (model.indexes && model.indexes.length) out.indexes = model.indexes.map(serializeIndex);
+  if (model.sequences && model.sequences.length) {
+    out.sequences = model.sequences.map(serializeSequence);
+  }
+  if (model.rawObjects && model.rawObjects.length) {
+    out.rawObjects = model.rawObjects.map(serializeRawObject);
+  }
   return out;
 }
 

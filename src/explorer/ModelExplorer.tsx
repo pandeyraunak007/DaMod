@@ -165,6 +165,51 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic }: Exp
     }
     useModelStore.getState().openRelationshipDraft(model.entities[0].id, model.entities[1].id);
   };
+  const addView = async (tabId: string) => {
+    await ensureActive(tabId);
+    useModelStore.getState().createView();
+    expand(`m:${tabId}`);
+    expand(`m:${tabId}:views`);
+  };
+  const addIndex = async (tabId: string) => {
+    await ensureActive(tabId);
+    const first = useModelStore.getState().model.entities[0];
+    if (!first) {
+      useModelStore.getState().pushNotice("Add an entity before an index.");
+      return;
+    }
+    useModelStore.getState().createIndex(first.id);
+    expand(`m:${tabId}:indexes`);
+  };
+  const addSequence = async (tabId: string) => {
+    await ensureActive(tabId);
+    useModelStore.getState().createSequence();
+    expand(`m:${tabId}:seqs`);
+  };
+  const addRaw = async (tabId: string) => {
+    await ensureActive(tabId);
+    useModelStore.getState().createRawObject("postgres");
+    expand(`m:${tabId}:raw`);
+  };
+  const selectObject = async (
+    tabId: string,
+    sel: { kind: "view" | "index" | "sequence" | "rawObject"; id: string },
+  ) => {
+    await ensureActive(tabId);
+    useModelStore.getState().select(sel);
+  };
+  const deleteObject = async (
+    tabId: string,
+    kind: "view" | "index" | "sequence" | "rawObject",
+    oid: string,
+  ) => {
+    await ensureActive(tabId);
+    const st = useModelStore.getState();
+    if (kind === "view") st.deleteView(oid);
+    else if (kind === "index") st.deleteIndex(oid);
+    else if (kind === "sequence") st.deleteSequence(oid);
+    else st.deleteRawObject(oid);
+  };
 
   if (collapsed) {
     return (
@@ -237,6 +282,12 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic }: Exp
                 onAddEntity={() => addEntity(m.tabId)}
                 onAddField={(eid) => addField(m.tabId, eid)}
                 onAddRelationship={() => addRelationship(m.tabId)}
+                onAddView={() => addView(m.tabId)}
+                onAddIndex={() => addIndex(m.tabId)}
+                onAddSequence={() => addSequence(m.tabId)}
+                onAddRaw={() => addRaw(m.tabId)}
+                onSelectObject={(sel) => selectObject(m.tabId, sel)}
+                onDeleteObject={(kind, oid) => deleteObject(m.tabId, kind, oid)}
                 onDuplicateModel={() => duplicateModel(m.tabId)}
                 onDeleteModel={() => onDeleteModel(m.tabId, m.model!.name)}
               />
@@ -301,6 +352,12 @@ function ModelBranch({
   onAddEntity,
   onAddField,
   onAddRelationship,
+  onAddView,
+  onAddIndex,
+  onAddSequence,
+  onAddRaw,
+  onSelectObject,
+  onDeleteObject,
   onDuplicateModel,
   onDeleteModel,
 }: {
@@ -317,6 +374,12 @@ function ModelBranch({
   onAddEntity: () => void;
   onAddField: (entityId: string) => void;
   onAddRelationship: () => void;
+  onAddView: () => void;
+  onAddIndex: () => void;
+  onAddSequence: () => void;
+  onAddRaw: () => void;
+  onSelectObject: (sel: { kind: "view" | "index" | "sequence" | "rawObject"; id: string }) => void;
+  onDeleteObject: (kind: "view" | "index" | "sequence" | "rawObject", id: string) => void;
   onDuplicateModel: () => void;
   onDeleteModel: () => void;
 }) {
@@ -408,8 +471,101 @@ function ModelBranch({
             model.relationships.filter(relMatches).map((r) => (
               <RelationshipRow key={r.id} tabId={tabId} relId={r.id} text={relText(r)} openMenu={openMenu} />
             ))}
+
+          <ObjectGroup
+            open={isOpen(`m:${tabId}:views`)}
+            onToggle={() => toggle(`m:${tabId}:views`)}
+            label={`Views (${model.views?.length ?? 0})`}
+            onAdd={onAddView}
+            items={(model.views ?? []).filter((v) => !filtering || matches(v.name, q))}
+            onSelect={(id) => onSelectObject({ kind: "view", id })}
+            onDelete={(id) => onDeleteObject("view", id)}
+            openMenu={openMenu}
+          />
+          <ObjectGroup
+            open={isOpen(`m:${tabId}:indexes`)}
+            onToggle={() => toggle(`m:${tabId}:indexes`)}
+            label={`Indexes (${model.indexes?.length ?? 0})`}
+            onAdd={onAddIndex}
+            items={(model.indexes ?? []).filter((v) => !filtering || matches(v.name, q))}
+            onSelect={(id) => onSelectObject({ kind: "index", id })}
+            onDelete={(id) => onDeleteObject("index", id)}
+            openMenu={openMenu}
+          />
+          <ObjectGroup
+            open={isOpen(`m:${tabId}:seqs`)}
+            onToggle={() => toggle(`m:${tabId}:seqs`)}
+            label={`Sequences (${model.sequences?.length ?? 0})`}
+            onAdd={onAddSequence}
+            items={(model.sequences ?? []).filter((v) => !filtering || matches(v.name, q))}
+            onSelect={(id) => onSelectObject({ kind: "sequence", id })}
+            onDelete={(id) => onDeleteObject("sequence", id)}
+            openMenu={openMenu}
+          />
+          <ObjectGroup
+            open={isOpen(`m:${tabId}:raw`)}
+            onToggle={() => toggle(`m:${tabId}:raw`)}
+            label={`Raw objects (${model.rawObjects?.length ?? 0})`}
+            onAdd={onAddRaw}
+            items={(model.rawObjects ?? []).filter((v) => !filtering || matches(v.name, q))}
+            onSelect={(id) => onSelectObject({ kind: "rawObject", id })}
+            onDelete={(id) => onDeleteObject("rawObject", id)}
+            openMenu={openMenu}
+          />
         </>
       )}
+    </>
+  );
+}
+
+function ObjectGroup({
+  open,
+  onToggle,
+  label,
+  onAdd,
+  items,
+  onSelect,
+  onDelete,
+  openMenu,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  label: string;
+  onAdd: () => void;
+  items: { id: string; name: string }[];
+  onSelect: (id: string) => void;
+  onDelete: (id: string) => void;
+  openMenu: OpenMenu;
+}) {
+  return (
+    <>
+      <TreeRow
+        depth={2}
+        open={open}
+        hasChildren
+        label={<span className="tree__group">{label}</span>}
+        onToggle={onToggle}
+        actions={
+          <RowAction title={`Add`} onClick={onAdd}>
+            +
+          </RowAction>
+        }
+      />
+      {open &&
+        items.map((it) => (
+          <TreeRow
+            key={it.id}
+            depth={3}
+            label={<span className="tree__obj">{it.name}</span>}
+            onClick={() => onSelect(it.id)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              openMenu(e.clientX, e.clientY, [
+                { label: "Delete", danger: true, onClick: () => onDelete(it.id) },
+              ]);
+            }}
+          />
+        ))}
     </>
   );
 }

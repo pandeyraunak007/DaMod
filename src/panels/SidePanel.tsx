@@ -18,6 +18,7 @@ import { validateIdentifier } from "../model/identifiers";
 import type { Entity, Field } from "../model/model";
 import { componentFor, entityKey, linksTouching } from "../links/links";
 import { newId } from "../lib/ids";
+import { ViewEditor, IndexEditor, SequenceEditor, RawObjectEditor } from "./DbObjectEditors";
 
 // An input for identifier-valued names (entity/field). Keeps a local draft so the
 // field can be freely erased and retyped; commits to the store only when the value
@@ -70,12 +71,14 @@ function IdentifierInput({
 
 export function SidePanel() {
   const selection = useModelStore((s) => s.selection);
+  const select = useModelStore((s) => s.select);
   const entity = useModelStore((s) =>
     selection?.kind === "entity"
       ? s.model.entities.find((e) => e.id === selection.id)
       : undefined,
   );
   const relId = selection?.kind === "relationship" ? selection.id : null;
+  const clear = () => select(null);
 
   return (
     <aside className="side">
@@ -83,6 +86,14 @@ export function SidePanel() {
         <EntityEditor entity={entity} />
       ) : relId ? (
         <RelationshipEditor relId={relId} />
+      ) : selection?.kind === "view" ? (
+        <ViewEditor id={selection.id} onGone={clear} />
+      ) : selection?.kind === "index" ? (
+        <IndexEditor id={selection.id} onGone={clear} />
+      ) : selection?.kind === "sequence" ? (
+        <SequenceEditor id={selection.id} onGone={clear} />
+      ) : selection?.kind === "rawObject" ? (
+        <RawObjectEditor id={selection.id} onGone={clear} />
       ) : (
         <div className="side__empty">
           <p>Nothing selected.</p>

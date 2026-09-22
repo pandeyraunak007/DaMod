@@ -76,6 +76,49 @@ export interface Relationship {
 
 export type Notation = "IE" | "IDEF1X";
 
+// ---- other physical/logical database objects --------------------------------
+
+/** A database view: a named SQL query. Rendered on the canvas and exported. */
+export interface View {
+  id: string;
+  name: string;
+  /** The SQL SELECT body (raw, exported verbatim). */
+  definition: string;
+  materialized?: boolean;
+  /** Source entity ids, for drawing canvas lines (optional). */
+  sources?: string[];
+  position: Position;
+}
+
+/** An index over one or more of an entity's columns. */
+export interface Index {
+  id: string;
+  name: string;
+  entity: string;
+  fields: string[];
+  unique?: boolean;
+}
+
+/** A sequence generator. */
+export interface Sequence {
+  id: string;
+  name: string;
+  start?: number;
+  increment?: number;
+}
+
+export type DbDialect = "postgres" | "snowflake" | "databricks";
+
+/** A free-form, dialect-specific object (Snowflake stage/stream/task, Databricks
+ *  table properties, etc.) whose SQL body is exported verbatim for its dialect. */
+export interface RawObject {
+  id: string;
+  name: string;
+  dialect: DbDialect;
+  kind?: string;
+  sql: string;
+}
+
 export interface Model {
   formatVersion: 1;
   id: string;
@@ -90,6 +133,10 @@ export interface Model {
   updatedAt: string;
   entities: Entity[];
   relationships: Relationship[];
+  views?: View[];
+  indexes?: Index[];
+  sequences?: Sequence[];
+  rawObjects?: RawObject[];
 }
 
 // ---- factories ---------------------------------------------------------------
@@ -127,6 +174,22 @@ export function newEntity(
     fields: [],
     ...overrides,
   };
+}
+
+export function newView(name: string, position: Position): View {
+  return { id: newId("view"), name, definition: "SELECT\n", position };
+}
+
+export function newIndex(name: string, entity: string): Index {
+  return { id: newId("index"), name, entity, fields: [] };
+}
+
+export function newSequence(name: string): Sequence {
+  return { id: newId("sequence"), name, start: 1, increment: 1 };
+}
+
+export function newRawObject(name: string, dialect: DbDialect): RawObject {
+  return { id: newId("rawObject"), name, dialect, sql: "" };
 }
 
 export function newModel(name: string, now: string, level: ModelLevel = "Physical"): Model {

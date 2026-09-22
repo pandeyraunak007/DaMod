@@ -53,6 +53,38 @@ const zRelationship = z.object({
   junctionEntity: z.string().optional(),
 });
 
+const zView = z.object({
+  id: z.string(),
+  name: z.string(),
+  definition: z.string(),
+  materialized: z.boolean().optional(),
+  sources: z.array(z.string()).optional(),
+  position: z.object({ x: z.number(), y: z.number() }),
+});
+
+const zIndex = z.object({
+  id: z.string(),
+  name: z.string(),
+  entity: z.string(),
+  fields: z.array(z.string()),
+  unique: z.boolean().optional(),
+});
+
+const zSequence = z.object({
+  id: z.string(),
+  name: z.string(),
+  start: z.number().optional(),
+  increment: z.number().optional(),
+});
+
+const zRawObject = z.object({
+  id: z.string(),
+  name: z.string(),
+  dialect: z.enum(["postgres", "snowflake", "databricks"]),
+  kind: z.string().optional(),
+  sql: z.string(),
+});
+
 const zModel = z.object({
   formatVersion: z.literal(CURRENT_FORMAT_VERSION),
   id: z.string(),
@@ -66,6 +98,10 @@ const zModel = z.object({
   updatedAt: z.string(),
   entities: z.array(zEntity),
   relationships: z.array(zRelationship),
+  views: z.array(zView).optional(),
+  indexes: z.array(zIndex).optional(),
+  sequences: z.array(zSequence).optional(),
+  rawObjects: z.array(zRawObject).optional(),
 });
 
 export type ParseResult<T> =

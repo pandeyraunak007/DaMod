@@ -95,3 +95,41 @@ describe("Workspace DDL (AT-4.7)", () => {
     expect(sql).toContain('CREATE TABLE "orders"."Order"');
   });
 });
+
+describe("other database objects (views, indexes, sequences, raw)", () => {
+  function withObjects() {
+    const m = ordersModel();
+    const order = m.entities.find((e) => e.name === "Order")!;
+    m.sequences = [{ id: "q_1", name: "order_seq", start: 1, increment: 1 }];
+    m.indexes = [
+      { id: "x_1", name: "idx_order_total", entity: order.id, fields: [order.fields[2].id], unique: false },
+    ];
+    m.views = [
+      { id: "v_1", name: "paid_orders", definition: "SELECT * FROM \"Order\"", position: { x: 0, y: 0 } },
+    ];
+    m.rawObjects = [
+      { id: "o_1", name: "load_stage", dialect: "snowflake", kind: "stage", sql: "CREATE STAGE load_stage;" },
+    ];
+    return m;
+  }
+
+  it("Postgres emits sequence, index and view; snowflake-only raw omitted", () => {
+    const sql = exportModelDDL(withObjects(), DIALECTS.postgres);
+    expect(sql).toContain('CREATE SEQUENCE "order_seq" START WITH 1 INCREMENT BY 1;');
+    expect(sql).toContain('CREATE INDEX "idx_order_total" ON "Order"');
+    expect(sql).toContain('CREATE OR REPLACE VIEW "paid_orders" AS');
+    expect(sql).not.toContain("CREATE STAGE"); // raw object is snowflake-only
+  });
+
+  it("Snowflake maps index to clustering and includes its raw object", () => {
+    const sql = exportModelDDL(withObjects(), DIALECTS.snowflake);
+    expect(sql).toContain("CLUSTER BY");
+    expect(sql).toContain("CREATE STAGE load_stage;");
+  });
+
+  it("Databricks notes sequences/indexes instead of creating them", () => {
+    const sql = exportModelDDL(withObjects(), DIALECTS.databricks);
+    expect(sql).toContain("no CREATE SEQUENCE");
+    expect(sql).toContain("ZORDER BY");
+  });
+});

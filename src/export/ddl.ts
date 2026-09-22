@@ -153,14 +153,89 @@ function alterFk(d: Dialect, fk: Fk, schema?: string): string {
     .join(", ")}) REFERENCES ${parentRef} (${fk.cols.map((c) => d.quote(c.pk)).join(", ")});`;
 }
 
+// ---- other database objects (dialect-aware) ---------------------------------
+
+function sequenceDDL(
+  d: Dialect,
+  s: NonNullable<Model["sequences"]>[number],
+  schema?: string,
+): string {
+  if (d.id === "databricks") {
+    return `-- sequence ${s.name}: Databricks has no CREATE SEQUENCE; use GENERATED ALWAYS AS IDENTITY on the column.`;
+  }
+  return `CREATE SEQUENCE ${tableRef(d, s.name, schema)} START WITH ${s.start ?? 1} INCREMENT BY ${s.increment ?? 1};`;
+}
+
+function indexDDL(
+  d: Dialect,
+  idx: NonNullable<Model["indexes"]>[number],
+  model: Model,
+  schema?: string,
+): string | null {
+  const entity = findEntity(model, idx.entity);
+  if (!entity) return null;
+  const cols = idx.fields
+    .map((fid) => entity.fields.find((f) => f.id === fid))
+    .filter((f): f is NonNullable<typeof f> => !!f)
+    .map((f) => d.quote(f.name));
+  if (cols.length === 0) return null;
+  const tbl = tableRef(d, entity.name, schema);
+  const list = cols.join(", ");
+  if (d.id === "postgres") {
+    return `CREATE ${idx.unique ? "UNIQUE " : ""}INDEX ${d.quote(idx.name)} ON ${tbl} (${list});`;
+  }
+  if (d.id === "snowflake") {
+    return `ALTER TABLE ${tbl} CLUSTER BY (${list}); -- Snowflake has no indexes; using a clustering key`;
+  }
+  return `-- Databricks: OPTIMIZE ${tbl} ZORDER BY (${list});`;
+}
+
+function viewDDL(d: Dialect, v: NonNullable<Model["views"]>[number], schema?: string): string {
+  const ref = tableRef(d, v.name, schema);
+  const body = v.definition.trim().replace(/;+\s*$/, "");
+  if (v.materialized) {
+    if (d.id === "databricks") {
+      return `-- Databricks materialized views are limited; created as a regular view\nCREATE OR REPLACE VIEW ${ref} AS\n${body};`;
+    }
+    return `CREATE MATERIALIZED VIEW ${ref} AS\n${body};`;
+  }
+  return `CREATE OR REPLACE VIEW ${ref} AS\n${body};`;
+}
+
+function rawObjectDDL(d: Dialect, o: NonNullable<Model["rawObjects"]>[number]): string | null {
+  if (o.dialect !== d.id || !o.sql.trim()) return null;
+  return `-- ${o.name}${o.kind ? ` (${o.kind})` : ""}\n${o.sql.trim()}`;
+}
+
+/** Sequences, indexes, views and raw objects for a model, as DDL blocks. */
+function objectBlocks(model: Model, d: Dialect, schema?: string): { pre: string[]; post: string[] } {
+  const pre: string[] = [];
+  const post: string[] = [];
+  const seqs = (model.sequences ?? []).map((s) => sequenceDDL(d, s, schema));
+  if (seqs.length) pre.push(seqs.join("\n"));
+  const idxs = (model.indexes ?? [])
+    .map((i) => indexDDL(d, i, model, schema))
+    .filter((x): x is string => !!x);
+  if (idxs.length) post.push(idxs.join("\n"));
+  const views = (model.views ?? []).map((v) => viewDDL(d, v, schema));
+  if (views.length) post.push(views.join("\n\n"));
+  const raws = (model.rawObjects ?? [])
+    .map((o) => rawObjectDDL(d, o))
+    .filter((x): x is string => !!x);
+  if (raws.length) post.push(raws.join("\n\n"));
+  return { pre, post };
+}
+
 /** Export a single model as DDL. */
 export function exportModelDDL(model: Model, d: Dialect): string {
   const fks = foreignKeys(model);
   const { order, deferred } = orderTables(model.entities, fks);
   const deferredSet = new Set(deferred);
   const inlineFks = fks.filter((fk) => !deferredSet.has(fk));
+  const { pre, post } = objectBlocks(model, d);
 
   const blocks: string[] = [`-- DaMod DDL export: ${model.name} (${d.label})`];
+  blocks.push(...pre); // sequences first (defaults may reference them)
   const tables = order.map((e) => tableDDL(d, e, inlineFks, undefined));
   blocks.push(tables.join("\n\n"));
 
@@ -168,6 +243,7 @@ export function exportModelDDL(model: Model, d: Dialect): string {
   if (comments.length) blocks.push(comments.join("\n"));
 
   if (deferred.length) blocks.push(deferred.map((fk) => alterFk(d, fk)).join("\n"));
+  blocks.push(...post); // indexes, views, raw objects
 
   return blocks.join("\n\n") + "\n";
 }
@@ -193,11 +269,13 @@ export function exportWorkspaceDDL(
     const { order, deferred } = orderTables(model.entities, fks);
     const deferredSet = new Set(deferred);
     const inlineFks = fks.filter((fk) => !deferredSet.has(fk));
+    const { pre, post } = objectBlocks(model, d, model.name);
     const tables = order.map((e) => tableDDL(d, e, inlineFks, model.name));
-    const parts = [`-- schema: ${model.name}`, tables.join("\n\n")];
+    const parts = [`-- schema: ${model.name}`, ...pre, tables.join("\n\n")];
     const comments = order.flatMap((e) => commentStatements(d, e, model.name));
     if (comments.length) parts.push(comments.join("\n"));
     if (deferred.length) parts.push(deferred.map((fk) => alterFk(d, fk, model.name)).join("\n"));
+    parts.push(...post);
     blocks.push(parts.join("\n\n"));
   }
 

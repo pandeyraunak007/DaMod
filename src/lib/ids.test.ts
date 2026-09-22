@@ -37,7 +37,7 @@ describe("isId", () => {
     expect(isId("e_")).toBe(false);
     expect(isId("e_a1b2c3d")).toBe(false); // 7 chars
     expect(isId("e_a1b2c3d4e")).toBe(false); // 9 chars
-    expect(isId("x_a1b2c3d4")).toBe(false); // unknown prefix
+    expect(isId("z_a1b2c3d4")).toBe(false); // unknown prefix
     expect(isId("e_A1B2C3D4")).toBe(false); // uppercase not allowed
     expect(isId("ea1b2c3d4")).toBe(false); // missing underscore
   });

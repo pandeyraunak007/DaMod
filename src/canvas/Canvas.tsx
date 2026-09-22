@@ -17,6 +17,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useModelStore } from "../store/modelStore";
 import { EntityNode } from "./EntityNode";
+import { ViewNode } from "./ViewNode";
 import {
   EdgeMarkers,
   MARKER_MANY,
@@ -27,7 +28,7 @@ import {
 import { FloatingToolbar } from "./FloatingToolbar";
 import type { Model, Relationship } from "../model/model";
 
-const nodeTypes = { entity: EntityNode };
+const nodeTypes = { entity: EntityNode, view: ViewNode };
 
 function baseRelId(edgeId: string): string {
   return edgeId.replace(/:(p|c)$/, "");
@@ -85,6 +86,17 @@ function buildEdges(model: Model, selectedRelId: string | null): Edge[] {
       }
     }
   }
+  // Dashed lines from a view to each of its source entities.
+  for (const v of model.views ?? []) {
+    for (const src of v.sources ?? []) {
+      edges.push({
+        id: `${v.id}:${src}`,
+        source: v.id,
+        target: src,
+        style: { stroke: "#8b5cf6", strokeDasharray: "4 4" },
+      });
+    }
+  }
   return edges;
 }
 
@@ -124,19 +136,27 @@ function CanvasInner() {
 
   const selectedEntityId = selection?.kind === "entity" ? selection.id : null;
   const selectedRelId = selection?.kind === "relationship" ? selection.id : null;
+  const selectedViewId = selection?.kind === "view" ? selection.id : null;
+  const views = model.views;
 
-  const nodes: Node[] = useMemo(
-    () =>
-      entities.map((e) => ({
-        id: e.id,
-        type: "entity",
-        position: e.position,
-        data: { entityId: e.id },
-        selected: e.id === selectedEntityId,
-        className: connectFrom === e.id ? "rf-connect-source" : undefined,
-      })),
-    [entities, selectedEntityId, connectFrom],
-  );
+  const nodes: Node[] = useMemo(() => {
+    const entityNodes: Node[] = entities.map((e) => ({
+      id: e.id,
+      type: "entity",
+      position: e.position,
+      data: { entityId: e.id },
+      selected: e.id === selectedEntityId,
+      className: connectFrom === e.id ? "rf-connect-source" : undefined,
+    }));
+    const viewNodes: Node[] = (views ?? []).map((v) => ({
+      id: v.id,
+      type: "view",
+      position: v.position,
+      data: { viewId: v.id },
+      selected: v.id === selectedViewId,
+    }));
+    return [...entityNodes, ...viewNodes];
+  }, [entities, views, selectedEntityId, selectedViewId, connectFrom]);
 
   const edges = useMemo(() => buildEdges(model, selectedRelId), [model, selectedRelId]);
 
@@ -155,6 +175,10 @@ function CanvasInner() {
 
   const onNodeClick: NodeMouseHandler = useCallback(
     (_, node) => {
+      if (node.type === "view") {
+        select({ kind: "view", id: node.id });
+        return;
+      }
       if (canvasMode === "add-relationship") {
         if (!connectFrom) {
           setConnectFrom(node.id);

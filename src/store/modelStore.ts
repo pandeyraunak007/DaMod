@@ -1,16 +1,25 @@
 import { create } from "zustand";
 import {
+  type DbDialect,
   type Entity,
   type Field,
+  type Index,
   type Model,
   type Notation,
   type Position,
+  type RawObject,
   type Relationship,
+  type Sequence,
+  type View,
   findEntity,
   findField,
   newEntity,
   newField,
+  newIndex,
   newModel,
+  newRawObject,
+  newSequence,
+  newView,
 } from "../model/model";
 import { paramShape, withTypeDefaults } from "../model/dataTypes";
 import {
@@ -39,6 +48,10 @@ const HISTORY_LIMIT = 100; // FR-4.5 asks for at least 50 steps.
 export type Selection =
   | { kind: "entity"; id: string }
   | { kind: "relationship"; id: string }
+  | { kind: "view"; id: string }
+  | { kind: "index"; id: string }
+  | { kind: "sequence"; id: string }
+  | { kind: "rawObject"; id: string }
   | null;
 
 export interface Notice {
@@ -85,6 +98,20 @@ interface ModelStore {
   deleteField: (entityId: string, fieldId: string) => void;
   reorderField: (entityId: string, from: number, to: number) => void;
   syncFields: (entityId: string, sourceFields: Field[]) => number;
+
+  // other database objects (views, indexes, sequences, raw objects)
+  createView: (position?: Position) => string;
+  updateView: (id: string, patch: Partial<View>) => void;
+  deleteView: (id: string) => void;
+  createIndex: (entityId: string) => string | null;
+  updateIndex: (id: string, patch: Partial<Index>) => void;
+  deleteIndex: (id: string) => void;
+  createSequence: () => string;
+  updateSequence: (id: string, patch: Partial<Sequence>) => void;
+  deleteSequence: (id: string) => void;
+  createRawObject: (dialect: DbDialect) => string;
+  updateRawObject: (id: string, patch: Partial<RawObject>) => void;
+  deleteRawObject: (id: string) => void;
 
   // relationships
   openRelationshipDraft: (source: string, target: string) => void;
@@ -356,6 +383,99 @@ export const useModelStore = create<ModelStore>((set, get) => {
       return added;
     },
 
+    createView: (position) => {
+      const state = get();
+      const taken = new Set((state.model.views ?? []).map((v) => v.name));
+      const count = state.model.views?.length ?? 0;
+      const pos = position ?? { x: 120 + (count % 4) * 260, y: 520 + Math.floor(count / 4) * 180 };
+      const view = newView(uniqueName("new_view", taken), pos);
+      commit((m) => {
+        m.views = [...(m.views ?? []), view];
+      });
+      set({ selection: { kind: "view", id: view.id } });
+      return view.id;
+    },
+    updateView: (id, patch) => {
+      commit((m) => {
+        m.views = (m.views ?? []).map((v) => (v.id === id ? { ...v, ...patch } : v));
+      });
+    },
+    deleteView: (id) => {
+      commit((m) => {
+        m.views = (m.views ?? []).filter((v) => v.id !== id);
+      });
+      set((s) => (s.selection?.kind === "view" && s.selection.id === id ? { selection: null } : {}));
+    },
+
+    createIndex: (entityId) => {
+      const entity = findEntity(get().model, entityId);
+      if (!entity) return null;
+      const taken = new Set((get().model.indexes ?? []).map((i) => i.name));
+      const index = newIndex(uniqueName(`idx_${entity.name.toLowerCase()}`, taken), entityId);
+      commit((m) => {
+        m.indexes = [...(m.indexes ?? []), index];
+      });
+      set({ selection: { kind: "index", id: index.id } });
+      return index.id;
+    },
+    updateIndex: (id, patch) => {
+      commit((m) => {
+        m.indexes = (m.indexes ?? []).map((i) => (i.id === id ? { ...i, ...patch } : i));
+      });
+    },
+    deleteIndex: (id) => {
+      commit((m) => {
+        m.indexes = (m.indexes ?? []).filter((i) => i.id !== id);
+      });
+      set((s) => (s.selection?.kind === "index" && s.selection.id === id ? { selection: null } : {}));
+    },
+
+    createSequence: () => {
+      const taken = new Set((get().model.sequences ?? []).map((s) => s.name));
+      const seq = newSequence(uniqueName("new_seq", taken));
+      commit((m) => {
+        m.sequences = [...(m.sequences ?? []), seq];
+      });
+      set({ selection: { kind: "sequence", id: seq.id } });
+      return seq.id;
+    },
+    updateSequence: (id, patch) => {
+      commit((m) => {
+        m.sequences = (m.sequences ?? []).map((s) => (s.id === id ? { ...s, ...patch } : s));
+      });
+    },
+    deleteSequence: (id) => {
+      commit((m) => {
+        m.sequences = (m.sequences ?? []).filter((s) => s.id !== id);
+      });
+      set((s) =>
+        s.selection?.kind === "sequence" && s.selection.id === id ? { selection: null } : {},
+      );
+    },
+
+    createRawObject: (dialect) => {
+      const taken = new Set((get().model.rawObjects ?? []).map((o) => o.name));
+      const obj = newRawObject(uniqueName(`new_${dialect}_object`, taken), dialect);
+      commit((m) => {
+        m.rawObjects = [...(m.rawObjects ?? []), obj];
+      });
+      set({ selection: { kind: "rawObject", id: obj.id } });
+      return obj.id;
+    },
+    updateRawObject: (id, patch) => {
+      commit((m) => {
+        m.rawObjects = (m.rawObjects ?? []).map((o) => (o.id === id ? { ...o, ...patch } : o));
+      });
+    },
+    deleteRawObject: (id) => {
+      commit((m) => {
+        m.rawObjects = (m.rawObjects ?? []).filter((o) => o.id !== id);
+      });
+      set((s) =>
+        s.selection?.kind === "rawObject" && s.selection.id === id ? { selection: null } : {},
+      );
+    },
+
     openRelationshipDraft: (source, target) =>
       set({ relationshipDraft: { source, target } }),
 
@@ -401,7 +521,12 @@ export const useModelStore = create<ModelStore>((set, get) => {
         const next = structuredClone(s.model);
         for (const u of updates) {
           const e = findEntity(next, u.id);
-          if (e) e.position = u.position;
+          if (e) {
+            e.position = u.position;
+            continue;
+          }
+          const v = next.views?.find((view) => view.id === u.id);
+          if (v) v.position = u.position;
         }
         return { model: next };
       });
