@@ -193,13 +193,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       if (active?.model) useModelStore.getState().loadModel(active.model);
 
       await appStateSet(JSON.stringify({ lastWorkspace: path }));
-
-      // Empty folder: seed a starter model so there is always something to edit.
-      if (tabs.length === 0) {
-        await get().newModel("untitled");
-      } else {
-        await writeWorkspaceMeta();
-      }
+      await writeWorkspaceMeta();
+      // An empty folder leaves activeId null; the UI prompts to create the first
+      // model (choosing its level) rather than silently seeding one.
     },
 
     restoreLastWorkspace: async () => {

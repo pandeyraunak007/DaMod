@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useModelStore } from "../store/modelStore";
 import { useWorkspaceStore } from "../store/workspaceStore";
 import { fieldTypeLabel } from "../model/fieldDisplay";
@@ -12,18 +12,34 @@ const LEVEL_BADGE: Record<ModelLevel, string> = {
   Physical: "P",
 };
 
+interface MenuItem {
+  label: string;
+  danger?: boolean;
+  onClick: () => void;
+}
+type OpenMenu = (x: number, y: number, items: MenuItem[]) => void;
+
+interface ExplorerProps {
+  onNewModel: () => void;
+  onDeleteModel: (id: string, name: string) => void;
+}
+
 // The dockable workspace tree (FR-12): Workspace → Models → Entities /
-// Relationships / Fields, plus a Semantic node. Clicking navigates and centres;
-// a filter hides non-matching nodes across every model.
-export function ModelExplorer() {
+// Relationships / Fields, plus a Semantic node. Nodes navigate (click), rename
+// (double-click) and can create/delete metaobjects via + buttons and a
+// right-click menu (FR-12.6).
+export function ModelExplorer({ onNewModel, onDeleteModel }: ExplorerProps) {
   const path = useWorkspaceStore((s) => s.path);
   const tabs = useWorkspaceStore((s) => s.tabs);
   const activeId = useWorkspaceStore((s) => s.activeId);
   const switchTab = useWorkspaceStore((s) => s.switchTab);
+  const duplicateModel = useWorkspaceStore((s) => s.duplicateModel);
   const activeModel = useModelStore((s) => s.model);
 
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState(false);
+  const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
+  const openMenu: OpenMenu = (x, y, items) => setMenu({ x, y, items });
 
   // Expansion state, persisted per workspace (FR-12.3).
   const storageKey = path ? `damod.explorer.${path}` : "damod.explorer.none";
@@ -57,7 +73,6 @@ export function ModelExplorer() {
 
   const q = query.trim().toLowerCase();
   const filtering = q.length > 0;
-
   const isOpen = (key: string) => filtering || expanded.has(key);
   const toggle = (key: string) =>
     setExpanded((prev) => {
@@ -65,6 +80,7 @@ export function ModelExplorer() {
       next.has(key) ? next.delete(key) : next.add(key);
       return next;
     });
+  const expand = (key: string) => setExpanded((prev) => new Set(prev).add(key));
 
   const expandAll = () => {
     const keys = new Set<string>(["ws"]);
@@ -80,13 +96,30 @@ export function ModelExplorer() {
   };
   const collapseAll = () => setExpanded(new Set());
 
-  const revealEntity = async (tabId: string, entityId: string) => {
+  // --- actions (switch to the node's model tab first) ---
+  const ensureActive = async (tabId: string) => {
     if (tabId !== activeId) await switchTab(tabId);
-    useModelStore.getState().revealEntity(entityId);
   };
-  const revealRelationship = async (tabId: string, relId: string) => {
-    if (tabId !== activeId) await switchTab(tabId);
-    useModelStore.getState().revealRelationship(relId);
+  const addEntity = async (tabId: string) => {
+    await ensureActive(tabId);
+    useModelStore.getState().createEntity();
+    expand(`m:${tabId}`);
+    expand(`m:${tabId}:ents`);
+  };
+  const addField = async (tabId: string, entityId: string) => {
+    await ensureActive(tabId);
+    useModelStore.getState().addField(entityId);
+    useModelStore.getState().revealEntity(entityId);
+    expand(`e:${tabId}:${entityId}`);
+  };
+  const addRelationship = async (tabId: string) => {
+    await ensureActive(tabId);
+    const model = useModelStore.getState().model;
+    if (model.entities.length < 2) {
+      useModelStore.getState().pushNotice("Add at least two entities before a relationship.");
+      return;
+    }
+    useModelStore.getState().openRelationshipDraft(model.entities[0].id, model.entities[1].id);
   };
 
   if (collapsed) {
@@ -100,7 +133,7 @@ export function ModelExplorer() {
   }
 
   return (
-    <aside className="explorer">
+    <aside className="explorer" onClick={() => menu && setMenu(null)}>
       <div className="explorer__head">
         <span className="explorer__title">Explorer</span>
         <div className="explorer__head-actions">
@@ -129,6 +162,11 @@ export function ModelExplorer() {
           hasChildren
           label={<span className="tree__ws">Workspace</span>}
           onToggle={() => toggle("ws")}
+          actions={
+            <RowAction title="New model" onClick={onNewModel}>
+              +
+            </RowAction>
+          }
         />
         {isOpen("ws") &&
           models.map((m) =>
@@ -149,13 +187,34 @@ export function ModelExplorer() {
                 filtering={filtering}
                 isOpen={isOpen}
                 toggle={toggle}
-                onRevealEntity={revealEntity}
-                onRevealRelationship={revealRelationship}
+                openMenu={openMenu}
                 onSwitch={switchTab}
+                onAddEntity={() => addEntity(m.tabId)}
+                onAddField={(eid) => addField(m.tabId, eid)}
+                onAddRelationship={() => addRelationship(m.tabId)}
+                onDuplicateModel={() => duplicateModel(m.tabId)}
+                onDeleteModel={() => onDeleteModel(m.tabId, m.model!.name)}
               />
             ),
           )}
       </div>
+
+      {menu && (
+        <div className="ctx" style={{ left: menu.x, top: menu.y }} onClick={(e) => e.stopPropagation()}>
+          {menu.items.map((it, i) => (
+            <button
+              key={i}
+              className={`ctx__item ${it.danger ? "ctx__item--danger" : ""}`}
+              onClick={() => {
+                setMenu(null);
+                it.onClick();
+              }}
+            >
+              {it.label}
+            </button>
+          ))}
+        </div>
+      )}
     </aside>
   );
 }
@@ -172,9 +231,13 @@ function ModelBranch({
   filtering,
   isOpen,
   toggle,
-  onRevealEntity,
-  onRevealRelationship,
+  openMenu,
   onSwitch,
+  onAddEntity,
+  onAddField,
+  onAddRelationship,
+  onDuplicateModel,
+  onDeleteModel,
 }: {
   tabId: string;
   model: Model;
@@ -183,12 +246,15 @@ function ModelBranch({
   filtering: boolean;
   isOpen: (k: string) => boolean;
   toggle: (k: string) => void;
-  onRevealEntity: (tabId: string, entityId: string) => void;
-  onRevealRelationship: (tabId: string, relId: string) => void;
+  openMenu: OpenMenu;
   onSwitch: (tabId: string) => void;
+  onAddEntity: () => void;
+  onAddField: (entityId: string) => void;
+  onAddRelationship: () => void;
+  onDuplicateModel: () => void;
+  onDeleteModel: () => void;
 }) {
   const entityName = (id: string) => model.entities.find((e) => e.id === id)?.name ?? "?";
-
   const entityMatches = (e: Model["entities"][number]) =>
     !filtering || matches(e.name, q) || e.fields.some((f) => matches(f.name, q));
   const relText = (r: Model["relationships"][number]) =>
@@ -199,6 +265,15 @@ function ModelBranch({
   const anyRel = model.relationships.some(relMatches);
   if (filtering && !matches(model.name, q) && !anyEntity && !anyRel) return null;
 
+  const modelMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    openMenu(e.clientX, e.clientY, [
+      { label: "Add entity", onClick: onAddEntity },
+      { label: "Duplicate model", onClick: onDuplicateModel },
+      { label: "Delete model", danger: true, onClick: onDeleteModel },
+    ]);
+  };
+
   return (
     <>
       <TreeRow
@@ -206,6 +281,7 @@ function ModelBranch({
         open={isOpen(`m:${tabId}`)}
         hasChildren
         active={active}
+        onContextMenu={modelMenu}
         label={
           <>
             <span className="tree__badge">{LEVEL_BADGE[model.level]}</span>
@@ -224,6 +300,11 @@ function ModelBranch({
             hasChildren
             label={<span className="tree__group">Entities ({model.entities.length})</span>}
             onToggle={() => toggle(`m:${tabId}:ents`)}
+            actions={
+              <RowAction title="Add entity" onClick={onAddEntity}>
+                +
+              </RowAction>
+            }
           />
           {isOpen(`m:${tabId}:ents`) &&
             model.entities.filter(entityMatches).map((e) => (
@@ -236,7 +317,9 @@ function ModelBranch({
                 filtering={filtering}
                 open={isOpen(`e:${tabId}:${e.id}`)}
                 onToggle={() => toggle(`e:${tabId}:${e.id}`)}
-                onReveal={() => onRevealEntity(tabId, e.id)}
+                openMenu={openMenu}
+                onAddField={() => onAddField(e.id)}
+                onAddRelationship={onAddRelationship}
               />
             ))}
 
@@ -247,15 +330,15 @@ function ModelBranch({
             hasChildren
             label={<span className="tree__group">Relationships ({model.relationships.length})</span>}
             onToggle={() => toggle(`m:${tabId}:rels`)}
+            actions={
+              <RowAction title="Add relationship" onClick={onAddRelationship}>
+                +
+              </RowAction>
+            }
           />
           {isOpen(`m:${tabId}:rels`) &&
             model.relationships.filter(relMatches).map((r) => (
-              <TreeRow
-                key={r.id}
-                depth={3}
-                label={<span className="tree__rel">{relText(r)}</span>}
-                onClick={() => onRevealRelationship(tabId, r.id)}
-              />
+              <RelationshipRow key={r.id} tabId={tabId} relId={r.id} text={relText(r)} openMenu={openMenu} />
             ))}
 
           {/* Semantic (populated in Phase 4) */}
@@ -280,13 +363,16 @@ function ModelBranch({
 }
 
 function EntityBranch({
+  tabId,
   model,
   entity,
   q,
   filtering,
   open,
   onToggle,
-  onReveal,
+  openMenu,
+  onAddField,
+  onAddRelationship,
 }: {
   tabId: string;
   model: Model;
@@ -295,13 +381,39 @@ function EntityBranch({
   filtering: boolean;
   open: boolean;
   onToggle: () => void;
-  onReveal: () => void;
+  openMenu: OpenMenu;
+  onAddField: () => void;
+  onAddRelationship: () => void;
 }) {
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState(entity.name);
-  const renameEntity = useModelStore((s) => s.renameEntity);
+  const switchTab = useWorkspaceStore((s) => s.switchTab);
+  const activeId = useWorkspaceStore((s) => s.activeId);
+
+  const reveal = async () => {
+    if (tabId !== activeId) await switchTab(tabId);
+    useModelStore.getState().revealEntity(entity.id);
+  };
+  const commitRename = () => {
+    useModelStore.getState().renameEntity(entity.id, draft);
+    setRenaming(false);
+  };
+  const deleteEntity = async () => {
+    if (tabId !== activeId) await switchTab(tabId);
+    useModelStore.getState().deleteEntity(entity.id);
+  };
 
   const fields = entity.fields.filter((f) => !filtering || matches(f.name, q) || matches(entity.name, q));
+
+  const entityMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    openMenu(e.clientX, e.clientY, [
+      { label: "Add field", onClick: onAddField },
+      { label: "Add relationship", onClick: onAddRelationship },
+      { label: "Rename", onClick: () => (setDraft(entity.name), setRenaming(true)) },
+      { label: "Delete entity", danger: true, onClick: deleteEntity },
+    ]);
+  };
 
   return (
     <>
@@ -310,7 +422,13 @@ function EntityBranch({
         open={open}
         hasChildren={entity.fields.length > 0}
         onToggle={onToggle}
-        onClick={onReveal}
+        onClick={reveal}
+        onContextMenu={entityMenu}
+        actions={
+          <RowAction title="Add field" onClick={onAddField}>
+            +
+          </RowAction>
+        }
         label={
           renaming ? (
             <input
@@ -318,15 +436,10 @@ function EntityBranch({
               className="tree__rename"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              onBlur={() => {
-                renameEntity(entity.id, draft);
-                setRenaming(false);
-              }}
+              onBlur={commitRename}
+              onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  renameEntity(entity.id, draft);
-                  setRenaming(false);
-                }
+                if (e.key === "Enter") commitRename();
                 if (e.key === "Escape") setRenaming(false);
               }}
             />
@@ -349,7 +462,7 @@ function EntityBranch({
           <TreeRow
             key={f.id}
             depth={4}
-            onClick={onReveal}
+            onClick={reveal}
             label={
               <span className="tree__field">
                 <span className="tree__field-key">{f.primaryKey ? "🔑" : f.unique ? "◈" : "•"}</span>
@@ -363,28 +476,92 @@ function EntityBranch({
   );
 }
 
+function RelationshipRow({
+  tabId,
+  relId,
+  text,
+  openMenu,
+}: {
+  tabId: string;
+  relId: string;
+  text: string;
+  openMenu: OpenMenu;
+}) {
+  const switchTab = useWorkspaceStore((s) => s.switchTab);
+  const activeId = useWorkspaceStore((s) => s.activeId);
+
+  const reveal = async () => {
+    if (tabId !== activeId) await switchTab(tabId);
+    useModelStore.getState().revealRelationship(relId);
+  };
+  const menu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    openMenu(e.clientX, e.clientY, [
+      {
+        label: "Delete relationship",
+        danger: true,
+        onClick: async () => {
+          if (tabId !== activeId) await switchTab(tabId);
+          useModelStore.getState().deleteRelationship(relId);
+        },
+      },
+    ]);
+  };
+  return (
+    <TreeRow depth={3} label={<span className="tree__rel">{text}</span>} onClick={reveal} onContextMenu={menu} />
+  );
+}
+
+function RowAction({
+  title,
+  onClick,
+  children,
+}: {
+  title: string;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      className="tree-row__add"
+      title={title}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 function TreeRow({
   depth,
   label,
   open,
   hasChildren,
   active,
+  actions,
   onToggle,
   onClick,
+  onContextMenu,
 }: {
   depth: number;
-  label: React.ReactNode;
+  label: ReactNode;
   open?: boolean;
   hasChildren?: boolean;
   active?: boolean;
+  actions?: ReactNode;
   onToggle?: () => void;
   onClick?: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }) {
   return (
     <div
       className={`tree-row ${active ? "tree-row--active" : ""}`}
       style={{ paddingLeft: 4 + depth * 14 }}
       onClick={onClick}
+      onContextMenu={onContextMenu}
     >
       {hasChildren ? (
         <button
@@ -400,6 +577,7 @@ function TreeRow({
         <span className="tree-row__caret tree-row__caret--empty" />
       )}
       <span className="tree-row__label">{label}</span>
+      {actions && <span className="tree-row__actions">{actions}</span>}
     </div>
   );
 }

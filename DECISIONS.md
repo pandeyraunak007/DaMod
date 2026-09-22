@@ -5,6 +5,35 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-09-22 — ERwin-style workflow: model-type-first + Explorer authoring
+
+Author asked for a workflow closer to ERwin Data Modeler: decide the model type
+on open and have the Model Explorer be where metaobjects are added.
+
+### Start with the model type (not a blank canvas)
+- **What:** With no workspace open the app shows a **Welcome** screen (New model /
+  Open workspace) instead of a blank canvas. **New model** leads with the level
+  choice (Conceptual / Logical / Physical/Logical / Physical) as selectable cards,
+  then a name, then — only when no workspace is open yet — a folder to keep models
+  in. The canvas opens at the chosen level.
+- **Why:** Matches a data modeler's "File → New → pick type" flow. The level is the
+  first, most prominent decision because it changes everything downstream (FR-11).
+- **Change:** Removed the silent `untitled` model that an empty workspace used to
+  seed. An empty workspace now shows a "create your first model" prompt.
+- **Constraint kept:** A model still lives in a workspace folder (our persistence
+  unit), so New-model-without-a-workspace asks for a folder once. Subsequent models
+  go straight into the open workspace.
+
+### Explorer authors metaobjects (FR-12.6)
+- **What:** The Model Explorer gained inline **+** buttons (＋Model on Workspace,
+  ＋Entity on the Entities group, ＋Field on an entity, ＋Relationship on the
+  Relationships group) and a **right-click context menu** per node (add / rename /
+  duplicate / delete). Actions switch to the node's model tab first.
+- **Why:** The Explorer becomes the primary place to build and manage the model
+  tree, as in ERwin, not just to navigate it.
+- **Not done:** link/validation badges on tree nodes (FR-12.7) still wait for
+  Phase 3 when links and validation exist.
+
 ## 2026-09-22 — Phase 1 additions (FR-11 levels, FR-12 Explorer) + Phase 2 (FR-1, FR-5)
 
 Spec v2 added modeling levels and the Model Explorer to Phase 1. Per the author's

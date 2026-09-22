@@ -7,6 +7,7 @@ import { NewModelDialog } from "./workspace/NewModelDialog";
 import { HistoryDialog } from "./workspace/HistoryDialog";
 import { ExternalChangeBanner } from "./workspace/ExternalChangeBanner";
 import { ModelExplorer } from "./explorer/ModelExplorer";
+import { Welcome } from "./workspace/Welcome";
 import { Canvas } from "./canvas/Canvas";
 import { SidePanel } from "./panels/SidePanel";
 import { RelationshipDialog } from "./panels/RelationshipDialog";
@@ -34,6 +35,7 @@ export default function App() {
 
   const tabs = useWorkspaceStore((s) => s.tabs);
   const activeId = useWorkspaceStore((s) => s.activeId);
+  const wsPath = useWorkspaceStore((s) => s.path);
   const activeTab = tabs.find((t) => t.id === activeId);
 
   // Restore the last workspace on startup (FR-1.1).
@@ -86,26 +88,45 @@ export default function App() {
       <Toolbar onNewModel={() => setNewModelOpen(true)} onOpenHistory={() => setHistoryOpen(true)} />
       <TabBar onDeleteModel={(id, name) => setDeleteModel({ id, name })} />
       <ExternalChangeBanner />
-      <div className="app__body">
-        <ModelExplorer />
-        <div className="app__canvas">
-          {activeTab?.loadError ? (
-            <div className="canvas-error">
-              <p className="canvas-error__title">Couldn't open {activeTab.fileName}</p>
-              <p className="canvas-error__reason">{activeTab.loadError}</p>
-              <button
-                className="btn"
-                onClick={() => useWorkspaceStore.getState().reloadFromDisk(activeTab.id)}
-              >
-                Retry
-              </button>
-            </div>
-          ) : (
-            <Canvas />
-          )}
+      {!wsPath ? (
+        <div className="app__body">
+          <Welcome onNewModel={() => setNewModelOpen(true)} />
         </div>
-        <SidePanel />
-      </div>
+      ) : (
+        <div className="app__body">
+          <ModelExplorer
+            onNewModel={() => setNewModelOpen(true)}
+            onDeleteModel={(id, name) => setDeleteModel({ id, name })}
+          />
+          <div className="app__canvas">
+            {activeTab?.loadError ? (
+              <div className="canvas-error">
+                <p className="canvas-error__title">Couldn't open {activeTab.fileName}</p>
+                <p className="canvas-error__reason">{activeTab.loadError}</p>
+                <button
+                  className="btn"
+                  onClick={() => useWorkspaceStore.getState().reloadFromDisk(activeTab.id)}
+                >
+                  Retry
+                </button>
+              </div>
+            ) : activeId ? (
+              <Canvas />
+            ) : (
+              <div className="canvas-error">
+                <p className="canvas-error__title">No models yet</p>
+                <p className="canvas-error__reason">
+                  Create your first model and choose its type to open the canvas.
+                </p>
+                <button className="btn btn--primary" onClick={() => setNewModelOpen(true)}>
+                  New model
+                </button>
+              </div>
+            )}
+          </div>
+          <SidePanel />
+        </div>
+      )}
 
       <NoticeToasts />
 
