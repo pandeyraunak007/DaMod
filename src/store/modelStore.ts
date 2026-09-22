@@ -29,6 +29,7 @@ import {
   usesLogicalTypes,
   usesPhysicalTypes,
 } from "../model/levels";
+import type { Ref } from "../links/links";
 import { validateIdentifier } from "../model/identifiers";
 import { newId } from "../lib/ids";
 
@@ -57,6 +58,7 @@ interface ModelStore {
   notices: Notice[];
   focus: FocusRequest | null;
   relationshipDraft: { source: string; target: string } | null;
+  linkDraft: Ref | null;
   _dragSnapshot: Model | null;
 
   // model
@@ -74,10 +76,13 @@ interface ModelStore {
   updateField: (entityId: string, fieldId: string, patch: Partial<Field>) => void;
   deleteField: (entityId: string, fieldId: string) => void;
   reorderField: (entityId: string, from: number, to: number) => void;
+  syncFields: (entityId: string, sourceFields: Field[]) => number;
 
   // relationships
   openRelationshipDraft: (source: string, target: string) => void;
   closeRelationshipDraft: () => void;
+  openLinkDraft: (ref: Ref) => void;
+  closeLinkDraft: () => void;
   createRelationship: (params: CreateRelationshipInput) => CreateRelationshipResult;
   updateRelationship: (id: string, patch: Partial<Relationship>) => void;
   deleteRelationship: (id: string) => void;
@@ -175,6 +180,7 @@ export const useModelStore = create<ModelStore>((set, get) => {
     notices: [],
     focus: null,
     relationshipDraft: null,
+    linkDraft: null,
     _dragSnapshot: null,
 
     setModelName: (name) => {
@@ -313,10 +319,30 @@ export const useModelStore = create<ModelStore>((set, get) => {
       });
     },
 
+    // Copy fields that exist on a source (canonical) entity but not here, by name
+    // (FR-6.10). Always explicit. Returns how many fields were added.
+    syncFields: (entityId, sourceFields) => {
+      let added = 0;
+      commit((m) => {
+        const entity = findEntity(m, entityId);
+        if (!entity) return;
+        const have = new Set(entity.fields.map((f) => f.name));
+        for (const src of sourceFields) {
+          if (have.has(src.name)) continue;
+          entity.fields.push({ ...structuredClone(src), id: newId("field") });
+          added++;
+        }
+      });
+      return added;
+    },
+
     openRelationshipDraft: (source, target) =>
       set({ relationshipDraft: { source, target } }),
 
     closeRelationshipDraft: () => set({ relationshipDraft: null }),
+
+    openLinkDraft: (ref) => set({ linkDraft: ref }),
+    closeLinkDraft: () => set({ linkDraft: null }),
 
     createRelationship: (params) => {
       const result = createRelationshipOp(get().model, params);
@@ -455,6 +481,7 @@ export const useModelStore = create<ModelStore>((set, get) => {
         notices: [],
         focus: null,
         relationshipDraft: null,
+        linkDraft: null,
       }),
   };
 });

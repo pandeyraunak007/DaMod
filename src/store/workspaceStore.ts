@@ -33,6 +33,15 @@ import {
 } from "../persist/fs";
 import { validateIdentifier } from "../model/identifiers";
 import { newId } from "../lib/ids";
+import {
+  type ConceptGroup,
+  type Link,
+  type LinksDoc,
+  type Ref,
+  emptyLinksDoc,
+  removeLinksTouching,
+} from "../links/links";
+import { serializeLinks, parseLinksFile } from "../links/linksPersist";
 
 const AUTOSAVE_MS = 2000; // FR-5.4
 
@@ -54,6 +63,7 @@ interface WorkspaceState {
   tabs: Tab[];
   activeId: string | null;
   saving: boolean;
+  links: LinksDoc;
 
   openWorkspacePicker: () => Promise<void>;
   openWorkspace: (path: string) => Promise<void>;
@@ -69,6 +79,14 @@ interface WorkspaceState {
   keepMine: (id: string) => Promise<void>;
   restoreHistory: (file: string) => Promise<void>;
   isActiveDirty: () => boolean;
+
+  // cross-model links (FR-6)
+  allModels: () => { id: string; name: string; model: Model }[];
+  addLink: (link: Link) => void;
+  deleteLink: (id: string) => void;
+  upsertConceptGroup: (group: ConceptGroup) => void;
+  deleteConceptGroup: (id: string) => void;
+  removeLinksForRef: (ref: Ref) => Link[];
 }
 
 function nowIso(): string {
@@ -102,6 +120,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     await writeFile(joinPath(path, WORKSPACE_FILE), serializeWorkspace(meta), false);
   }
 
+  /** Update links state and persist links.json (FR-6.5). */
+  function commitLinks(doc: LinksDoc): void {
+    set({ links: doc });
+    const { path } = get();
+    if (path) {
+      void writeFile(joinPath(path, LINKS_FILE), serializeLinks(doc), false).catch(() => {});
+    }
+  }
+
   /** Load a valid tab's model into the editor; sync the previously active tab back. */
   function activate(id: string): void {
     const { tabs, activeId } = get();
@@ -126,6 +153,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     tabs: [],
     activeId: null,
     saving: false,
+    links: emptyLinksDoc(),
 
     openWorkspacePicker: async () => {
       const dir = await pickWorkspaceFolder();
@@ -141,6 +169,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       }
       if (listing.semantic == null) {
         await writeFile(joinPath(path, SEMANTIC_FILE), emptySemanticFile(), false);
+      }
+
+      // Load cross-model links (FR-6.5). A malformed file surfaces a notice and
+      // is left untouched (FR-5.7); the workspace still opens.
+      let links = emptyLinksDoc();
+      if (listing.links != null) {
+        const parsedLinks = parseLinksFile(listing.links);
+        if (parsedLinks.ok) links = parsedLinks.value;
+        else useModelStore.getState().pushNotice(`links.json: ${parsedLinks.error}`);
       }
 
       let meta: Partial<WorkspaceMeta> = {};
@@ -189,7 +226,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       const firstValid = tabs.find((t) => !t.loadError);
       const active = activeFromMeta && !activeFromMeta.loadError ? activeFromMeta : firstValid;
 
-      set({ path, name, createdAt, tabs, activeId: active?.id ?? tabs[0]?.id ?? null });
+      set({ path, name, createdAt, tabs, links, activeId: active?.id ?? tabs[0]?.id ?? null });
       if (active?.model) useModelStore.getState().loadModel(active.model);
 
       await appStateSet(JSON.stringify({ lastWorkspace: path }));
@@ -417,6 +454,56 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       const tab = activeTab();
       if (!tab || tab.loadError) return false;
       return serializeModel(useModelStore.getState().model) !== tab.lastSavedText;
+    },
+
+    allModels: () => {
+      const { tabs, activeId } = get();
+      const active = useModelStore.getState().model;
+      const out: { id: string; name: string; model: Model }[] = [];
+      for (const t of tabs) {
+        const m = t.id === activeId ? active : t.model;
+        if (m && !t.loadError) out.push({ id: m.id, name: m.name, model: m });
+      }
+      return out;
+    },
+
+    addLink: (link) => {
+      const doc = get().links;
+      commitLinks({ ...doc, links: [...doc.links, link] });
+    },
+
+    deleteLink: (id) => {
+      const doc = get().links;
+      commitLinks({ ...doc, links: doc.links.filter((l) => l.id !== id) });
+    },
+
+    upsertConceptGroup: (group) => {
+      const doc = get().links;
+      const exists = doc.conceptGroups.some((g) => g.id === group.id);
+      commitLinks({
+        ...doc,
+        conceptGroups: exists
+          ? doc.conceptGroups.map((g) => (g.id === group.id ? group : g))
+          : [...doc.conceptGroups, group],
+      });
+    },
+
+    deleteConceptGroup: (id) => {
+      const doc = get().links;
+      commitLinks({ ...doc, conceptGroups: doc.conceptGroups.filter((g) => g.id !== id) });
+    },
+
+    removeLinksForRef: (ref) => {
+      const doc = get().links;
+      const { kept, removed } = removeLinksTouching(doc.links, ref);
+      // Drop concept groups whose canonical entity is the one being deleted.
+      const conceptGroups = ref.field
+        ? doc.conceptGroups
+        : doc.conceptGroups.filter(
+            (g) => !(g.canonical.model === ref.model && g.canonical.entity === ref.entity),
+          );
+      commitLinks({ ...doc, links: kept, conceptGroups });
+      return removed;
     },
   };
 });

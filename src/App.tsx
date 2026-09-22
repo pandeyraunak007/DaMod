@@ -8,11 +8,15 @@ import { HistoryDialog } from "./workspace/HistoryDialog";
 import { ExternalChangeBanner } from "./workspace/ExternalChangeBanner";
 import { ModelExplorer } from "./explorer/ModelExplorer";
 import { Welcome } from "./workspace/Welcome";
+import { ValidationPanel } from "./validation/ValidationPanel";
+import { WorkspaceMap } from "./links/WorkspaceMap";
 import { Canvas } from "./canvas/Canvas";
 import { SidePanel } from "./panels/SidePanel";
 import { RelationshipDialog } from "./panels/RelationshipDialog";
+import { LinkDialog } from "./links/LinkDialog";
 import { useModelStore } from "./store/modelStore";
 import { useWorkspaceStore } from "./store/workspaceStore";
+import { linksTouching } from "./links/links";
 
 function isEditableTarget(el: EventTarget | null): boolean {
   const node = el as HTMLElement | null;
@@ -25,11 +29,14 @@ export default function App() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [newModelOpen, setNewModelOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
   const [deleteModel, setDeleteModel] = useState<{ id: string; name: string } | null>(null);
 
   const selection = useModelStore((s) => s.selection);
   const relationshipDraft = useModelStore((s) => s.relationshipDraft);
   const closeRelationshipDraft = useModelStore((s) => s.closeRelationshipDraft);
+  const linkDraft = useModelStore((s) => s.linkDraft);
+  const closeLinkDraft = useModelStore((s) => s.closeLinkDraft);
   const undo = useModelStore((s) => s.undo);
   const redo = useModelStore((s) => s.redo);
 
@@ -85,7 +92,11 @@ export default function App() {
 
   return (
     <div className="app">
-      <Toolbar onNewModel={() => setNewModelOpen(true)} onOpenHistory={() => setHistoryOpen(true)} />
+      <Toolbar
+        onNewModel={() => setNewModelOpen(true)}
+        onOpenHistory={() => setHistoryOpen(true)}
+        onOpenMap={() => setMapOpen(true)}
+      />
       <TabBar onDeleteModel={(id, name) => setDeleteModel({ id, name })} />
       <ExternalChangeBanner />
       {!wsPath ? (
@@ -127,12 +138,15 @@ export default function App() {
           <SidePanel />
         </div>
       )}
+      {wsPath && <ValidationPanel />}
 
       <NoticeToasts />
 
       {relationshipDraft && <RelationshipDialog onClose={closeRelationshipDraft} />}
+      {linkDraft && <LinkDialog from={linkDraft} onClose={closeLinkDraft} />}
       {newModelOpen && <NewModelDialog onClose={() => setNewModelOpen(false)} />}
       {historyOpen && <HistoryDialog onClose={() => setHistoryOpen(false)} />}
+      {mapOpen && <WorkspaceMap onClose={() => setMapOpen(false)} />}
       {confirmDelete && selection && <DeleteConfirm onClose={() => setConfirmDelete(false)} />}
       {deleteModel && (
         <DeleteModelConfirm
@@ -150,11 +164,14 @@ function DeleteConfirm({ onClose }: { onClose: () => void }) {
   const model = useModelStore((s) => s.model);
   const deleteEntity = useModelStore((s) => s.deleteEntity);
   const deleteRelationship = useModelStore((s) => s.deleteRelationship);
+  const links = useWorkspaceStore((s) => s.links);
+  const removeLinksForRef = useWorkspaceStore((s) => s.removeLinksForRef);
 
   if (!selection) return null;
 
   let title = "";
   let detail = "";
+  let linkCount = 0;
   if (selection.kind === "entity") {
     const entity = model.entities.find((e) => e.id === selection.id);
     const rels = model.relationships.filter(
@@ -163,18 +180,25 @@ function DeleteConfirm({ onClose }: { onClose: () => void }) {
         r.childEntity === selection.id ||
         r.junctionEntity === selection.id,
     );
+    linkCount = linksTouching(links.links, { model: model.id, entity: selection.id }).length;
     title = `Delete entity “${entity?.name ?? "?"}”?`;
-    detail = rels.length
-      ? `${rels.length} relationship${rels.length > 1 ? "s" : ""} (and any junction entity) will also be removed.`
-      : "It has no relationships.";
+    const parts: string[] = [];
+    if (rels.length)
+      parts.push(`${rels.length} relationship${rels.length > 1 ? "s" : ""} (and any junction entity)`);
+    if (linkCount) parts.push(`${linkCount} cross-model link${linkCount > 1 ? "s" : ""}`);
+    detail = parts.length ? `${parts.join(" and ")} will also be removed.` : "It has no relationships.";
   } else {
     title = "Delete this relationship?";
     detail = "The foreign-key field it created is left in place.";
   }
 
   const confirm = () => {
-    if (selection.kind === "entity") deleteEntity(selection.id);
-    else deleteRelationship(selection.id);
+    if (selection.kind === "entity") {
+      if (linkCount) removeLinksForRef({ model: model.id, entity: selection.id });
+      deleteEntity(selection.id);
+    } else {
+      deleteRelationship(selection.id);
+    }
     onClose();
   };
 

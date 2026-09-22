@@ -1,9 +1,22 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useModelStore } from "../store/modelStore";
 import { useWorkspaceStore } from "../store/workspaceStore";
 import { fieldTypeLabel } from "../model/fieldDisplay";
 import type { Model } from "../model/model";
 import type { ModelLevel } from "../model/levels";
+import { linksTouching } from "../links/links";
+import { validateWorkspace, type Severity } from "../validation/rules";
+
+export interface ExplorerMarks {
+  modelSeverity: (modelId: string) => Severity | null;
+  entitySeverity: (modelId: string, entityId: string) => Severity | null;
+  entityHasLink: (modelId: string, entityId: string) => boolean;
+}
+
+function sevDot(sev: Severity | null): ReactNode {
+  if (!sev) return null;
+  return <span className={`tree__sev tree__sev--${sev}`}>{sev === "error" ? "●" : "▲"}</span>;
+}
 
 const LEVEL_BADGE: Record<ModelLevel, string> = {
   Conceptual: "C",
@@ -34,6 +47,7 @@ export function ModelExplorer({ onNewModel, onDeleteModel }: ExplorerProps) {
   const activeId = useWorkspaceStore((s) => s.activeId);
   const switchTab = useWorkspaceStore((s) => s.switchTab);
   const duplicateModel = useWorkspaceStore((s) => s.duplicateModel);
+  const links = useWorkspaceStore((s) => s.links);
   const activeModel = useModelStore((s) => s.model);
 
   const [query, setQuery] = useState("");
@@ -70,6 +84,34 @@ export function ModelExplorer({ onNewModel, onDeleteModel }: ExplorerProps) {
       fileName: t.fileName,
       error: t.loadError,
     }));
+
+  const marks: ExplorerMarks = useMemo(() => {
+    const named = models
+      .filter((m) => m.model && !m.error)
+      .map((m) => ({ id: m.model!.id, name: m.model!.name, model: m.model! }));
+    const issues = validateWorkspace({
+      models: named,
+      links: links.links,
+      conceptGroups: links.conceptGroups,
+    });
+    const errM = new Set<string>();
+    const warnM = new Set<string>();
+    const errE = new Set<string>();
+    const warnE = new Set<string>();
+    for (const i of issues) {
+      if (i.target.model) (i.severity === "error" ? errM : warnM).add(i.target.model);
+      if (i.target.model && i.target.entity) {
+        (i.severity === "error" ? errE : warnE).add(`${i.target.model}:${i.target.entity}`);
+      }
+    }
+    return {
+      modelSeverity: (m) => (errM.has(m) ? "error" : warnM.has(m) ? "warning" : null),
+      entitySeverity: (m, e) =>
+        errE.has(`${m}:${e}`) ? "error" : warnE.has(`${m}:${e}`) ? "warning" : null,
+      entityHasLink: (m, e) => linksTouching(links.links, { model: m, entity: e }).length > 0,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabs, activeId, activeModel, links]);
 
   const q = query.trim().toLowerCase();
   const filtering = q.length > 0;
@@ -188,6 +230,7 @@ export function ModelExplorer({ onNewModel, onDeleteModel }: ExplorerProps) {
                 isOpen={isOpen}
                 toggle={toggle}
                 openMenu={openMenu}
+                marks={marks}
                 onSwitch={switchTab}
                 onAddEntity={() => addEntity(m.tabId)}
                 onAddField={(eid) => addField(m.tabId, eid)}
@@ -232,6 +275,7 @@ function ModelBranch({
   isOpen,
   toggle,
   openMenu,
+  marks,
   onSwitch,
   onAddEntity,
   onAddField,
@@ -247,6 +291,7 @@ function ModelBranch({
   isOpen: (k: string) => boolean;
   toggle: (k: string) => void;
   openMenu: OpenMenu;
+  marks: ExplorerMarks;
   onSwitch: (tabId: string) => void;
   onAddEntity: () => void;
   onAddField: (entityId: string) => void;
@@ -286,6 +331,7 @@ function ModelBranch({
           <>
             <span className="tree__badge">{LEVEL_BADGE[model.level]}</span>
             <span className="tree__model">{model.name}</span>
+            {sevDot(marks.modelSeverity(tabId))}
           </>
         }
         onToggle={() => toggle(`m:${tabId}`)}
@@ -318,6 +364,7 @@ function ModelBranch({
                 open={isOpen(`e:${tabId}:${e.id}`)}
                 onToggle={() => toggle(`e:${tabId}:${e.id}`)}
                 openMenu={openMenu}
+                marks={marks}
                 onAddField={() => onAddField(e.id)}
                 onAddRelationship={onAddRelationship}
               />
@@ -371,6 +418,7 @@ function EntityBranch({
   open,
   onToggle,
   openMenu,
+  marks,
   onAddField,
   onAddRelationship,
 }: {
@@ -382,6 +430,7 @@ function EntityBranch({
   open: boolean;
   onToggle: () => void;
   openMenu: OpenMenu;
+  marks: ExplorerMarks;
   onAddField: () => void;
   onAddRelationship: () => void;
 }) {
@@ -453,6 +502,8 @@ function EntityBranch({
               }}
             >
               {entity.name}
+              {marks.entityHasLink(tabId, entity.id) && <span className="tree__link"> 🔗</span>}
+              {sevDot(marks.entitySeverity(tabId, entity.id))}
             </span>
           )
         }

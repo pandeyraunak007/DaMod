@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useModelStore } from "../store/modelStore";
+import { useWorkspaceStore } from "../store/workspaceStore";
 import {
   DATA_TYPE_KINDS,
   paramShape,
@@ -15,6 +16,8 @@ import {
 } from "../model/levels";
 import { validateIdentifier } from "../model/identifiers";
 import type { Entity, Field } from "../model/model";
+import { componentFor, entityKey, linksTouching } from "../links/links";
+import { newId } from "../lib/ids";
 
 export function SidePanel() {
   const selection = useModelStore((s) => s.selection);
@@ -46,10 +49,12 @@ export function SidePanel() {
 function EntityEditor({ entity }: { entity: Entity }) {
   const entities = useModelStore((s) => s.model.entities);
   const level = useModelStore((s) => s.model.level);
+  const modelId = useModelStore((s) => s.model.id);
   const renameEntity = useModelStore((s) => s.renameEntity);
   const updateEntity = useModelStore((s) => s.updateEntity);
   const addField = useModelStore((s) => s.addField);
   const openRelationshipDraft = useModelStore((s) => s.openRelationshipDraft);
+  const openLinkDraft = useModelStore((s) => s.openLinkDraft);
 
   const [nameError, setNameError] = useState<string | null>(null);
 
@@ -135,11 +140,145 @@ function EntityEditor({ entity }: { entity: Entity }) {
         </div>
       </div>
 
-      <div className="editor__section">
+      <div className="editor__section editor__section--row">
         <button className="btn btn--small" onClick={startRelationship}>
-          + Relationship from {entity.name}
+          + Relationship
+        </button>
+        <button
+          className="btn btn--small"
+          onClick={() => openLinkDraft({ model: modelId, entity: entity.id })}
+        >
+          + Link (same-as)
         </button>
       </div>
+
+      <ConceptGroupSection modelId={modelId} entity={entity} />
+      <WhereUsed modelId={modelId} entity={entity} />
+    </div>
+  );
+}
+
+// Name a same-as concept group and pick its canonical entity (FR-6.7). Shown only
+// when the entity is part of a same-as component.
+function ConceptGroupSection({ modelId, entity }: { modelId: string; entity: Entity }) {
+  const links = useWorkspaceStore((s) => s.links);
+  const upsertConceptGroup = useWorkspaceStore((s) => s.upsertConceptGroup);
+  const allModels = useWorkspaceStore((s) => s.allModels);
+  const syncFields = useModelStore((s) => s.syncFields);
+  const pushNotice = useModelStore((s) => s.pushNotice);
+
+  const component = componentFor(links.links, modelId, entity.id);
+  if (!component || component.length < 2) return null;
+
+  const models = allModels();
+  const label = (m: string, e: string) => {
+    const mm = models.find((x) => x.id === m);
+    const ent = mm?.model.entities.find((en) => en.id === e);
+    return `${mm?.name ?? "?"}.${ent?.name ?? "?"}`;
+  };
+
+  const keys = new Set(component.map((r) => entityKey(r.model, r.entity)));
+  const group = links.conceptGroups.find((g) =>
+    keys.has(entityKey(g.canonical.model, g.canonical.entity)),
+  );
+
+  const isCanonical =
+    group && group.canonical.model === modelId && group.canonical.entity === entity.id;
+  const canonicalEntity =
+    group &&
+    models
+      .find((m) => m.id === group.canonical.model)
+      ?.model.entities.find((e) => e.id === group.canonical.entity);
+
+  const syncFromCanonical = () => {
+    if (!canonicalEntity) return;
+    const added = syncFields(entity.id, canonicalEntity.fields);
+    pushNotice(added ? `Added ${added} field(s) from the canonical entity.` : "Nothing to sync.");
+  };
+
+  const setName = (name: string) =>
+    upsertConceptGroup({
+      id: group?.id ?? newId("conceptGroup"),
+      name,
+      canonical: group?.canonical ?? { model: component[0].model, entity: component[0].entity },
+    });
+  const setCanonical = (value: string) => {
+    const [m, e] = value.split("|");
+    upsertConceptGroup({
+      id: group?.id ?? newId("conceptGroup"),
+      name: group?.name ?? entity.name,
+      canonical: { model: m, entity: e },
+    });
+  };
+
+  return (
+    <div className="editor__section">
+      <span className="editor__label">Concept group</span>
+      <input
+        className="editor__input"
+        placeholder="Group name (e.g. Customer)"
+        value={group?.name ?? ""}
+        onChange={(e) => setName(e.target.value)}
+      />
+      <label className="editor__label" style={{ marginTop: "0.4rem" }}>
+        Canonical entity
+      </label>
+      <select
+        className="editor__input"
+        value={group ? `${group.canonical.model}|${group.canonical.entity}` : ""}
+        onChange={(e) => setCanonical(e.target.value)}
+      >
+        <option value="">Choose…</option>
+        {component.map((r) => (
+          <option key={entityKey(r.model, r.entity)} value={`${r.model}|${r.entity}`}>
+            {label(r.model, r.entity)}
+          </option>
+        ))}
+      </select>
+      {group && !isCanonical && canonicalEntity && (
+        <button className="btn btn--small" style={{ marginTop: "0.4rem" }} onClick={syncFromCanonical}>
+          Sync fields from canonical ({canonicalEntity.name})
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Where used (FR-6.8): every link that depends on this entity, across all models.
+function WhereUsed({ modelId, entity }: { modelId: string; entity: Entity }) {
+  const links = useWorkspaceStore((s) => s.links);
+  const allModels = useWorkspaceStore((s) => s.allModels);
+  const deleteLink = useWorkspaceStore((s) => s.deleteLink);
+
+  const touching = linksTouching(links.links, { model: modelId, entity: entity.id });
+  if (touching.length === 0) return null;
+
+  const models = allModels();
+  const label = (m: string, e: string) => {
+    const mm = models.find((x) => x.id === m);
+    const ent = mm?.model.entities.find((en) => en.id === e);
+    return `${mm?.name ?? "?"}.${ent?.name ?? "?"}`;
+  };
+
+  return (
+    <div className="editor__section">
+      <span className="editor__label">Where used ({touching.length})</span>
+      <ul className="whereused">
+        {touching.map((l) => {
+          const onFrom = l.from.model === modelId && l.from.entity === entity.id;
+          const other = onFrom ? l.to : l.from;
+          return (
+            <li key={l.id} className="whereused__row">
+              <span>
+                {l.type} → {label(other.model, other.entity)}
+              </span>
+              <button className="field-row__del" title="Delete link" onClick={() => deleteLink(l.id)}>
+                ✕
+              </button>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
@@ -160,6 +299,8 @@ function FieldRow({
   const updateField = useModelStore((s) => s.updateField);
   const deleteField = useModelStore((s) => s.deleteField);
   const reorderField = useModelStore((s) => s.reorderField);
+  const modelId = useModelStore((s) => s.model.id);
+  const openLinkDraft = useModelStore((s) => s.openLinkDraft);
   const [nameError, setNameError] = useState<string | null>(null);
 
   const duplicate = entity.fields.some((o) => o.id !== field.id && o.name === field.name);
@@ -214,6 +355,13 @@ function FieldRow({
             ))}
           </select>
         )}
+        <button
+          className="field-row__del"
+          title="Add link (references / derived-from)"
+          onClick={() => openLinkDraft({ model: modelId, entity: entity.id, field: field.id })}
+        >
+          🔗
+        </button>
         <button
           className="field-row__del"
           title="Delete field"

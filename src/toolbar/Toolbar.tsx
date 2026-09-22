@@ -11,9 +11,10 @@ import {
 interface Props {
   onNewModel: () => void;
   onOpenHistory: () => void;
+  onOpenMap: () => void;
 }
 
-export function Toolbar({ onNewModel, onOpenHistory }: Props) {
+export function Toolbar({ onNewModel, onOpenHistory, onOpenMap }: Props) {
   const modelName = useModelStore((s) => s.model.name);
   const level = useModelStore((s) => s.model.level);
   const setModelName = useModelStore((s) => s.setModelName);
@@ -70,6 +71,9 @@ export function Toolbar({ onNewModel, onOpenHistory }: Props) {
           disabled={!wsPath || !activeId}
         >
           Duplicate
+        </button>
+        <button className="btn btn--small" onClick={onOpenMap} disabled={!wsPath}>
+          Map
         </button>
         <button className="btn btn--small" onClick={onOpenHistory} disabled={!wsPath}>
           History

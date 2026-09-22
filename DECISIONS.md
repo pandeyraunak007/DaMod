@@ -5,6 +5,42 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-09-22 — Phase 3: cross-model linking (FR-6) + validation (FR-10)
+
+67 unit tests cover the pure logic (links + validation rules). UI verified by
+typecheck/build and clean boot; AT-3.1–3.7 pending manual run.
+
+### Links live in links.json, referenced by ID (FR-6.5)
+- **What:** Three link types — same-as (entity↔entity), references (field→entity),
+  derived-from (field→field) — plus concept groups, all in `links.json` (workspace
+  level). Loaded on open, validated with Zod, saved atomically on every change.
+- **Concept groups = same-as connected components (FR-6.7).** Membership is derived
+  from same-as links via union-find (A–B, B–C ⇒ one group); the stored group only
+  carries the name + canonical entity. Transitivity is automatic.
+- **Where models come from:** validation, badges, the map and where-used need every
+  model, not just the active one. `workspaceStore.allModels()` returns the active
+  model (from the model store) plus the parked tabs — a single source of truth.
+
+### Validation is one-function-per-rule over the whole workspace (FR-10.5)
+- **What:** `validateWorkspace(ctx)` runs 11 independent rules and concatenates
+  issues (severity + message + go-to target). The panel reruns via `useMemo` on
+  model/links change (FR-10.4) and never blocks saving — only export will.
+- **Level-aware (FR-11.9):** entity-without-PK and physical-field-without-type only
+  fire where they apply; Conceptual/Logical aren't flagged for missing physical types.
+- **Cross-level type comparison:** two fields "differ" if both have physical types
+  that render differently (so string(255) vs text is caught, AT-3.5), else by their
+  generic types. Same-generic physical differences are still flagged.
+
+### Link UI
+- Create links from an entity ("+ Link", same-as) or a field ("🔗", references /
+  derived-from); same-as proposes name-matched field mappings the author edits
+  (FR-6.2 — proposes id↔id, author adds email↔email_address). Badges on canvas
+  cards/fields and Explorer nodes with hover (FR-6.4/12.7). Where-used lists every
+  dependent link (FR-6.8). Deleting a linked entity warns and cascades the links
+  (FR-6.6). Workspace map draws models as nodes with per-pair link counts, click a
+  line to list its links (FR-6.3). Sync-from-canonical copies missing fields by name
+  (FR-6.10). Validation rollup dots on Explorer nodes (FR-12.7).
+
 ## 2026-09-22 — ERwin-style workflow: model-type-first + Explorer authoring
 
 Author asked for a workflow closer to ERwin Data Modeler: decide the model type

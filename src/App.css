@@ -655,6 +655,19 @@ body,
   border-radius: 4px;
   padding: 0 0.2rem;
 }
+.tree__link {
+  font-size: 0.7rem;
+}
+.tree__sev {
+  margin-left: 0.3rem;
+  font-size: 0.66rem;
+}
+.tree__sev--error {
+  color: var(--danger);
+}
+.tree__sev--warning {
+  color: var(--warn);
+}
 
 /* ---- history dialog ---- */
 .history {
@@ -851,6 +864,158 @@ body,
 }
 .ctx__item--danger {
   color: var(--danger);
+}
+
+/* ---- validation panel ---- */
+.vpanel {
+  border-top: 1px solid var(--border);
+  background: #fff;
+  flex-shrink: 0;
+}
+.vpanel--open {
+  max-height: 40vh;
+  display: flex;
+  flex-direction: column;
+}
+.vpanel__bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  border: none;
+  background: #f6f7f9;
+  padding: 0.3rem 0.8rem;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+.vpanel__count {
+  color: var(--muted);
+}
+.vpanel__count.is-error {
+  color: var(--danger);
+  font-weight: 600;
+}
+.vpanel__count.is-warn {
+  color: var(--warn);
+  font-weight: 600;
+}
+.vpanel__spacer {
+  flex: 1;
+}
+.vpanel__toggle {
+  color: var(--muted);
+}
+.vpanel__list {
+  overflow-y: auto;
+  padding: 0.3rem 0;
+}
+.vpanel__empty {
+  color: var(--muted);
+  padding: 0.6rem 0.8rem;
+  margin: 0;
+}
+.vpanel__issue {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 0.3rem 0.8rem;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+.vpanel__issue:hover {
+  background: #eef1f5;
+}
+.vpanel__sev--error {
+  color: var(--danger);
+}
+.vpanel__sev--warning {
+  color: var(--warn);
+}
+.vpanel__msg {
+  flex: 1;
+}
+.vpanel__goto {
+  color: var(--accent);
+  font-size: 0.76rem;
+  opacity: 0;
+}
+.vpanel__issue:hover .vpanel__goto {
+  opacity: 1;
+}
+
+/* ---- link dialog mappings ---- */
+.mappings {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.4rem;
+}
+.mappings__row,
+.mappings__add {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0;
+}
+.mappings__arrow {
+  color: var(--muted);
+}
+.mappings__add select {
+  flex: 1;
+  padding: 0.2rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+}
+
+/* ---- workspace map ---- */
+.modal--map {
+  width: 720px;
+  max-width: 94vw;
+}
+.map__flow {
+  height: 360px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.map__links {
+  margin-top: 0.6rem;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+/* ---- where used ---- */
+.whereused {
+  list-style: none;
+  margin: 0.2rem 0 0;
+  padding: 0;
+}
+.whereused__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.2rem 0;
+  font-size: 0.82rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---- link badges ---- */
+.entity__link-badge {
+  margin-left: 0.3rem;
+  font-size: 0.62rem;
+  color: #fff;
+  background: #8b5cf6;
+  border-radius: 8px;
+  padding: 0.02rem 0.3rem;
+  cursor: default;
+}
+.entity__field-link {
+  color: #8b5cf6;
+  margin-left: 0.2rem;
 }
 
 /* ---- toasts ---- */
