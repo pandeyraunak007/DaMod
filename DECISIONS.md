@@ -5,6 +5,61 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-09-22 — Phase 1: one model (FR-2, FR-3, FR-4)
+
+The model lives in memory only this phase; persistence is Phase 2. All acceptance
+logic (identifier rules, FK creation, type propagation, cascade delete, undo/redo)
+is covered by unit tests in `src/model/*.test.ts` and `src/store/*.test.ts` — 35
+tests, run with `npm test`.
+
+### Layering: pure model ops + a Zustand store
+- **What:** Domain types and transforms are pure functions in `src/model/`
+  (`dataTypes`, `identifiers`, `model`, `operations`). The Zustand store
+  (`src/store/modelStore.ts`) wraps them and owns history + selection + notices.
+- **Why:** Pure functions are unit-testable without a DOM (NFR-9) and keep the
+  store thin. The store clones the model per edit (`structuredClone`) so history
+  is a plain stack of immutable snapshots.
+- **Not done:** No immer (keeps the dependency budget at zero for this — NFR-8).
+
+### Undo/redo as past/present/future snapshots (FR-4.5)
+- **What:** Every edit pushes the prior model onto `past` (cap 100) and clears
+  `future`. Drags commit a single history step on drag-stop, not per pixel.
+- **Why:** Simple, correct, and easily 50+ deep. Snapshot-per-edit is fine at the
+  50-entity target (NFR-3); a 200-entity model still works, just with larger snapshots.
+
+### Foreign-key type is derived from the referenced primary key (FR-3.3, FR-3.7)
+- **What:** Creating a 1:1/1:M relationship makes the FK field on the child with
+  the parent PK's exact type. `reconcileForeignKeyTypes` realigns FKs whenever a
+  PK's type changes and raises a notice listing what changed. Junction id fields
+  are mapped positionally (parent keys first, then child keys).
+- **Note on AT-1.7:** The spec's expected result says changing `Customer.id` to
+  bigint updates "`Order.customer_id` **and OrderProduct keys**". In the sample
+  models `OrderProduct`'s keys reference `Order.id` and `Product.id`, not
+  `Customer.id`, so only `Order.customer_id` actually changes. The tool propagates
+  strictly along real references; `OrderProduct` keys would only change if
+  `Order.id` or `Product.id` changed. Flagging as a probable spec wording slip —
+  behaviour is intentionally reference-accurate.
+
+### Relationship creation: drag OR side-panel form (FR-3.1), self-refs allowed (FR-3.6)
+- **What:** Dragging one entity onto another opens a dialog; a "+ Relationship"
+  button in the entity's side panel opens the same dialog. Parent/child are
+  dropdowns, so they can be swapped or set equal for a self-reference.
+- **Why:** Covers both FR-3.1 paths and makes self-references practical (dragging
+  a node to itself is awkward). M:N always materialises a junction (agreed rule).
+
+### Canvas = React Flow, controlled from the store
+- **What:** Nodes/edges are derived from the store each render; custom `EntityNode`
+  cards show fields with PK/Unique/NOT NULL markers; crow's-foot markers via SVG
+  `<marker>` defs. Delete key is intercepted (`deleteKeyCode={null}`) so deletion
+  runs through a confirmation (FR-4.6).
+- **Not done:** No auto edge-routing beyond React Flow defaults; auto-arrange
+  (FR-4.7) is a simple grid.
+
+### Ctrl/Cmd+S is a stub this phase
+- **What:** ⌘S shows a "saving arrives in Phase 2" notice.
+- **Why:** There is no persistence yet (Phase 2 = FR-1, FR-5). The shortcut is
+  wired so the muscle memory works; it becomes a real save next phase.
+
 ## 2026-09-22 — Phase 0: scaffold
 
 ### Desktop framework: Tauri v2 (not Electron)
