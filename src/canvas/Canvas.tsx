@@ -111,8 +111,9 @@ function CanvasInner() {
         position: e.position,
         data: { entityId: e.id },
         selected: e.id === selectedEntityId,
+        className: connectFrom === e.id ? "rf-connect-source" : undefined,
       })),
-    [entities, selectedEntityId],
+    [entities, selectedEntityId, connectFrom],
   );
 
   const edges = useMemo(() => buildEdges(model, selectedRelId), [model, selectedRelId]);
@@ -176,6 +177,20 @@ function CanvasInner() {
 
   return (
     <div className={`canvas-wrap canvas-wrap--${canvasMode}`}>
+      {canvasMode === "add-relationship" && (
+        <div className="connect-hint">
+          {connectFrom ? (
+            <>
+              Click the <strong>second</strong> entity (the child that gets the foreign key).
+            </>
+          ) : (
+            <>
+              Adding a relationship — click the <strong>first</strong> entity (the parent).
+            </>
+          )}
+          <span className="connect-hint__esc">Esc to cancel</span>
+        </div>
+      )}
       <ReactFlow
         nodes={nodes}
         edges={edges}

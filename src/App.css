@@ -288,10 +288,63 @@ body,
   color: var(--warn);
 }
 .entity__handle {
-  width: 9px;
-  height: 9px;
+  width: 11px;
+  height: 11px;
   background: #94a3b8;
-  border: 1px solid #fff;
+  border: 1.5px solid #fff;
+  opacity: 0;
+  transition: opacity 0.12s, background 0.12s, transform 0.12s;
+}
+/* Reveal connection handles on hover so drag-to-connect is easy to grab. */
+.react-flow__node:hover .entity__handle {
+  opacity: 1;
+}
+.entity__handle:hover {
+  background: var(--accent);
+  transform: scale(1.4);
+}
+
+/* Add-relationship mode: obvious click targets and a highlighted source. */
+.canvas-wrap--add-relationship .react-flow__node:hover .entity {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.rf-connect-source .entity {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.55);
+}
+.rf-connect-source::after {
+  content: "source";
+  position: absolute;
+  top: -0.9rem;
+  left: 0;
+  font-size: 0.64rem;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 4px;
+  padding: 0 0.3rem;
+  pointer-events: none;
+}
+.connect-hint {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  background: #1e293b;
+  color: #fff;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.connect-hint__esc {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+  padding-left: 0.6rem;
 }
 
 /* ---- editor / side panel ---- */

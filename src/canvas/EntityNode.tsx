@@ -64,8 +64,10 @@ function EntityNodeImpl({ data, selected }: NodeProps) {
 
   return (
     <div className={`entity ${selected ? "entity--selected" : ""} ${entity.junction ? "entity--junction" : ""}`}>
-      <Handle type="target" position={Position.Left} className="entity__handle" />
-      <Handle type="source" position={Position.Right} className="entity__handle" />
+      <Handle type="target" position={Position.Left} id="l" className="entity__handle" />
+      <Handle type="source" position={Position.Right} id="r" className="entity__handle" />
+      <Handle type="target" position={Position.Top} id="t" className="entity__handle" />
+      <Handle type="source" position={Position.Bottom} id="b" className="entity__handle" />
 
       <div className="entity__header" onDoubleClick={startEdit}>
         {editing ? (
