@@ -1081,6 +1081,121 @@ body,
   border-radius: 5px;
 }
 
+/* ---- semantic view ---- */
+.semantic {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+}
+.semantic__list {
+  width: 260px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  background: #fbfcfd;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+.semantic__section {
+  margin-bottom: 0.8rem;
+}
+.semantic__section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  font-weight: 600;
+  margin: 0.3rem 0;
+}
+.semantic__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 0.25rem 0.4rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.semantic__item:hover {
+  background: #eef1f5;
+}
+.semantic__item--active {
+  background: #e0ecff;
+  font-weight: 600;
+}
+.semantic__detail {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.9rem;
+}
+.picker {
+  display: flex;
+  gap: 0.3rem;
+}
+.picker select {
+  flex: 1;
+  min-width: 0;
+  padding: 0.25rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+}
+.attr-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 0.35rem;
+  flex-wrap: wrap;
+}
+.attr-row input,
+.attr-row select {
+  padding: 0.2rem 0.35rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+}
+.metric-sql {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 0.5rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  margin: 0;
+}
+.lineage {
+  list-style: none;
+  margin: 0.2rem 0 0;
+  padding: 0;
+  font-size: 0.82rem;
+}
+.lineage li {
+  padding: 0.15rem 0;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---- export dialog ---- */
+.export-preview {
+  max-height: 300px;
+  overflow: auto;
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 8px;
+  padding: 0.7rem 0.9rem;
+  font-size: 0.76rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre;
+  margin: 0.4rem 0;
+}
+.export-preview + .field__hint code {
+  background: #eef2f7;
+  padding: 0.05rem 0.25rem;
+  border-radius: 4px;
+}
+
 /* ---- workspace map ---- */
 .modal--map {
   width: 720px;

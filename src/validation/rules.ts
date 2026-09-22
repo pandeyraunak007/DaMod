@@ -12,6 +12,7 @@ import {
   entityKey,
   sameAsComponents,
 } from "../links/links";
+import type { FieldRef, SemanticDoc } from "../semantic/semantic";
 
 export type Severity = "error" | "warning";
 
@@ -42,12 +43,23 @@ export interface ValidationContext {
   models: NamedModel[];
   links: Link[];
   conceptGroups: ConceptGroup[];
+  semantic?: SemanticDoc;
 }
 
 // ---- helpers ----------------------------------------------------------------
 
 function findModel(ctx: ValidationContext, id: string): Model | undefined {
   return ctx.models.find((m) => m.id === id)?.model;
+}
+
+function resolveField(ctx: ValidationContext, ref: FieldRef): Field | undefined {
+  const entity = findModel(ctx, ref.model)?.entities.find((e) => e.id === ref.entity);
+  return entity?.fields.find((f) => f.id === ref.field);
+}
+
+function isNumeric(f: Field): boolean {
+  if (f.type) return f.type === "integer" || f.type === "bigint" || f.type === "decimal";
+  return f.logicalType === "Number" || f.logicalType === "Decimal";
 }
 
 /** A field's generic type, for cross-level comparison. */
@@ -345,6 +357,91 @@ function physicalFieldWithoutType(ctx: ValidationContext): Issue[] {
   return issues;
 }
 
+function metricAggregateFit(ctx: ValidationContext): Issue[] {
+  const issues: Issue[] = [];
+  for (const m of ctx.semantic?.metrics ?? []) {
+    if (!m.aggregate || !m.field) continue;
+    if (m.aggregate !== "sum" && m.aggregate !== "avg") continue; // only these need numbers
+    const field = resolveField(ctx, m.field);
+    if (field && !isNumeric(field)) {
+      issues.push({
+        id: `aggFit:${m.id}`,
+        rule: "metricAggregateFit",
+        severity: "error",
+        message: `Metric “${m.name}” uses ${m.aggregate} over a non-numeric field`,
+        target: { model: m.field.model, entity: m.field.entity, field: m.field.field },
+      });
+    }
+  }
+  return issues;
+}
+
+function semanticBindingDangling(ctx: ValidationContext): Issue[] {
+  const issues: Issue[] = [];
+  const s = ctx.semantic;
+  if (!s) return issues;
+  const fieldMissing = (ref: FieldRef) => !resolveField(ctx, ref);
+  const entityMissing = (ref: { model: string; entity: string }) =>
+    !findModel(ctx, ref.model)?.entities.some((e) => e.id === ref.entity);
+  const conceptMissing = (id: string) => !ctx.conceptGroups.some((g) => g.id === id);
+
+  const flag = (id: string, name: string, kind: string) =>
+    issues.push({
+      id: `semDangling:${id}`,
+      rule: "semanticBindingDangling",
+      severity: "error",
+      message: `${kind} “${name}” binds to a deleted item`,
+      target: {},
+    });
+
+  for (const t of s.terms) {
+    for (const b of t.bindings ?? []) {
+      const bad =
+        ("concept" in b && conceptMissing(b.concept)) ||
+        ("field" in b && fieldMissing(b)) ||
+        (!("concept" in b) && !("field" in b) && entityMissing(b));
+      if (bad) flag(t.id, t.name, "Term");
+    }
+  }
+  for (const d of s.dimensions) {
+    if (d.concept && conceptMissing(d.concept)) flag(d.id, d.name, "Dimension");
+    if (d.entity && entityMissing(d.entity)) flag(d.id, d.name, "Dimension");
+    if (d.field && fieldMissing(d.field)) flag(d.id, d.name, "Dimension");
+    for (const a of d.attributes ?? []) if (fieldMissing(a.field)) flag(d.id, d.name, "Dimension");
+  }
+  for (const m of s.metrics) {
+    if (m.field && fieldMissing(m.field)) flag(m.id, m.name, "Metric");
+    if (m.grain && entityMissing(m.grain)) flag(m.id, m.name, "Metric");
+    for (const f of m.filters ?? []) if (fieldMissing(f.field)) flag(m.id, m.name, "Metric");
+  }
+  return issues;
+}
+
+function duplicateSemanticNames(ctx: ValidationContext): Issue[] {
+  const issues: Issue[] = [];
+  const s = ctx.semantic;
+  if (!s) return issues;
+  const check = (items: { id: string; name: string }[], kind: string) => {
+    const counts = new Map<string, number>();
+    for (const it of items) counts.set(it.name, (counts.get(it.name) ?? 0) + 1);
+    for (const it of items) {
+      if ((counts.get(it.name) ?? 0) > 1) {
+        issues.push({
+          id: `dupSem:${kind}:${it.id}`,
+          rule: "duplicateSemanticNames",
+          severity: "error",
+          message: `Duplicate ${kind} name “${it.name}”`,
+          target: {},
+        });
+      }
+    }
+  };
+  check(s.terms, "term");
+  check(s.dimensions, "dimension");
+  check(s.metrics, "metric");
+  return issues;
+}
+
 const RULES: ((ctx: ValidationContext) => Issue[])[] = [
   duplicateEntityNames,
   duplicateFieldNames,
@@ -357,6 +454,9 @@ const RULES: ((ctx: ValidationContext) => Issue[])[] = [
   entityWithoutPrimaryKey,
   entityWithoutRelationships,
   physicalFieldWithoutType,
+  metricAggregateFit,
+  semanticBindingDangling,
+  duplicateSemanticNames,
 ];
 
 /** Run every rule over the workspace and return all issues (FR-10.1). */

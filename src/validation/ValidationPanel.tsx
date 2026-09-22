@@ -11,6 +11,7 @@ export function ValidationPanel() {
   const tabs = useWorkspaceStore((s) => s.tabs);
   const activeId = useWorkspaceStore((s) => s.activeId);
   const links = useWorkspaceStore((s) => s.links);
+  const semantic = useWorkspaceStore((s) => s.semantic);
   const switchTab = useWorkspaceStore((s) => s.switchTab);
 
   const [expanded, setExpanded] = useState(false);
@@ -22,8 +23,13 @@ export function ValidationPanel() {
       .filter((m): m is NonNullable<typeof m> => m != null)
       .map((m) => ({ id: m.id, name: m.name, model: m }));
     if (models.length === 0) return [];
-    return validateWorkspace({ models, links: links.links, conceptGroups: links.conceptGroups });
-  }, [activeModel, tabs, activeId, links]);
+    return validateWorkspace({
+      models,
+      links: links.links,
+      conceptGroups: links.conceptGroups,
+      semantic,
+    });
+  }, [activeModel, tabs, activeId, links, semantic]);
 
   const errors = issues.filter((i) => i.severity === "error");
   const warnings = issues.filter((i) => i.severity === "warning");

@@ -9,7 +9,9 @@ import { ExternalChangeBanner } from "./workspace/ExternalChangeBanner";
 import { ModelExplorer } from "./explorer/ModelExplorer";
 import { Welcome } from "./workspace/Welcome";
 import { ValidationPanel } from "./validation/ValidationPanel";
+import { SemanticView } from "./semantic/SemanticView";
 import { WorkspaceMap } from "./links/WorkspaceMap";
+import { ExportDialog } from "./export/ExportDialog";
 import { Canvas } from "./canvas/Canvas";
 import { SidePanel } from "./panels/SidePanel";
 import { RelationshipDialog } from "./panels/RelationshipDialog";
@@ -30,6 +32,8 @@ export default function App() {
   const [newModelOpen, setNewModelOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [semanticOpen, setSemanticOpen] = useState(false);
   const [deleteModel, setDeleteModel] = useState<{ id: string; name: string } | null>(null);
 
   const selection = useModelStore((s) => s.selection);
@@ -100,6 +104,9 @@ export default function App() {
         onNewModel={() => setNewModelOpen(true)}
         onOpenHistory={() => setHistoryOpen(true)}
         onOpenMap={() => setMapOpen(true)}
+        onOpenExport={() => setExportOpen(true)}
+        onToggleSemantic={() => setSemanticOpen((v) => !v)}
+        semanticActive={semanticOpen}
       />
       <TabBar onDeleteModel={(id, name) => setDeleteModel({ id, name })} />
       <ExternalChangeBanner />
@@ -107,11 +114,21 @@ export default function App() {
         <div className="app__body">
           <Welcome onNewModel={() => setNewModelOpen(true)} />
         </div>
+      ) : semanticOpen ? (
+        <div className="app__body">
+          <ModelExplorer
+            onNewModel={() => setNewModelOpen(true)}
+            onDeleteModel={(id, name) => setDeleteModel({ id, name })}
+            onOpenSemantic={() => setSemanticOpen(true)}
+          />
+          <SemanticView />
+        </div>
       ) : (
         <div className="app__body">
           <ModelExplorer
             onNewModel={() => setNewModelOpen(true)}
             onDeleteModel={(id, name) => setDeleteModel({ id, name })}
+            onOpenSemantic={() => setSemanticOpen(true)}
           />
           <div className="app__canvas">
             {activeTab?.loadError ? (
@@ -151,6 +168,7 @@ export default function App() {
       {newModelOpen && <NewModelDialog onClose={() => setNewModelOpen(false)} />}
       {historyOpen && <HistoryDialog onClose={() => setHistoryOpen(false)} />}
       {mapOpen && <WorkspaceMap onClose={() => setMapOpen(false)} />}
+      {exportOpen && <ExportDialog onClose={() => setExportOpen(false)} />}
       {confirmDelete && selection && <DeleteConfirm onClose={() => setConfirmDelete(false)} />}
       {deleteModel && (
         <DeleteModelConfirm

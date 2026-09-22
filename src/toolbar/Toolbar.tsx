@@ -1,20 +1,25 @@
 import { useEffect, useState } from "react";
 import { useModelStore } from "../store/modelStore";
 import { useWorkspaceStore } from "../store/workspaceStore";
-import {
-  MODEL_LEVELS,
-  type ModelLevel,
-  canExportDdl,
-  exportDisabledReason,
-} from "../model/levels";
+import { MODEL_LEVELS, type ModelLevel, exportDisabledReason } from "../model/levels";
 
 interface Props {
   onNewModel: () => void;
   onOpenHistory: () => void;
   onOpenMap: () => void;
+  onOpenExport: () => void;
+  onToggleSemantic: () => void;
+  semanticActive: boolean;
 }
 
-export function Toolbar({ onNewModel, onOpenHistory, onOpenMap }: Props) {
+export function Toolbar({
+  onNewModel,
+  onOpenHistory,
+  onOpenMap,
+  onOpenExport,
+  onToggleSemantic,
+  semanticActive,
+}: Props) {
   const modelName = useModelStore((s) => s.model.name);
   const level = useModelStore((s) => s.model.level);
   const setModelName = useModelStore((s) => s.setModelName);
@@ -75,6 +80,13 @@ export function Toolbar({ onNewModel, onOpenHistory, onOpenMap }: Props) {
         <button className="btn btn--small" onClick={onOpenMap} disabled={!wsPath}>
           Map
         </button>
+        <button
+          className={`btn btn--small ${semanticActive ? "btn--primary" : ""}`}
+          onClick={onToggleSemantic}
+          disabled={!wsPath}
+        >
+          {semanticActive ? "Canvas" : "Semantic"}
+        </button>
         <button className="btn btn--small" onClick={onOpenHistory} disabled={!wsPath}>
           History
         </button>
@@ -120,11 +132,10 @@ export function Toolbar({ onNewModel, onOpenHistory, onOpenMap }: Props) {
         </button>
         <button
           className="btn"
-          disabled={!canExportDdl(level)}
-          title={exportReason ?? "Export Postgres DDL"}
-          onClick={() => pushNotice("DDL export arrives in Phase 4.")}
+          title={exportReason ? `${exportReason} (workspace + semantic export still available)` : "Export DDL / YAML"}
+          onClick={onOpenExport}
         >
-          Export DDL
+          Export
         </button>
       </div>
 

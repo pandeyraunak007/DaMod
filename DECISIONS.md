@@ -5,6 +5,40 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-09-22 — Phase 4: semantic layer (FR-7) + export (FR-8/FR-9), multi-dialect
+
+84 unit tests cover the pure logic (semantic persistence, DDL across 3 dialects,
+YAML export). UI verified by typecheck/build and clean boot; AT-4.1–4.9 pending.
+
+### Scope change: three SQL dialects (was one)
+- **What:** The author asked for **Postgres, Snowflake and Databricks** DDL export,
+  overriding the spec's original "one dialect" non-goal. Export is parameterised by
+  a `Dialect` (type map + identifier quoting + comment style). Postgres stays the
+  reference dialect the acceptance tests run against a real DB.
+- **Type maps:** Postgres per the FR-8 table; Snowflake (VARCHAR/NUMBER/TIMESTAMP_TZ/
+  VARIANT, uuid→VARCHAR(36)); Databricks (STRING/INT/DECIMAL/TIMESTAMP, uuid&json→
+  STRING, backtick-quoted identifiers, inline column comments).
+- **Identifiers are always quoted** so reserved words like `Order` are safe — the
+  sample models use `Order`, which is unquotable in Postgres.
+
+### DDL generation (FR-8)
+- Deterministic (byte-identical): tables in a stable topological order (referenced
+  first), circular refs and self-references emitted as `ALTER TABLE ... ADD FOREIGN
+  KEY` at the end. M:N junctions export like any table with a composite PK. Comments
+  via `COMMENT ON` (Postgres/Snowflake) or inline (Databricks). Whole-workspace
+  export writes a schema per model + cross-model `references` links as FKs at the end.
+- **Validation-first (FR-8.7):** the export dialog runs `validateWorkspace` and
+  blocks on any error; DDL scopes are disabled for Conceptual/Logical models (FR-11.8).
+
+### Semantic layer (FR-7) + YAML export (FR-9)
+- Terms / dimensions / metrics in `semantic.json` (Zod-validated, deterministic),
+  edited in a dedicated Semantic view (toolbar toggle) — no canvas. Metric detail
+  shows a generated SQL snippet; lineage lists the models/entities/fields it depends
+  on. Metric aggregate-type-fit, dangling-binding and duplicate-name rules added to
+  validation. `semantic.yaml` export writes readable `model.entity.field` paths (never
+  IDs), a SQL snippet per metric, ordered by name, deterministic (added the `yaml`
+  dependency per NFR-8). Explorer gained a workspace-level Semantic node with counts.
+
 ## 2026-09-22 — Phase 3: cross-model linking (FR-6) + validation (FR-10)
 
 67 unit tests cover the pure logic (links + validation rules). UI verified by

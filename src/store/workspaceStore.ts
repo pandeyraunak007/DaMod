@@ -42,6 +42,14 @@ import {
   removeLinksTouching,
 } from "../links/links";
 import { serializeLinks, parseLinksFile } from "../links/linksPersist";
+import {
+  type Dimension,
+  type Metric,
+  type SemanticDoc,
+  type Term,
+  emptySemanticDoc,
+} from "../semantic/semantic";
+import { serializeSemantic, parseSemanticFile } from "../semantic/semanticPersist";
 
 const AUTOSAVE_MS = 2000; // FR-5.4
 
@@ -64,6 +72,7 @@ interface WorkspaceState {
   activeId: string | null;
   saving: boolean;
   links: LinksDoc;
+  semantic: SemanticDoc;
 
   openWorkspacePicker: () => Promise<void>;
   openWorkspace: (path: string) => Promise<void>;
@@ -87,6 +96,17 @@ interface WorkspaceState {
   upsertConceptGroup: (group: ConceptGroup) => void;
   deleteConceptGroup: (id: string) => void;
   removeLinksForRef: (ref: Ref) => Link[];
+
+  // semantic layer (FR-7)
+  addTerm: (term: Term) => void;
+  updateTerm: (id: string, patch: Partial<Term>) => void;
+  deleteTerm: (id: string) => void;
+  addDimension: (dim: Dimension) => void;
+  updateDimension: (id: string, patch: Partial<Dimension>) => void;
+  deleteDimension: (id: string) => void;
+  addMetric: (metric: Metric) => void;
+  updateMetric: (id: string, patch: Partial<Metric>) => void;
+  deleteMetric: (id: string) => void;
 }
 
 function nowIso(): string {
@@ -129,6 +149,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     }
   }
 
+  /** Update semantic state and persist semantic.json. */
+  function commitSemantic(doc: SemanticDoc): void {
+    set({ semantic: doc });
+    const { path } = get();
+    if (path) {
+      void writeFile(joinPath(path, SEMANTIC_FILE), serializeSemantic(doc), false).catch(() => {});
+    }
+  }
+
   /** Load a valid tab's model into the editor; sync the previously active tab back. */
   function activate(id: string): void {
     const { tabs, activeId } = get();
@@ -154,6 +183,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     activeId: null,
     saving: false,
     links: emptyLinksDoc(),
+    semantic: emptySemanticDoc(),
 
     openWorkspacePicker: async () => {
       const dir = await pickWorkspaceFolder();
@@ -178,6 +208,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
         const parsedLinks = parseLinksFile(listing.links);
         if (parsedLinks.ok) links = parsedLinks.value;
         else useModelStore.getState().pushNotice(`links.json: ${parsedLinks.error}`);
+      }
+
+      let semantic = emptySemanticDoc();
+      if (listing.semantic != null) {
+        const parsedSem = parseSemanticFile(listing.semantic);
+        if (parsedSem.ok) semantic = parsedSem.value;
+        else useModelStore.getState().pushNotice(`semantic.json: ${parsedSem.error}`);
       }
 
       let meta: Partial<WorkspaceMeta> = {};
@@ -226,7 +263,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       const firstValid = tabs.find((t) => !t.loadError);
       const active = activeFromMeta && !activeFromMeta.loadError ? activeFromMeta : firstValid;
 
-      set({ path, name, createdAt, tabs, links, activeId: active?.id ?? tabs[0]?.id ?? null });
+      set({
+        path,
+        name,
+        createdAt,
+        tabs,
+        links,
+        semantic,
+        activeId: active?.id ?? tabs[0]?.id ?? null,
+      });
       if (active?.model) useModelStore.getState().loadModel(active.model);
 
       await appStateSet(JSON.stringify({ lastWorkspace: path }));
@@ -504,6 +549,51 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
           );
       commitLinks({ ...doc, links: kept, conceptGroups });
       return removed;
+    },
+
+    addTerm: (term) => {
+      const s = get().semantic;
+      commitSemantic({ ...s, terms: [...s.terms, term] });
+    },
+    updateTerm: (id, patch) => {
+      const s = get().semantic;
+      commitSemantic({ ...s, terms: s.terms.map((t) => (t.id === id ? { ...t, ...patch } : t)) });
+    },
+    deleteTerm: (id) => {
+      const s = get().semantic;
+      commitSemantic({ ...s, terms: s.terms.filter((t) => t.id !== id) });
+    },
+
+    addDimension: (dim) => {
+      const s = get().semantic;
+      commitSemantic({ ...s, dimensions: [...s.dimensions, dim] });
+    },
+    updateDimension: (id, patch) => {
+      const s = get().semantic;
+      commitSemantic({
+        ...s,
+        dimensions: s.dimensions.map((d) => (d.id === id ? { ...d, ...patch } : d)),
+      });
+    },
+    deleteDimension: (id) => {
+      const s = get().semantic;
+      commitSemantic({ ...s, dimensions: s.dimensions.filter((d) => d.id !== id) });
+    },
+
+    addMetric: (metric) => {
+      const s = get().semantic;
+      commitSemantic({ ...s, metrics: [...s.metrics, metric] });
+    },
+    updateMetric: (id, patch) => {
+      const s = get().semantic;
+      commitSemantic({
+        ...s,
+        metrics: s.metrics.map((m) => (m.id === id ? { ...m, ...patch } : m)),
+      });
+    },
+    deleteMetric: (id) => {
+      const s = get().semantic;
+      commitSemantic({ ...s, metrics: s.metrics.filter((m) => m.id !== id) });
     },
   };
 });

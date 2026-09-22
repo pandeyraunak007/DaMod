@@ -35,19 +35,21 @@ type OpenMenu = (x: number, y: number, items: MenuItem[]) => void;
 interface ExplorerProps {
   onNewModel: () => void;
   onDeleteModel: (id: string, name: string) => void;
+  onOpenSemantic: () => void;
 }
 
 // The dockable workspace tree (FR-12): Workspace → Models → Entities /
 // Relationships / Fields, plus a Semantic node. Nodes navigate (click), rename
 // (double-click) and can create/delete metaobjects via + buttons and a
 // right-click menu (FR-12.6).
-export function ModelExplorer({ onNewModel, onDeleteModel }: ExplorerProps) {
+export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic }: ExplorerProps) {
   const path = useWorkspaceStore((s) => s.path);
   const tabs = useWorkspaceStore((s) => s.tabs);
   const activeId = useWorkspaceStore((s) => s.activeId);
   const switchTab = useWorkspaceStore((s) => s.switchTab);
   const duplicateModel = useWorkspaceStore((s) => s.duplicateModel);
   const links = useWorkspaceStore((s) => s.links);
+  const semantic = useWorkspaceStore((s) => s.semantic);
   const activeModel = useModelStore((s) => s.model);
 
   const [query, setQuery] = useState("");
@@ -240,6 +242,25 @@ export function ModelExplorer({ onNewModel, onDeleteModel }: ExplorerProps) {
               />
             ),
           )}
+        {isOpen("ws") && (
+          <>
+            <TreeRow
+              depth={1}
+              open={isOpen("ws:sem")}
+              hasChildren
+              label={<span className="tree__group">Semantic layer</span>}
+              onToggle={() => toggle("ws:sem")}
+              onClick={onOpenSemantic}
+            />
+            {isOpen("ws:sem") && (
+              <>
+                <TreeRow depth={2} onClick={onOpenSemantic} label={<span className="tree__muted">Terms ({semantic.terms.length})</span>} />
+                <TreeRow depth={2} onClick={onOpenSemantic} label={<span className="tree__muted">Dimensions ({semantic.dimensions.length})</span>} />
+                <TreeRow depth={2} onClick={onOpenSemantic} label={<span className="tree__muted">Metrics ({semantic.metrics.length})</span>} />
+              </>
+            )}
+          </>
+        )}
       </div>
 
       {menu && (
@@ -387,22 +408,6 @@ function ModelBranch({
             model.relationships.filter(relMatches).map((r) => (
               <RelationshipRow key={r.id} tabId={tabId} relId={r.id} text={relText(r)} openMenu={openMenu} />
             ))}
-
-          {/* Semantic (populated in Phase 4) */}
-          <TreeRow
-            depth={2}
-            open={isOpen(`m:${tabId}:sem`)}
-            hasChildren
-            label={<span className="tree__group">Semantic layer</span>}
-            onToggle={() => toggle(`m:${tabId}:sem`)}
-          />
-          {isOpen(`m:${tabId}:sem`) && (
-            <>
-              <TreeRow depth={3} label={<span className="tree__muted">Terms (0)</span>} />
-              <TreeRow depth={3} label={<span className="tree__muted">Dimensions (0)</span>} />
-              <TreeRow depth={3} label={<span className="tree__muted">Metrics (0)</span>} />
-            </>
-          )}
         </>
       )}
     </>
