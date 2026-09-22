@@ -1,10 +1,17 @@
 import { useEffect, useState } from "react";
 import "./App.css";
+import "@xyflow/react/dist/style.css";
 import { Toolbar } from "./toolbar/Toolbar";
+import { TabBar } from "./workspace/TabBar";
+import { NewModelDialog } from "./workspace/NewModelDialog";
+import { HistoryDialog } from "./workspace/HistoryDialog";
+import { ExternalChangeBanner } from "./workspace/ExternalChangeBanner";
+import { ModelExplorer } from "./explorer/ModelExplorer";
 import { Canvas } from "./canvas/Canvas";
 import { SidePanel } from "./panels/SidePanel";
 import { RelationshipDialog } from "./panels/RelationshipDialog";
 import { useModelStore } from "./store/modelStore";
+import { useWorkspaceStore } from "./store/workspaceStore";
 
 function isEditableTarget(el: EventTarget | null): boolean {
   const node = el as HTMLElement | null;
@@ -15,13 +22,37 @@ function isEditableTarget(el: EventTarget | null): boolean {
 
 export default function App() {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [newModelOpen, setNewModelOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [deleteModel, setDeleteModel] = useState<{ id: string; name: string } | null>(null);
 
   const selection = useModelStore((s) => s.selection);
   const relationshipDraft = useModelStore((s) => s.relationshipDraft);
   const closeRelationshipDraft = useModelStore((s) => s.closeRelationshipDraft);
   const undo = useModelStore((s) => s.undo);
   const redo = useModelStore((s) => s.redo);
-  const pushNotice = useModelStore((s) => s.pushNotice);
+
+  const tabs = useWorkspaceStore((s) => s.tabs);
+  const activeId = useWorkspaceStore((s) => s.activeId);
+  const activeTab = tabs.find((t) => t.id === activeId);
+
+  // Restore the last workspace on startup (FR-1.1).
+  useEffect(() => {
+    useWorkspaceStore.getState().restoreLastWorkspace();
+  }, []);
+
+  // Autosave 2s after the last change (FR-5.4): schedule on every model edit.
+  useEffect(() => {
+    return useModelStore.subscribe((state, prev) => {
+      if (state.model !== prev.model) useWorkspaceStore.getState().scheduleAutosave();
+    });
+  }, []);
+
+  // Poll for on-disk changes (FR-5.8).
+  useEffect(() => {
+    const id = setInterval(() => useWorkspaceStore.getState().checkExternalChanges(), 1500);
+    return () => clearInterval(id);
+  }, []);
 
   // Keyboard shortcuts (FR-4.6).
   useEffect(() => {
@@ -29,11 +60,11 @@ export default function App() {
       const mod = e.metaKey || e.ctrlKey;
       if (mod && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        pushNotice("Saving arrives in Phase 2 — the model is held in memory for now.");
+        useWorkspaceStore.getState().saveActive(true);
         return;
       }
       if (mod && e.key.toLowerCase() === "z") {
-        if (isEditableTarget(e.target)) return; // let inputs handle their own undo
+        if (isEditableTarget(e.target)) return;
         e.preventDefault();
         if (e.shiftKey) redo();
         else undo();
@@ -48,14 +79,30 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [undo, redo, pushNotice]);
+  }, [undo, redo]);
 
   return (
     <div className="app">
-      <Toolbar />
+      <Toolbar onNewModel={() => setNewModelOpen(true)} onOpenHistory={() => setHistoryOpen(true)} />
+      <TabBar onDeleteModel={(id, name) => setDeleteModel({ id, name })} />
+      <ExternalChangeBanner />
       <div className="app__body">
+        <ModelExplorer />
         <div className="app__canvas">
-          <Canvas />
+          {activeTab?.loadError ? (
+            <div className="canvas-error">
+              <p className="canvas-error__title">Couldn't open {activeTab.fileName}</p>
+              <p className="canvas-error__reason">{activeTab.loadError}</p>
+              <button
+                className="btn"
+                onClick={() => useWorkspaceStore.getState().reloadFromDisk(activeTab.id)}
+              >
+                Retry
+              </button>
+            </div>
+          ) : (
+            <Canvas />
+          )}
         </div>
         <SidePanel />
       </div>
@@ -63,9 +110,15 @@ export default function App() {
       <NoticeToasts />
 
       {relationshipDraft && <RelationshipDialog onClose={closeRelationshipDraft} />}
-
-      {confirmDelete && selection && (
-        <DeleteConfirm onClose={() => setConfirmDelete(false)} />
+      {newModelOpen && <NewModelDialog onClose={() => setNewModelOpen(false)} />}
+      {historyOpen && <HistoryDialog onClose={() => setHistoryOpen(false)} />}
+      {confirmDelete && selection && <DeleteConfirm onClose={() => setConfirmDelete(false)} />}
+      {deleteModel && (
+        <DeleteModelConfirm
+          id={deleteModel.id}
+          name={deleteModel.name}
+          onClose={() => setDeleteModel(null)}
+        />
       )}
     </div>
   );
@@ -114,6 +167,41 @@ function DeleteConfirm({ onClose }: { onClose: () => void }) {
             Cancel
           </button>
           <button className="btn btn--danger" onClick={confirm} autoFocus>
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DeleteModelConfirm({
+  id,
+  name,
+  onClose,
+}: {
+  id: string;
+  name: string;
+  onClose: () => void;
+}) {
+  const deleteModel = useWorkspaceStore((s) => s.deleteModel);
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal modal--small" onClick={(e) => e.stopPropagation()}>
+        <h2 className="modal__title">Delete model “{name}”?</h2>
+        <p className="modal__text">Its file is removed from the workspace folder. This cannot be undone.</p>
+        <div className="modal__actions">
+          <button className="btn btn--ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="btn btn--danger"
+            autoFocus
+            onClick={async () => {
+              await deleteModel(id);
+              onClose();
+            }}
+          >
             Delete
           </button>
         </div>

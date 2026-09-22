@@ -13,6 +13,7 @@ import {
 } from "../model/model";
 import { paramShape, withTypeDefaults } from "../model/dataTypes";
 import {
+  type AmbiguousField,
   type CreateRelationshipInput,
   type CreateRelationshipResult,
   type DeleteEntityResult,
@@ -20,7 +21,14 @@ import {
   createRelationship as createRelationshipOp,
   deleteEntity as deleteEntityOp,
   reconcileForeignKeyTypes,
+  relevelModel,
 } from "../model/operations";
+import {
+  type ModelLevel,
+  isConceptual,
+  usesLogicalTypes,
+  usesPhysicalTypes,
+} from "../model/levels";
 import { validateIdentifier } from "../model/identifiers";
 import { newId } from "../lib/ids";
 
@@ -53,6 +61,7 @@ interface ModelStore {
 
   // model
   setModelName: (name: string) => string | null;
+  setModelLevel: (level: ModelLevel) => AmbiguousField[];
 
   // entities
   createEntity: (position?: Position) => string;
@@ -81,6 +90,8 @@ interface ModelStore {
 
   // selection / focus / notices
   select: (selection: Selection) => void;
+  revealEntity: (id: string) => void;
+  revealRelationship: (id: string) => void;
   search: (query: string) => boolean;
   pushNotice: (message: string) => void;
   dismissNotice: (id: string) => void;
@@ -114,6 +125,12 @@ function uniqueName(base: string, taken: Set<string>): string {
 
 /** Ensure a field's parameters match its type kind. */
 function normalizeFieldParams(field: Field): void {
+  if (!field.type) {
+    delete field.length;
+    delete field.precision;
+    delete field.scale;
+    return;
+  }
   const shape = paramShape(field.type);
   const defaults = withTypeDefaults(field.type);
   if (shape === "length") {
@@ -169,6 +186,16 @@ export const useModelStore = create<ModelStore>((set, get) => {
       return null;
     },
 
+    setModelLevel: (level) => {
+      const result = relevelModel(get().model, level);
+      set((s) => ({
+        past: pushPast(s.past, s.model),
+        model: { ...result.model, updatedAt: nowIso() },
+        future: [],
+      }));
+      return result.ambiguous;
+    },
+
     createEntity: (position) => {
       const state = get();
       const taken = new Set(state.model.entities.map((e) => e.name));
@@ -215,10 +242,21 @@ export const useModelStore = create<ModelStore>((set, get) => {
     },
 
     addField: (entityId) => {
-      const entity = findEntity(get().model, entityId);
+      const state = get();
+      const entity = findEntity(state.model, entityId);
       if (!entity) return null;
       const taken = new Set(entity.fields.map((f) => f.name));
-      const field = newField(uniqueName("field", taken), "string");
+      const name = uniqueName("field", taken);
+      const level = state.model.level;
+      // The new field's type shape follows the model's level (FR-11).
+      let field: Field;
+      if (isConceptual(level)) {
+        field = newField(name);
+      } else if (usesPhysicalTypes(level)) {
+        field = newField(name, "string", usesLogicalTypes(level) ? { logicalType: "Text" } : {});
+      } else {
+        field = newField(name, undefined, { logicalType: "Text" });
+      }
       commit((m) => {
         const e = findEntity(m, entityId);
         e?.fields.push(field);
@@ -352,6 +390,14 @@ export const useModelStore = create<ModelStore>((set, get) => {
     },
 
     select: (selection) => set({ selection }),
+
+    revealEntity: (id) =>
+      set((s) => ({
+        selection: { kind: "entity", id },
+        focus: { entityId: id, token: (s.focus?.token ?? 0) + 1 },
+      })),
+
+    revealRelationship: (id) => set({ selection: { kind: "relationship", id } }),
 
     search: (query) => {
       const q = query.trim().toLowerCase();

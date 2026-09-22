@@ -5,6 +5,14 @@ import {
   paramShape,
   type DataTypeKind,
 } from "../model/dataTypes";
+import {
+  LOGICAL_TYPE_KINDS,
+  type LogicalTypeKind,
+  type ModelLevel,
+  isConceptual,
+  usesLogicalTypes,
+  usesPhysicalTypes,
+} from "../model/levels";
 import { validateIdentifier } from "../model/identifiers";
 import type { Entity, Field } from "../model/model";
 
@@ -37,6 +45,7 @@ export function SidePanel() {
 
 function EntityEditor({ entity }: { entity: Entity }) {
   const entities = useModelStore((s) => s.model.entities);
+  const level = useModelStore((s) => s.model.level);
   const renameEntity = useModelStore((s) => s.renameEntity);
   const updateEntity = useModelStore((s) => s.updateEntity);
   const addField = useModelStore((s) => s.addField);
@@ -106,6 +115,9 @@ function EntityEditor({ entity }: { entity: Entity }) {
             + Field
           </button>
         </div>
+        {isConceptual(level) && (
+          <p className="side__hint">Conceptual model — fields carry names only.</p>
+        )}
         <div className="fields">
           {entity.fields.map((f, i) => (
             <FieldRow
@@ -114,6 +126,7 @@ function EntityEditor({ entity }: { entity: Entity }) {
               field={f}
               index={i}
               total={entity.fields.length}
+              level={level}
             />
           ))}
           {entity.fields.length === 0 && (
@@ -136,11 +149,13 @@ function FieldRow({
   field,
   index,
   total,
+  level,
 }: {
   entity: Entity;
   field: Field;
   index: number;
   total: number;
+  level: ModelLevel;
 }) {
   const updateField = useModelStore((s) => s.updateField);
   const deleteField = useModelStore((s) => s.deleteField);
@@ -148,7 +163,10 @@ function FieldRow({
   const [nameError, setNameError] = useState<string | null>(null);
 
   const duplicate = entity.fields.some((o) => o.id !== field.id && o.name === field.name);
-  const shape = paramShape(field.type);
+  const shape = field.type ? paramShape(field.type) : "none";
+  const conceptual = isConceptual(level);
+  const showPhysical = usesPhysicalTypes(level);
+  const showLogical = usesLogicalTypes(level);
 
   return (
     <div className="field-row">
@@ -162,19 +180,40 @@ function FieldRow({
             if (!err) updateField(entity.id, field.id, { name: e.target.value });
           }}
         />
-        <select
-          className="field-row__type"
-          value={field.type}
-          onChange={(e) =>
-            updateField(entity.id, field.id, { type: e.target.value as DataTypeKind })
-          }
-        >
-          {DATA_TYPE_KINDS.map((k) => (
-            <option key={k} value={k}>
-              {k}
-            </option>
-          ))}
-        </select>
+        {showPhysical && (
+          <select
+            className="field-row__type"
+            title="Physical type"
+            value={field.type ?? "string"}
+            onChange={(e) =>
+              updateField(entity.id, field.id, { type: e.target.value as DataTypeKind })
+            }
+          >
+            {DATA_TYPE_KINDS.map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
+          </select>
+        )}
+        {showLogical && !showPhysical && (
+          <select
+            className="field-row__type"
+            title="Logical type"
+            value={field.logicalType ?? "Text"}
+            onChange={(e) =>
+              updateField(entity.id, field.id, {
+                logicalType: e.target.value as LogicalTypeKind,
+              })
+            }
+          >
+            {LOGICAL_TYPE_KINDS.map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
+          </select>
+        )}
         <button
           className="field-row__del"
           title="Delete field"
@@ -184,7 +223,39 @@ function FieldRow({
         </button>
       </div>
 
-      {shape === "length" && (
+      {/* Hybrid: logical name + generic type shown beside the physical column (FR-11.5). */}
+      {showPhysical && showLogical && (
+        <div className="field-row__params">
+          <label>
+            logical name
+            <input
+              value={field.logicalName ?? ""}
+              onChange={(e) =>
+                updateField(entity.id, field.id, { logicalName: e.target.value })
+              }
+            />
+          </label>
+          <label>
+            logical type
+            <select
+              value={field.logicalType ?? "Text"}
+              onChange={(e) =>
+                updateField(entity.id, field.id, {
+                  logicalType: e.target.value as LogicalTypeKind,
+                })
+              }
+            >
+              {LOGICAL_TYPE_KINDS.map((k) => (
+                <option key={k} value={k}>
+                  {k}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+
+      {showPhysical && shape === "length" && (
         <div className="field-row__params">
           <label>
             length
@@ -199,7 +270,7 @@ function FieldRow({
           </label>
         </div>
       )}
-      {shape === "decimal" && (
+      {showPhysical && shape === "decimal" && (
         <div className="field-row__params">
           <label>
             precision
@@ -226,6 +297,27 @@ function FieldRow({
         </div>
       )}
 
+      {conceptual ? (
+        <div className="field-row__flags">
+          <span className="field-row__spacer" />
+          <button
+            className="field-row__move"
+            disabled={index === 0}
+            onClick={() => reorderField(entity.id, index, index - 1)}
+            title="Move up"
+          >
+            ↑
+          </button>
+          <button
+            className="field-row__move"
+            disabled={index === total - 1}
+            onClick={() => reorderField(entity.id, index, index + 1)}
+            title="Move down"
+          >
+            ↓
+          </button>
+        </div>
+      ) : (
       <div className="field-row__flags">
         <label className="checkbox">
           <input
@@ -275,6 +367,7 @@ function FieldRow({
           ↓
         </button>
       </div>
+      )}
 
       {nameError && <p className="editor__error">{nameError}</p>}
       {!nameError && duplicate && (

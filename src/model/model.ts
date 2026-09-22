@@ -3,21 +3,26 @@
 // memory only.
 
 import { newId } from "../lib/ids";
-import {
-  type DataTypeKind,
-  type TypeSpec,
-  withTypeDefaults,
-} from "./dataTypes";
+import { type DataTypeKind, withTypeDefaults } from "./dataTypes";
+import type { LogicalTypeKind, ModelLevel } from "./levels";
 
 export interface Position {
   x: number;
   y: number;
 }
 
-export interface Field extends TypeSpec {
+export interface Field {
   id: string;
   name: string;
-  type: DataTypeKind;
+  /** Physical (Postgres) type — present at Physical and Physical/Logical levels. */
+  type?: DataTypeKind;
+  length?: number;
+  precision?: number;
+  scale?: number;
+  /** Generic type — present at Logical and Physical/Logical levels (FR-11.3). */
+  logicalType?: LogicalTypeKind;
+  /** Hybrid logical name shown beside the physical column (FR-11.5). */
+  logicalName?: string;
   nullable: boolean;
   primaryKey: boolean;
   unique: boolean;
@@ -60,6 +65,9 @@ export interface Model {
   id: string;
   name: string;
   description?: string;
+  level: ModelLevel;
+  /** Source model id when this model was derived from another (FR-11.7). */
+  derivedFrom?: string;
   createdAt: string;
   updatedAt: string;
   entities: Entity[];
@@ -68,9 +76,14 @@ export interface Model {
 
 // ---- factories ---------------------------------------------------------------
 
+/**
+ * Create a field. Pass a physical `kind` for a typed (physical) field, or omit
+ * it for a typeless field (Conceptual, or a Logical field that only carries a
+ * logicalType via overrides).
+ */
 export function newField(
   name: string,
-  kind: DataTypeKind = "string",
+  kind?: DataTypeKind,
   overrides: Partial<Field> = {},
 ): Field {
   return {
@@ -79,7 +92,7 @@ export function newField(
     nullable: true,
     primaryKey: false,
     unique: false,
-    ...withTypeDefaults(kind),
+    ...(kind ? withTypeDefaults(kind) : {}),
     ...overrides,
   };
 }
@@ -98,11 +111,12 @@ export function newEntity(
   };
 }
 
-export function newModel(name: string, now: string): Model {
+export function newModel(name: string, now: string, level: ModelLevel = "Physical"): Model {
   return {
     formatVersion: 1,
     id: newId("model"),
     name,
+    level,
     createdAt: now,
     updatedAt: now,
     entities: [],

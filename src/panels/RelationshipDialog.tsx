@@ -24,6 +24,7 @@ const CARDINALITIES: { value: Cardinality; label: string }[] = [
 // junction entity is always created.
 export function RelationshipDialog({ onClose }: Props) {
   const entities = useModelStore((s) => s.model.entities);
+  const level = useModelStore((s) => s.model.level);
   const draft = useModelStore((s) => s.relationshipDraft);
   const createRelationship = useModelStore((s) => s.createRelationship);
 
@@ -126,7 +127,12 @@ export function RelationshipDialog({ onClose }: Props) {
           </select>
         </div>
 
-        {cardinality !== "many-to-many" ? (
+        {level === "Conceptual" ? (
+          <p className="field__hint">
+            Conceptual model — the relationship is drawn as a line only, with no
+            foreign-key fields.
+          </p>
+        ) : cardinality !== "many-to-many" ? (
           <div className="field">
             <label>Foreign-key field on {child.name}</label>
             <input
