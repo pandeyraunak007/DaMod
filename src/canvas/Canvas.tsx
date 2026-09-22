@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -18,6 +18,7 @@ import "@xyflow/react/dist/style.css";
 import { useModelStore } from "../store/modelStore";
 import { EntityNode } from "./EntityNode";
 import { EdgeMarkers, MARKER_MANY, MARKER_ONE } from "./EdgeMarkers";
+import { FloatingToolbar } from "./FloatingToolbar";
 import type { Model, Relationship } from "../model/model";
 
 const nodeTypes = { entity: EntityNode };
@@ -93,6 +94,12 @@ function CanvasInner() {
   const select = useModelStore((s) => s.select);
   const openRelationshipDraft = useModelStore((s) => s.openRelationshipDraft);
 
+  const canvasMode = useModelStore((s) => s.canvasMode);
+  const setCanvasMode = useModelStore((s) => s.setCanvasMode);
+  const createEntity = useModelStore((s) => s.createEntity);
+  const { screenToFlowPosition } = useReactFlow();
+  const [connectFrom, setConnectFrom] = useState<string | null>(null);
+
   const selectedEntityId = selection?.kind === "entity" ? selection.id : null;
   const selectedRelId = selection?.kind === "relationship" ? selection.id : null;
 
@@ -124,8 +131,21 @@ function CanvasInner() {
   );
 
   const onNodeClick: NodeMouseHandler = useCallback(
-    (_, node) => select({ kind: "entity", id: node.id }),
-    [select],
+    (_, node) => {
+      if (canvasMode === "add-relationship") {
+        if (!connectFrom) {
+          setConnectFrom(node.id);
+          select({ kind: "entity", id: node.id });
+        } else {
+          openRelationshipDraft(connectFrom, node.id);
+          setConnectFrom(null);
+          setCanvasMode("select");
+        }
+        return;
+      }
+      select({ kind: "entity", id: node.id });
+    },
+    [canvasMode, connectFrom, openRelationshipDraft, select, setCanvasMode],
   );
 
   const onEdgeClick: EdgeMouseHandler = useCallback(
@@ -140,29 +160,46 @@ function CanvasInner() {
     [openRelationshipDraft],
   );
 
+  const onPaneClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (canvasMode === "add-entity") {
+        const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+        createEntity({ x: Math.round(pos.x), y: Math.round(pos.y) });
+        setCanvasMode("select");
+        return;
+      }
+      setConnectFrom(null);
+      select(null);
+    },
+    [canvasMode, screenToFlowPosition, createEntity, setCanvasMode, select],
+  );
+
   return (
-    <ReactFlow
-      nodes={nodes}
-      edges={edges}
-      nodeTypes={nodeTypes}
-      onNodesChange={onNodesChange}
-      onNodeDragStart={beginInteraction}
-      onNodeDragStop={endInteraction}
-      onNodeClick={onNodeClick}
-      onEdgeClick={onEdgeClick}
-      onConnect={onConnect}
-      onPaneClick={() => select(null)}
-      connectionMode={ConnectionMode.Loose}
-      deleteKeyCode={null}
-      fitView
-      minZoom={0.1}
-      maxZoom={2.5}
-    >
-      <Background gap={16} />
-      <MiniMap pannable zoomable />
-      <Controls />
-      <FocusController />
-    </ReactFlow>
+    <div className={`canvas-wrap canvas-wrap--${canvasMode}`}>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        onNodesChange={onNodesChange}
+        onNodeDragStart={beginInteraction}
+        onNodeDragStop={endInteraction}
+        onNodeClick={onNodeClick}
+        onEdgeClick={onEdgeClick}
+        onConnect={onConnect}
+        onPaneClick={onPaneClick}
+        connectionMode={ConnectionMode.Loose}
+        deleteKeyCode={null}
+        fitView
+        minZoom={0.1}
+        maxZoom={2.5}
+      >
+        <Background gap={16} />
+        <MiniMap pannable zoomable />
+        <Controls />
+        <FocusController />
+      </ReactFlow>
+      <FloatingToolbar connecting={connectFrom != null} />
+    </div>
   );
 }
 

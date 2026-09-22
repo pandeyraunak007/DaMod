@@ -79,6 +79,10 @@ export default function App() {
         else undo();
         return;
       }
+      if (e.key === "Escape") {
+        useModelStore.getState().setCanvasMode("select");
+        return;
+      }
       if ((e.key === "Delete" || e.key === "Backspace") && !isEditableTarget(e.target)) {
         if (useModelStore.getState().selection) {
           e.preventDefault();

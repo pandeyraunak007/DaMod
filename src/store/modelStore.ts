@@ -50,6 +50,8 @@ export interface FocusRequest {
   token: number;
 }
 
+export type CanvasMode = "select" | "add-entity" | "add-relationship";
+
 interface ModelStore {
   model: Model;
   past: Model[];
@@ -59,6 +61,7 @@ interface ModelStore {
   focus: FocusRequest | null;
   relationshipDraft: { source: string; target: string } | null;
   linkDraft: Ref | null;
+  canvasMode: CanvasMode;
   _dragSnapshot: Model | null;
 
   // model
@@ -92,6 +95,9 @@ interface ModelStore {
   beginInteraction: () => void;
   endInteraction: () => void;
   arrange: () => void;
+
+  // canvas interaction mode (floating toolbar)
+  setCanvasMode: (mode: CanvasMode) => void;
 
   // selection / focus / notices
   select: (selection: Selection) => void;
@@ -181,6 +187,7 @@ export const useModelStore = create<ModelStore>((set, get) => {
     focus: null,
     relationshipDraft: null,
     linkDraft: null,
+    canvasMode: "select",
     _dragSnapshot: null,
 
     setModelName: (name) => {
@@ -415,6 +422,8 @@ export const useModelStore = create<ModelStore>((set, get) => {
       });
     },
 
+    setCanvasMode: (mode) => set({ canvasMode: mode }),
+
     select: (selection) => set({ selection }),
 
     revealEntity: (id) =>
@@ -482,6 +491,7 @@ export const useModelStore = create<ModelStore>((set, get) => {
         focus: null,
         relationshipDraft: null,
         linkDraft: null,
+        canvasMode: "select",
       }),
   };
 });
