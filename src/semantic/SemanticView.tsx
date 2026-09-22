@@ -6,6 +6,7 @@ import {
   FILTER_OPS,
   TIME_GRAINS,
   type Aggregate,
+  type Cube,
   type Dimension,
   type EntityRef,
   type FieldRef,
@@ -13,6 +14,7 @@ import {
   type Metric,
   type Term,
   deriveKey,
+  newCube,
   newDimension,
   newMetric,
   newTerm,
@@ -20,7 +22,7 @@ import {
 import { Resolver, metricSql } from "../export/semanticExport";
 import type { NamedModel } from "../export/semanticExport";
 
-type Sel = { kind: "term" | "dimension" | "metric"; id: string } | null;
+type Sel = { kind: "term" | "dimension" | "metric" | "cube"; id: string } | null;
 
 // The semantic view (FR-7.7): lists terms, dimensions and metrics with search and
 // a detail panel for editing. No canvas here.
@@ -30,6 +32,7 @@ export function SemanticView() {
   const addTerm = useWorkspaceStore((s) => s.addTerm);
   const addDimension = useWorkspaceStore((s) => s.addDimension);
   const addMetric = useWorkspaceStore((s) => s.addMetric);
+  const addCube = useWorkspaceStore((s) => s.addCube);
 
   const models = allModels();
   const [sel, setSel] = useState<Sel>(null);
@@ -51,6 +54,11 @@ export function SemanticView() {
     const m = newMetric("New metric");
     addMetric(m);
     setSel({ kind: "metric", id: m.id });
+  };
+  const createCube = () => {
+    const c = newCube("New cube");
+    addCube(c);
+    setSel({ kind: "cube", id: c.id });
   };
 
   return (
@@ -77,12 +85,18 @@ export function SemanticView() {
             <ListItem key={m.id} name={m.name} active={sel?.id === m.id} onClick={() => setSel({ kind: "metric", id: m.id })} />
           ))}
         </Section>
+        <Section title="Cubes" onAdd={createCube}>
+          {(semantic.cubes ?? []).filter((c) => match(c.name)).map((c) => (
+            <ListItem key={c.id} name={c.name} active={sel?.id === c.id} onClick={() => setSel({ kind: "cube", id: c.id })} />
+          ))}
+        </Section>
       </div>
       <div className="semantic__detail">
         {!sel && <p className="side__hint">Select or create a term, dimension or metric.</p>}
         {sel?.kind === "term" && <TermEditor id={sel.id} onGone={() => setSel(null)} />}
         {sel?.kind === "dimension" && <DimensionEditor id={sel.id} models={models} onGone={() => setSel(null)} />}
         {sel?.kind === "metric" && <MetricEditor id={sel.id} models={models} onGone={() => setSel(null)} />}
+        {sel?.kind === "cube" && <CubeEditor id={sel.id} onGone={() => setSel(null)} />}
       </div>
     </div>
   );
@@ -343,6 +357,57 @@ function DimensionEditor({ id, models, onGone }: { id: string; models: NamedMode
           </div>
         </>
       )}
+      <div className="editor__section">
+        <label className="editor__label">Hierarchies (OLAP)</label>
+        {(dim.hierarchies ?? []).map((h, i) => (
+          <div key={i} className="attr-row">
+            <input
+              value={h.name}
+              placeholder="name"
+              onChange={(e) => {
+                const hs = [...(dim.hierarchies ?? [])];
+                hs[i] = { ...hs[i], name: e.target.value };
+                patch({ hierarchies: hs });
+              }}
+            />
+            <input
+              value={h.levels.join(" > ")}
+              placeholder="Year > Quarter > Month"
+              onChange={(e) => {
+                const hs = [...(dim.hierarchies ?? [])];
+                hs[i] = {
+                  ...hs[i],
+                  levels: e.target.value.split(">").map((s) => s.trim()).filter(Boolean),
+                };
+                patch({ hierarchies: hs });
+              }}
+            />
+            <button
+              className="field-row__del"
+              onClick={() => patch({ hierarchies: (dim.hierarchies ?? []).filter((_, j) => j !== i) })}
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+        <button
+          className="btn btn--small"
+          onClick={() =>
+            patch({
+              hierarchies: [
+                ...(dim.hierarchies ?? []),
+                { name: "hierarchy", levels: dim.time ? [...TIME_GRAINS] : [] },
+              ],
+            })
+          }
+        >
+          + Hierarchy
+        </button>
+        <p className="field__hint">
+          Levels: {dim.time ? TIME_GRAINS.join(", ") : (dim.attributes ?? []).map((a) => a.name).join(", ") || "add attributes first"}
+        </p>
+      </div>
+
       <Lineage paths={lineage} />
       <button className="btn btn--danger btn--small" onClick={() => (del(id), onGone())}>
         Delete dimension
@@ -456,6 +521,62 @@ function MetricEditor({ id, models, onGone }: { id: string; models: NamedModel[]
       <Lineage paths={lineage} />
       <button className="btn btn--danger btn--small" onClick={() => (del(id), onGone())}>
         Delete metric
+      </button>
+    </div>
+  );
+}
+
+function CubeEditor({ id, onGone }: { id: string; onGone: () => void }) {
+  const cube = useWorkspaceStore((s) => (s.semantic.cubes ?? []).find((c) => c.id === id));
+  const metrics = useWorkspaceStore((s) => s.semantic.metrics);
+  const dimensions = useWorkspaceStore((s) => s.semantic.dimensions);
+  const update = useWorkspaceStore((s) => s.updateCube);
+  const del = useWorkspaceStore((s) => s.deleteCube);
+  if (!cube) return null;
+  const patch = (p: Partial<Cube>) => update(id, p);
+  const toggle = (arr: string[], v: string) =>
+    arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
+
+  return (
+    <div className="editor">
+      <div className="editor__section">
+        <label className="editor__label">Name</label>
+        <input className="editor__input" value={cube.name} onChange={(e) => patch({ name: e.target.value })} />
+      </div>
+      <div className="editor__section">
+        <label className="editor__label">Description</label>
+        <input className="editor__input" value={cube.description ?? ""} onChange={(e) => patch({ description: e.target.value })} />
+      </div>
+      <div className="editor__section">
+        <label className="editor__label">Measures (metrics)</label>
+        {metrics.length === 0 && <p className="side__hint">Create metrics first.</p>}
+        {metrics.map((m) => (
+          <label key={m.id} className="checkbox">
+            <input
+              type="checkbox"
+              checked={cube.measures.includes(m.id)}
+              onChange={() => patch({ measures: toggle(cube.measures, m.id) })}
+            />
+            {m.name}
+          </label>
+        ))}
+      </div>
+      <div className="editor__section">
+        <label className="editor__label">Dimensions</label>
+        {dimensions.length === 0 && <p className="side__hint">Create dimensions first.</p>}
+        {dimensions.map((d) => (
+          <label key={d.id} className="checkbox">
+            <input
+              type="checkbox"
+              checked={cube.dimensions.includes(d.id)}
+              onChange={() => patch({ dimensions: toggle(cube.dimensions, d.id) })}
+            />
+            {d.name}
+          </label>
+        ))}
+      </div>
+      <button className="btn btn--danger btn--small" onClick={() => (del(id), onGone())}>
+        Delete cube
       </button>
     </div>
   );

@@ -38,6 +38,7 @@ function fixture() {
       },
       { id: "k_aov", name: "AOV", key: "aov", derived: { left: "k_rev", op: "/", right: "k_lc" } },
     ],
+    cubes: [],
   };
   return { models, semantic, orders };
 }

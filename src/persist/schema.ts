@@ -33,6 +33,7 @@ const zEntity = z.object({
   name: z.string(),
   description: z.string().optional(),
   tags: z.array(z.string()).optional(),
+  stereotype: z.enum(["fact", "dimension"]).optional(),
   position: z.object({ x: z.number(), y: z.number() }),
   fields: z.array(zField),
 });
@@ -59,6 +60,7 @@ const zModel = z.object({
   description: z.string().optional(),
   // Models written before levels existed default to Physical (FR-5.6 migration).
   level: z.enum(MODEL_LEVELS as unknown as [string, ...string[]]).optional().default("Physical"),
+  notation: z.enum(["IE", "IDEF1X"]).optional(),
   derivedFrom: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),

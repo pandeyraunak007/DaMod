@@ -3,6 +3,7 @@ import {
   type Entity,
   type Field,
   type Model,
+  type Notation,
   type Position,
   type Relationship,
   findEntity,
@@ -67,11 +68,15 @@ interface ModelStore {
   // model
   setModelName: (name: string) => string | null;
   setModelLevel: (level: ModelLevel) => AmbiguousField[];
+  setNotation: (notation: Notation) => void;
 
   // entities
   createEntity: (position?: Position) => string;
   renameEntity: (id: string, name: string) => string | null;
-  updateEntity: (id: string, patch: Partial<Pick<Entity, "description" | "tags">>) => void;
+  updateEntity: (
+    id: string,
+    patch: Partial<Pick<Entity, "description" | "tags" | "stereotype">>,
+  ) => void;
   deleteEntity: (id: string) => DeleteEntityResult;
 
   // fields
@@ -95,6 +100,7 @@ interface ModelStore {
   beginInteraction: () => void;
   endInteraction: () => void;
   arrange: () => void;
+  arrangeStar: () => void;
 
   // canvas interaction mode (floating toolbar)
   setCanvasMode: (mode: CanvasMode) => void;
@@ -209,6 +215,12 @@ export const useModelStore = create<ModelStore>((set, get) => {
       return result.ambiguous;
     },
 
+    setNotation: (notation) => {
+      commit((m) => {
+        m.notation = notation;
+      });
+    },
+
     createEntity: (position) => {
       const state = get();
       const taken = new Set(state.model.entities.map((e) => e.name));
@@ -240,6 +252,7 @@ export const useModelStore = create<ModelStore>((set, get) => {
         if (!e) return;
         if ("description" in patch) e.description = patch.description || undefined;
         if ("tags" in patch) e.tags = patch.tags?.length ? patch.tags : undefined;
+        if ("stereotype" in patch) e.stereotype = patch.stereotype || undefined;
       });
     },
 
@@ -417,6 +430,27 @@ export const useModelStore = create<ModelStore>((set, get) => {
           e.position = {
             x: 80 + (i % cols) * gapX,
             y: 80 + Math.floor(i / cols) * gapY,
+          };
+        });
+      });
+    },
+
+    // Star-schema layout: facts in the centre, dimensions (and others) in a ring.
+    arrangeStar: () => {
+      commit((m) => {
+        const facts = m.entities.filter((e) => e.stereotype === "fact");
+        const ring = m.entities.filter((e) => e.stereotype !== "fact");
+        const cx = 560;
+        const cy = 380;
+        facts.forEach((f, i) => {
+          f.position = { x: cx - 90, y: cy - 60 + i * 170 };
+        });
+        const R = 320;
+        ring.forEach((d, i) => {
+          const a = (2 * Math.PI * i) / Math.max(1, ring.length) - Math.PI / 2;
+          d.position = {
+            x: Math.round(cx + R * Math.cos(a) - 90),
+            y: Math.round(cy + R * Math.sin(a) - 60),
           };
         });
       });

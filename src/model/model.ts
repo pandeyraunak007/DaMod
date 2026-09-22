@@ -30,6 +30,8 @@ export interface Field {
   description?: string;
 }
 
+export type Stereotype = "fact" | "dimension";
+
 export interface Entity {
   id: string;
   name: string;
@@ -39,6 +41,8 @@ export interface Entity {
   fields: Field[];
   /** Marks an entity the tool created for a many-to-many relationship (FR-3.4). */
   junction?: boolean;
+  /** Dimensional-modeling role (star schema). */
+  stereotype?: Stereotype;
 }
 
 export type Cardinality = "one-to-one" | "one-to-many" | "many-to-many";
@@ -70,12 +74,16 @@ export interface Relationship {
   junctionEntity?: string;
 }
 
+export type Notation = "IE" | "IDEF1X";
+
 export interface Model {
   formatVersion: 1;
   id: string;
   name: string;
   description?: string;
   level: ModelLevel;
+  /** Diagram notation (default IE crow's-foot). */
+  notation?: Notation;
   /** Source model id when this model was derived from another (FR-11.7). */
   derivedFrom?: string;
   createdAt: string;

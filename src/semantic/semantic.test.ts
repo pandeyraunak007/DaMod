@@ -43,6 +43,7 @@ describe("semantic serialization", () => {
       },
       { id: "k_2", name: "AOV", key: "aov", derived: { left: "k_1", op: "/", right: "k_3" } },
     ],
+    cubes: [],
   };
 
   it("is deterministic and round-trips", () => {

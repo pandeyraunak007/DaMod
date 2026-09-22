@@ -43,6 +43,7 @@ import {
 } from "../links/links";
 import { serializeLinks, parseLinksFile } from "../links/linksPersist";
 import {
+  type Cube,
   type Dimension,
   type Metric,
   type SemanticDoc,
@@ -107,6 +108,9 @@ interface WorkspaceState {
   addMetric: (metric: Metric) => void;
   updateMetric: (id: string, patch: Partial<Metric>) => void;
   deleteMetric: (id: string) => void;
+  addCube: (cube: Cube) => void;
+  updateCube: (id: string, patch: Partial<Cube>) => void;
+  deleteCube: (id: string) => void;
 }
 
 function nowIso(): string {
@@ -594,6 +598,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     deleteMetric: (id) => {
       const s = get().semantic;
       commitSemantic({ ...s, metrics: s.metrics.filter((m) => m.id !== id) });
+    },
+
+    addCube: (cube) => {
+      const s = get().semantic;
+      commitSemantic({ ...s, cubes: [...(s.cubes ?? []), cube] });
+    },
+    updateCube: (id, patch) => {
+      const s = get().semantic;
+      commitSemantic({
+        ...s,
+        cubes: (s.cubes ?? []).map((c) => (c.id === id ? { ...c, ...patch } : c)),
+      });
+    },
+    deleteCube: (id) => {
+      const s = get().semantic;
+      commitSemantic({ ...s, cubes: (s.cubes ?? []).filter((c) => c.id !== id) });
     },
   };
 });

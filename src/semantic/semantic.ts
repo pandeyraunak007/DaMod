@@ -33,6 +33,12 @@ export interface DimensionAttribute {
   field: FieldRef;
 }
 
+/** An OLAP hierarchy: ordered levels (attribute or grain names), coarse → fine. */
+export interface Hierarchy {
+  name: string;
+  levels: string[];
+}
+
 export interface Dimension {
   id: string;
   name: string;
@@ -44,6 +50,8 @@ export interface Dimension {
   /** A time dimension is bound to a date/timestamp field with standard grains. */
   time?: boolean;
   field?: FieldRef;
+  /** OLAP drill hierarchies over this dimension's attributes (or time grains). */
+  hierarchies?: Hierarchy[];
 }
 
 export const TIME_GRAINS = ["day", "week", "month", "quarter", "year"] as const;
@@ -78,15 +86,25 @@ export interface Metric {
   derived?: { left: string; op: DerivedOp; right: string };
 }
 
+/** An OLAP cube: a named grouping of measures (metrics) over dimensions. */
+export interface Cube {
+  id: string;
+  name: string;
+  description?: string;
+  measures: string[]; // metric ids
+  dimensions: string[]; // dimension ids
+}
+
 export interface SemanticDoc {
   formatVersion: 1;
   terms: Term[];
   dimensions: Dimension[];
   metrics: Metric[];
+  cubes: Cube[];
 }
 
 export function emptySemanticDoc(): SemanticDoc {
-  return { formatVersion: 1, terms: [], dimensions: [], metrics: [] };
+  return { formatVersion: 1, terms: [], dimensions: [], metrics: [], cubes: [] };
 }
 
 /**
@@ -116,4 +134,8 @@ export function newDimension(name: string): Dimension {
 
 export function newMetric(name: string): Metric {
   return { id: newId("metric"), name, key: deriveKey(name), aggregate: "count" };
+}
+
+export function newCube(name: string): Cube {
+  return { id: newId("cube"), name, measures: [], dimensions: [] };
 }

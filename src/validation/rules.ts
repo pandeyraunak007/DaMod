@@ -336,6 +336,33 @@ function entityWithoutRelationships(ctx: ValidationContext): Issue[] {
   return issues;
 }
 
+function factWithoutDimension(ctx: ValidationContext): Issue[] {
+  const issues: Issue[] = [];
+  for (const { id, model } of ctx.models) {
+    const dimIds = new Set(
+      model.entities.filter((e) => e.stereotype === "dimension").map((e) => e.id),
+    );
+    if (dimIds.size === 0) continue;
+    for (const fact of model.entities.filter((e) => e.stereotype === "fact")) {
+      const touchesDim = model.relationships.some(
+        (r) =>
+          (r.parentEntity === fact.id && dimIds.has(r.childEntity)) ||
+          (r.childEntity === fact.id && dimIds.has(r.parentEntity)),
+      );
+      if (!touchesDim) {
+        issues.push({
+          id: `factNoDim:${id}:${fact.id}`,
+          rule: "factWithoutDimension",
+          severity: "warning",
+          message: `Fact “${fact.name}” references no dimension`,
+          target: { model: id, entity: fact.id },
+        });
+      }
+    }
+  }
+  return issues;
+}
+
 function physicalFieldWithoutType(ctx: ValidationContext): Issue[] {
   const issues: Issue[] = [];
   for (const { id, model } of ctx.models) {
@@ -453,6 +480,7 @@ const RULES: ((ctx: ValidationContext) => Issue[])[] = [
   sameAsGroupWithoutCanonical,
   entityWithoutPrimaryKey,
   entityWithoutRelationships,
+  factWithoutDimension,
   physicalFieldWithoutType,
   metricAggregateFit,
   semanticBindingDangling,

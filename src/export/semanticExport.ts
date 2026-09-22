@@ -123,6 +123,9 @@ export function exportSemanticYaml(
     if (d.attributes && d.attributes.length) {
       out.attributes = d.attributes.map((a) => ({ name: a.name, field: r.fieldPath(a.field) }));
     }
+    if (d.hierarchies && d.hierarchies.length) {
+      out.hierarchies = d.hierarchies.map((h) => ({ name: h.name, levels: [...h.levels] }));
+    }
     return out;
   });
 
@@ -149,5 +152,15 @@ export function exportSemanticYaml(
     return out;
   });
 
-  return yamlStringify({ terms, dimensions, metrics });
+  const cubes = [...(semantic.cubes ?? [])].sort(byName).map((c) => {
+    const out: Record<string, unknown> = { name: c.name };
+    if (c.description) out.description = c.description;
+    out.measures = c.measures.map((id) => semantic.metrics.find((m) => m.id === id)?.name ?? "?");
+    out.dimensions = c.dimensions.map(
+      (id) => semantic.dimensions.find((d) => d.id === id)?.name ?? "?",
+    );
+    return out;
+  });
+
+  return yamlStringify({ terms, dimensions, metrics, cubes });
 }

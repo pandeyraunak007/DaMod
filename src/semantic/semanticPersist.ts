@@ -6,6 +6,7 @@ import {
   AGGREGATES,
   DERIVED_OPS,
   FILTER_OPS,
+  type Cube,
   type Dimension,
   type FieldRef,
   type Metric,
@@ -44,6 +45,17 @@ function serializeDimension(d: Dimension): Record<string, unknown> {
   }
   if (d.time) out.time = true;
   if (d.field) out.field = fieldRef(d.field);
+  if (d.hierarchies && d.hierarchies.length) {
+    out.hierarchies = d.hierarchies.map((h) => ({ name: h.name, levels: [...h.levels] }));
+  }
+  return out;
+}
+
+function serializeCube(c: Cube): Record<string, unknown> {
+  const out: Record<string, unknown> = { id: c.id, name: c.name };
+  if (c.description) out.description = c.description;
+  out.measures = [...c.measures];
+  out.dimensions = [...c.dimensions];
   return out;
 }
 
@@ -70,6 +82,7 @@ export function serializeSemantic(doc: SemanticDoc): string {
     terms: doc.terms.map(serializeTerm),
     dimensions: doc.dimensions.map(serializeDimension),
     metrics: doc.metrics.map(serializeMetric),
+    cubes: (doc.cubes ?? []).map(serializeCube),
   };
   return JSON.stringify(out, null, 2) + "\n";
 }
@@ -96,6 +109,17 @@ const zDimension = z.object({
   attributes: z.array(z.object({ name: z.string(), field: zFieldRef })).optional(),
   time: z.boolean().optional(),
   field: zFieldRef.optional(),
+  hierarchies: z
+    .array(z.object({ name: z.string(), levels: z.array(z.string()) }))
+    .optional(),
+});
+
+const zCube = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  measures: z.array(z.string()).optional().default([]),
+  dimensions: z.array(z.string()).optional().default([]),
 });
 
 const zMetric = z.object({
@@ -129,6 +153,7 @@ const zSemanticDoc = z.object({
   terms: z.array(zTerm).optional().default([]),
   dimensions: z.array(zDimension).optional().default([]),
   metrics: z.array(zMetric).optional().default([]),
+  cubes: z.array(zCube).optional().default([]),
 });
 
 export function parseSemanticFile(text: string): ParseResult<SemanticDoc> {

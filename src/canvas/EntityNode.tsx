@@ -4,6 +4,7 @@ import { useModelStore } from "../store/modelStore";
 import { useWorkspaceStore } from "../store/workspaceStore";
 import { fieldTypeLabel } from "../model/fieldDisplay";
 import { isConceptual } from "../model/levels";
+import type { Field } from "../model/model";
 import { type Ref, linksTouching } from "../links/links";
 
 // A canvas card for one entity (FR-4.1): name plus fields with key markers and
@@ -14,6 +15,8 @@ function EntityNodeImpl({ data, selected }: NodeProps) {
   const entity = useModelStore((s) => s.model.entities.find((e) => e.id === entityId));
   const level = useModelStore((s) => s.model.level);
   const modelId = useModelStore((s) => s.model.id);
+  const notation = useModelStore((s) => s.model.notation ?? "IE");
+  const relationships = useModelStore((s) => s.model.relationships);
   const renameEntity = useModelStore((s) => s.renameEntity);
   const links = useWorkspaceStore((s) => s.links.links);
   const allModels = useWorkspaceStore((s) => s.allModels);
@@ -62,8 +65,53 @@ function EntityNodeImpl({ data, selected }: NodeProps) {
     setEditing(false);
   };
 
+  const idef = notation === "IDEF1X";
+  // Foreign-key fields (for IDEF1X (FK) markers).
+  const fkIds = new Set<string>();
+  for (const r of relationships) {
+    if (r.childEntity === entity.id) r.foreignKeyFields.forEach((id) => fkIds.add(id));
+  }
+  if (entity.junction) entity.fields.forEach((f) => f.primaryKey && fkIds.add(f.id));
+  // IDEF1X: identifier-dependent entities (identifying/subtype child) get round corners.
+  const dependent = relationships.some(
+    (r) => r.childEntity === entity.id && (r.identifying || r.subtype),
+  );
+  const keyMark = (f: Field) =>
+    f.primaryKey ? "PK" : fkIds.has(f.id) ? "FK" : f.unique ? "U" : "";
+
+  const renderField = (f: Field) => (
+    <li key={f.id} className="entity__field">
+      <span className="entity__key">{keyMark(f)}</span>
+      <span className="entity__field-name">{f.name}</span>
+      <span className="entity__field-type">
+        {fieldTypeLabel(f, level)}
+        {!f.nullable && <span className="entity__notnull" title="NOT NULL"> •</span>}
+        {linksTouching(links, { model: modelId, entity: entity.id, field: f.id }).length > 0 && (
+          <span
+            className="entity__field-link"
+            title={linkTitle({ model: modelId, entity: entity.id, field: f.id })}
+          >
+            {" "}
+            🔗
+          </span>
+        )}
+      </span>
+    </li>
+  );
+
+  const cls = [
+    "entity",
+    selected && "entity--selected",
+    entity.junction && "entity--junction",
+    entity.stereotype && `entity--${entity.stereotype}`,
+    idef && "entity--idef",
+    idef && dependent && "entity--dependent",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div className={`entity ${selected ? "entity--selected" : ""} ${entity.junction ? "entity--junction" : ""}`}>
+    <div className={cls}>
       <Handle type="target" position={Position.Left} id="l" className="entity__handle" />
       <Handle type="source" position={Position.Right} id="r" className="entity__handle" />
       <Handle type="target" position={Position.Top} id="t" className="entity__handle" />
@@ -100,33 +148,25 @@ function EntityNodeImpl({ data, selected }: NodeProps) {
       </div>
 
       {/* Conceptual models draw entity boxes with no field rows (FR-11.2). */}
-      {!isConceptual(level) && (
-        <ul className="entity__fields">
-          {entity.fields.length === 0 && <li className="entity__empty">no fields</li>}
-          {entity.fields.map((f) => (
-            <li key={f.id} className="entity__field">
-              <span className="entity__key">
-                {f.primaryKey ? "PK" : f.unique ? "U" : ""}
-              </span>
-              <span className="entity__field-name">{f.name}</span>
-              <span className="entity__field-type">
-                {fieldTypeLabel(f, level)}
-                {!f.nullable && <span className="entity__notnull" title="NOT NULL"> •</span>}
-                {linksTouching(links, { model: modelId, entity: entity.id, field: f.id }).length >
-                  0 && (
-                  <span
-                    className="entity__field-link"
-                    title={linkTitle({ model: modelId, entity: entity.id, field: f.id })}
-                  >
-                    {" "}
-                    🔗
-                  </span>
-                )}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+      {!isConceptual(level) &&
+        (entity.fields.length === 0 ? (
+          <ul className="entity__fields">
+            <li className="entity__empty">no fields</li>
+          </ul>
+        ) : idef ? (
+          // IDEF1X: primary keys in a top compartment, a line, then the rest.
+          <>
+            <ul className="entity__fields">
+              {entity.fields.filter((f) => f.primaryKey).map(renderField)}
+            </ul>
+            <div className="entity__pk-divider" />
+            <ul className="entity__fields">
+              {entity.fields.filter((f) => !f.primaryKey).map(renderField)}
+            </ul>
+          </>
+        ) : (
+          <ul className="entity__fields">{entity.fields.map(renderField)}</ul>
+        ))}
     </div>
   );
 }

@@ -22,10 +22,14 @@ export function Toolbar({
 }: Props) {
   const modelName = useModelStore((s) => s.model.name);
   const level = useModelStore((s) => s.model.level);
+  const notation = useModelStore((s) => s.model.notation ?? "IE");
   const setModelName = useModelStore((s) => s.setModelName);
   const setModelLevel = useModelStore((s) => s.setModelLevel);
+  const setNotation = useModelStore((s) => s.setNotation);
   const createEntity = useModelStore((s) => s.createEntity);
   const arrange = useModelStore((s) => s.arrange);
+  const arrangeStar = useModelStore((s) => s.arrangeStar);
+  const hasStereotypes = useModelStore((s) => s.model.entities.some((e) => e.stereotype));
   const undo = useModelStore((s) => s.undo);
   const redo = useModelStore((s) => s.redo);
   const canUndo = useModelStore((s) => s.past.length > 0);
@@ -115,6 +119,13 @@ export function Toolbar({
             </option>
           ))}
         </select>
+        <button
+          className="btn btn--small"
+          onClick={() => setNotation(notation === "IE" ? "IDEF1X" : "IE")}
+          title="Toggle diagram notation"
+        >
+          {notation}
+        </button>
       </div>
 
       <div className="toolbar__group">
@@ -124,6 +135,11 @@ export function Toolbar({
         <button className="btn" onClick={arrange} title="Auto-arrange layout">
           Arrange
         </button>
+        {hasStereotypes && (
+          <button className="btn" onClick={arrangeStar} title="Star-schema layout (facts centre)">
+            Star
+          </button>
+        )}
         <button className="btn" onClick={undo} disabled={!canUndo} title="Undo (⌘Z)">
           Undo
         </button>

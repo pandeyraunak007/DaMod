@@ -161,6 +161,23 @@ function EntityEditor({ entity }: { entity: Entity }) {
       </div>
 
       <div className="editor__section">
+        <label className="editor__label">Stereotype (dimensional)</label>
+        <select
+          className="editor__input"
+          value={entity.stereotype ?? ""}
+          onChange={(e) =>
+            updateEntity(entity.id, {
+              stereotype: e.target.value ? (e.target.value as "fact" | "dimension") : undefined,
+            })
+          }
+        >
+          <option value="">— none —</option>
+          <option value="fact">Fact</option>
+          <option value="dimension">Dimension</option>
+        </select>
+      </div>
+
+      <div className="editor__section">
         <div className="editor__fields-head">
           <span className="editor__label">Fields</span>
           <button className="btn btn--small" onClick={() => addField(entity.id)}>

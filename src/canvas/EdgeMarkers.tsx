@@ -32,6 +32,18 @@ export function EdgeMarkers() {
         >
           <path d="M12,4 L12,18" stroke="#64748b" strokeWidth="1.6" fill="none" />
         </marker>
+        {/* IDEF1X child-end dot (filled circle) for the "many" cardinality. */}
+        <marker
+          id="damod-idef-dot"
+          markerWidth="16"
+          markerHeight="16"
+          refX="8"
+          refY="8"
+          orient="auto-start-reverse"
+          markerUnits="userSpaceOnUse"
+        >
+          <circle cx="8" cy="8" r="4.5" fill="#64748b" />
+        </marker>
         {/* Subtype / category symbol (IDEF1X-style circle with an underline). */}
         <marker
           id="damod-subtype"
@@ -53,3 +65,4 @@ export function EdgeMarkers() {
 export const MARKER_MANY = "url(#damod-many)";
 export const MARKER_ONE = "url(#damod-one)";
 export const MARKER_SUBTYPE = "url(#damod-subtype)";
+export const MARKER_IDEF_DOT = "url(#damod-idef-dot)";

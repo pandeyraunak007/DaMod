@@ -225,6 +225,28 @@ body,
 .entity--junction {
   border-style: dashed;
 }
+/* IDEF1X: identifier-dependent entities have rounded corners; PK compartment divider. */
+.entity--idef.entity--dependent {
+  border-radius: 16px;
+}
+.entity__pk-divider {
+  height: 0;
+  border-top: 1.5px solid var(--border-strong);
+  margin: 0;
+}
+/* Dimensional stereotypes (star schema). */
+.entity--fact {
+  border-color: #2563eb;
+}
+.entity--fact .entity__header {
+  background: #dbeafe;
+}
+.entity--dimension {
+  border-color: #16a34a;
+}
+.entity--dimension .entity__header {
+  background: #dcfce7;
+}
 .entity__header {
   background: #eef2f7;
   padding: 0.35rem 0.55rem;

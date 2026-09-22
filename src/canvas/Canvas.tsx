@@ -17,7 +17,13 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useModelStore } from "../store/modelStore";
 import { EntityNode } from "./EntityNode";
-import { EdgeMarkers, MARKER_MANY, MARKER_ONE, MARKER_SUBTYPE } from "./EdgeMarkers";
+import {
+  EdgeMarkers,
+  MARKER_MANY,
+  MARKER_ONE,
+  MARKER_SUBTYPE,
+  MARKER_IDEF_DOT,
+} from "./EdgeMarkers";
 import { FloatingToolbar } from "./FloatingToolbar";
 import type { Model, Relationship } from "../model/model";
 
@@ -30,11 +36,19 @@ function baseRelId(edgeId: string): string {
 function buildEdges(model: Model, selectedRelId: string | null): Edge[] {
   const edges: Edge[] = [];
   const selected = (rel: Relationship) => rel.id === selectedRelId;
+  const idef = (model.notation ?? "IE") === "IDEF1X";
 
   for (const rel of model.relationships) {
     if (rel.cardinality !== "many-to-many") {
-      const childMarker = rel.cardinality === "one-to-many" ? MARKER_MANY : MARKER_ONE;
-      const parentMarker = rel.subtype ? MARKER_SUBTYPE : MARKER_ONE;
+      // IDEF1X marks the child (many) end with a filled dot; IE uses crow's foot.
+      const childMarker = idef
+        ? rel.cardinality === "one-to-many"
+          ? MARKER_IDEF_DOT
+          : undefined
+        : rel.cardinality === "one-to-many"
+          ? MARKER_MANY
+          : MARKER_ONE;
+      const parentMarker = rel.subtype ? MARKER_SUBTYPE : idef ? undefined : MARKER_ONE;
       // Identifying (and subtype) relationships are solid; non-identifying dashed.
       const style: React.CSSProperties = {};
       if (selected(rel)) {

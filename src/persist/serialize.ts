@@ -39,6 +39,7 @@ function serializeEntity(e: Entity): Record<string, unknown> {
   const out: Record<string, unknown> = { id: e.id, name: e.name };
   if (e.description) out.description = e.description;
   if (e.tags && e.tags.length) out.tags = [...e.tags];
+  if (e.stereotype) out.stereotype = e.stereotype;
   out.position = { x: e.position.x, y: e.position.y };
   out.fields = e.fields.map(serializeField);
   return out;
@@ -69,6 +70,7 @@ export function modelToPlain(model: Model): Record<string, unknown> {
   };
   if (model.description) out.description = model.description;
   out.level = model.level;
+  if (model.notation && model.notation !== "IE") out.notation = model.notation;
   if (model.derivedFrom) out.derivedFrom = model.derivedFrom;
   out.createdAt = model.createdAt;
   out.updatedAt = model.updatedAt;
