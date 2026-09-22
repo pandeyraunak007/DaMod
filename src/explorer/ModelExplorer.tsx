@@ -618,6 +618,13 @@ function EntityBranch({
   const entityMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     openMenu(e.clientX, e.clientY, [
+      {
+        label: "Properties…",
+        onClick: async () => {
+          await reveal();
+          useModelStore.getState().openProperties();
+        },
+      },
       { label: "Add field", onClick: onAddField },
       { label: "Add relationship", onClick: onAddRelationship },
       { label: "Rename", onClick: () => (setDraft(entity.name), setRenaming(true)) },
@@ -709,6 +716,13 @@ function RelationshipRow({
   const menu = (e: React.MouseEvent) => {
     e.preventDefault();
     openMenu(e.clientX, e.clientY, [
+      {
+        label: "Properties…",
+        onClick: async () => {
+          await reveal();
+          useModelStore.getState().openProperties();
+        },
+      },
       {
         label: "Delete relationship",
         danger: true,

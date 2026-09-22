@@ -1308,6 +1308,99 @@ body,
   margin-left: 0.2rem;
 }
 
+/* ---- properties dialog (ERwin-style) ---- */
+.modal--props {
+  width: 560px;
+  max-width: 94vw;
+  padding: 0;
+  overflow: hidden;
+}
+.props__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.8rem 1.1rem 0.4rem;
+}
+.tabs {
+  display: flex;
+  gap: 0.15rem;
+  padding: 0 1.1rem;
+  border-bottom: 1px solid var(--border);
+}
+.tab-btn {
+  border: none;
+  background: transparent;
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+}
+.tab-btn--active {
+  color: var(--text);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+.props__body {
+  padding: 0.9rem 1.1rem 1.1rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.props__body .field label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-bottom: 0.2rem;
+}
+.props__body .field input,
+.props__body .field select,
+.props__body .field textarea,
+.props__body > textarea {
+  width: 100%;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  font: inherit;
+}
+.props__body .field {
+  margin-bottom: 0.7rem;
+}
+.props__field {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 0.4rem;
+}
+.props__field-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  border: none;
+  background: #f6f7f9;
+  padding: 0.35rem 0.5rem;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 6px;
+}
+.props__field-body {
+  padding: 0.5rem;
+}
+.props__field-body input,
+.props__field-body select,
+.props__field-body textarea {
+  padding: 0.25rem 0.35rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  font: inherit;
+}
+.props__field-body .field {
+  margin-top: 0.4rem;
+}
+.props__field-body .field input,
+.props__field-body .field textarea {
+  width: 100%;
+}
+
 /* ---- toasts ---- */
 .toasts {
   position: fixed;

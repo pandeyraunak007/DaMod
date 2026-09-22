@@ -15,6 +15,7 @@ import { ExportDialog } from "./export/ExportDialog";
 import { Canvas } from "./canvas/Canvas";
 import { SidePanel } from "./panels/SidePanel";
 import { RelationshipDialog } from "./panels/RelationshipDialog";
+import { PropertiesDialog } from "./panels/PropertiesDialog";
 import { LinkDialog } from "./links/LinkDialog";
 import { useModelStore } from "./store/modelStore";
 import { useWorkspaceStore } from "./store/workspaceStore";
@@ -41,6 +42,8 @@ export default function App() {
   const closeRelationshipDraft = useModelStore((s) => s.closeRelationshipDraft);
   const linkDraft = useModelStore((s) => s.linkDraft);
   const closeLinkDraft = useModelStore((s) => s.closeLinkDraft);
+  const propertiesOpen = useModelStore((s) => s.propertiesOpen);
+  const closeProperties = useModelStore((s) => s.closeProperties);
   const undo = useModelStore((s) => s.undo);
   const redo = useModelStore((s) => s.redo);
 
@@ -86,6 +89,13 @@ export default function App() {
       if (e.key === "Escape") {
         useModelStore.getState().setCanvasMode("select");
         return;
+      }
+      if (e.key === "Enter" && !isEditableTarget(e.target)) {
+        const sel = useModelStore.getState().selection;
+        if (sel?.kind === "entity" || sel?.kind === "relationship") {
+          e.preventDefault();
+          useModelStore.getState().openProperties();
+        }
       }
       if ((e.key === "Delete" || e.key === "Backspace") && !isEditableTarget(e.target)) {
         if (useModelStore.getState().selection) {
@@ -165,6 +175,7 @@ export default function App() {
 
       {relationshipDraft && <RelationshipDialog onClose={closeRelationshipDraft} />}
       {linkDraft && <LinkDialog from={linkDraft} onClose={closeLinkDraft} />}
+      {propertiesOpen && <PropertiesDialog onClose={closeProperties} />}
       {newModelOpen && <NewModelDialog onClose={() => setNewModelOpen(false)} />}
       {historyOpen && <HistoryDialog onClose={() => setHistoryOpen(false)} />}
       {mapOpen && <WorkspaceMap onClose={() => setMapOpen(false)} />}

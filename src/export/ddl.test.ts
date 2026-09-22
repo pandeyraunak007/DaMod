@@ -133,3 +133,14 @@ describe("other database objects (views, indexes, sequences, raw)", () => {
     expect(sql).toContain("ZORDER BY");
   });
 });
+
+describe("referential integrity in DDL (ERwin RI)", () => {
+  it("emits ON DELETE / ON UPDATE for Postgres", () => {
+    const m = ordersModel();
+    const rel = m.relationships.find((r) => r.cardinality === "one-to-many")!;
+    rel.onDelete = "cascade";
+    rel.onUpdate = "restrict";
+    const sql = exportModelDDL(m, DIALECTS.postgres);
+    expect(sql).toContain("ON DELETE CASCADE ON UPDATE RESTRICT");
+  });
+});

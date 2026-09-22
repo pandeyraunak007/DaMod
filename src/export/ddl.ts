@@ -4,7 +4,13 @@
 // at the end (FR-8.3), and COMMENTs (FR-8.4). The same model always produces a
 // byte-identical file (FR-8.6). Parameterised by dialect.
 
-import { type Entity, type Model, findEntity, primaryKeyFields } from "../model/model";
+import {
+  type Entity,
+  type Model,
+  type RiAction,
+  findEntity,
+  primaryKeyFields,
+} from "../model/model";
 import type { Dialect } from "./dialects";
 import type { Link } from "../links/links";
 
@@ -16,6 +22,21 @@ interface Fk {
   child: Entity;
   parent: Entity;
   cols: FkCol[];
+  onDelete?: RiAction;
+  onUpdate?: RiAction;
+}
+
+/** Referential-integrity clause for a foreign key (Postgres only; other engines
+ *  treat FKs as informational). */
+function riClause(d: Dialect, fk: Fk): string {
+  if (d.id !== "postgres") return "";
+  const word = (a?: RiAction) => (!a || a === "no action" ? null : a.toUpperCase());
+  const parts: string[] = [];
+  const del = word(fk.onDelete);
+  const upd = word(fk.onUpdate);
+  if (del) parts.push(` ON DELETE ${del}`);
+  if (upd) parts.push(` ON UPDATE ${upd}`);
+  return parts.join("");
 }
 
 function sqlString(s: string): string {
@@ -42,7 +63,9 @@ export function foreignKeys(model: Model): Fk[] {
         const fkName = fieldName(child, fkId);
         if (pk && fkName) cols.push({ fk: fkName, pk: pk.name });
       });
-      if (cols.length) fks.push({ child, parent, cols });
+      if (cols.length) {
+        fks.push({ child, parent, cols, onDelete: rel.onDelete, onUpdate: rel.onUpdate });
+      }
     } else if (rel.junctionEntity) {
       const junction = findEntity(model, rel.junctionEntity);
       const child = findEntity(model, rel.childEntity);
@@ -124,7 +147,7 @@ function tableDDL(
     lines.push(
       `  FOREIGN KEY (${fk.cols.map((c) => q(c.fk)).join(", ")}) REFERENCES ${parentRef} (${fk.cols
         .map((c) => q(c.pk))
-        .join(", ")})`,
+        .join(", ")})${riClause(d, fk)}`,
     );
   }
   let ddl = `CREATE TABLE ${ref} (\n${lines.join(",\n")}\n)`;
@@ -150,7 +173,9 @@ function alterFk(d: Dialect, fk: Fk, schema?: string): string {
   const parentRef = tableRef(d, fk.parent.name, schema);
   return `ALTER TABLE ${childRef} ADD FOREIGN KEY (${fk.cols
     .map((c) => d.quote(c.fk))
-    .join(", ")}) REFERENCES ${parentRef} (${fk.cols.map((c) => d.quote(c.pk)).join(", ")});`;
+    .join(", ")}) REFERENCES ${parentRef} (${fk.cols
+    .map((c) => d.quote(c.pk))
+    .join(", ")})${riClause(d, fk)};`;
 }
 
 // ---- other database objects (dialect-aware) ---------------------------------

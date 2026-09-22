@@ -15,9 +15,15 @@ import type {
   RawObject,
   Relationship,
   Sequence,
+  Udp,
   View,
 } from "../model/model";
 import { paramShape } from "../model/dataTypes";
+
+function udpsOut(out: Record<string, unknown>, note: string | undefined, udps: Udp[] | undefined) {
+  if (note) out.note = note;
+  if (udps && udps.length) out.udps = udps.map((u) => ({ name: u.name, value: u.value }));
+}
 
 // A field is serialized with whatever type information it carries, regardless of
 // the model's level. This preserves the reversibility of level changes (FR-11.6)
@@ -41,6 +47,7 @@ function serializeField(f: Field): Record<string, unknown> {
   if (f.unique) out.unique = true;
   if (f.default != null && f.default !== "") out.default = f.default;
   if (f.description) out.description = f.description;
+  udpsOut(out, f.note, f.udps);
   return out;
 }
 
@@ -51,6 +58,7 @@ function serializeEntity(e: Entity): Record<string, unknown> {
   if (e.stereotype) out.stereotype = e.stereotype;
   out.position = { x: e.position.x, y: e.position.y };
   out.fields = e.fields.map(serializeField);
+  udpsOut(out, e.note, e.udps);
   return out;
 }
 
@@ -67,6 +75,10 @@ function serializeRelationship(r: Relationship): Record<string, unknown> {
   out.childOptional = r.childOptional;
   if (r.foreignKeyFields.length) out.foreignKeyFields = [...r.foreignKeyFields];
   if (r.junctionEntity) out.junctionEntity = r.junctionEntity;
+  if (r.childVerbPhrase) out.childVerbPhrase = r.childVerbPhrase;
+  if (r.onDelete && r.onDelete !== "no action") out.onDelete = r.onDelete;
+  if (r.onUpdate && r.onUpdate !== "no action") out.onUpdate = r.onUpdate;
+  udpsOut(out, r.note, r.udps);
   return out;
 }
 

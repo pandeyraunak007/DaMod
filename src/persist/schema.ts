@@ -10,6 +10,9 @@ import type { Entity, Model } from "../model/model";
 
 export const CURRENT_FORMAT_VERSION = 1;
 
+const zUdp = z.object({ name: z.string(), value: z.string() });
+const zRiAction = z.enum(["no action", "cascade", "restrict", "set null", "set default"]);
+
 const zField = z.object({
   id: z.string(),
   name: z.string(),
@@ -26,6 +29,8 @@ const zField = z.object({
   unique: z.boolean().optional().default(false),
   default: z.string().optional(),
   description: z.string().optional(),
+  note: z.string().optional(),
+  udps: z.array(zUdp).optional(),
 });
 
 const zEntity = z.object({
@@ -34,6 +39,8 @@ const zEntity = z.object({
   description: z.string().optional(),
   tags: z.array(z.string()).optional(),
   stereotype: z.enum(["fact", "dimension"]).optional(),
+  note: z.string().optional(),
+  udps: z.array(zUdp).optional(),
   position: z.object({ x: z.number(), y: z.number() }),
   fields: z.array(zField),
 });
@@ -51,6 +58,11 @@ const zRelationship = z.object({
   childOptional: z.boolean(),
   foreignKeyFields: z.array(z.string()).optional().default([]),
   junctionEntity: z.string().optional(),
+  childVerbPhrase: z.string().optional(),
+  onDelete: zRiAction.optional(),
+  onUpdate: zRiAction.optional(),
+  note: z.string().optional(),
+  udps: z.array(zUdp).optional(),
 });
 
 const zView = z.object({

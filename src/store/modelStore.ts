@@ -76,6 +76,7 @@ interface ModelStore {
   relationshipDraft: { source: string; target: string } | null;
   linkDraft: Ref | null;
   canvasMode: CanvasMode;
+  propertiesOpen: boolean;
   _dragSnapshot: Model | null;
 
   // model
@@ -88,7 +89,7 @@ interface ModelStore {
   renameEntity: (id: string, name: string) => string | null;
   updateEntity: (
     id: string,
-    patch: Partial<Pick<Entity, "description" | "tags" | "stereotype">>,
+    patch: Partial<Pick<Entity, "description" | "tags" | "stereotype" | "note" | "udps">>,
   ) => void;
   deleteEntity: (id: string) => DeleteEntityResult;
 
@@ -131,6 +132,10 @@ interface ModelStore {
 
   // canvas interaction mode (floating toolbar)
   setCanvasMode: (mode: CanvasMode) => void;
+
+  // ERwin-style properties dialog
+  openProperties: () => void;
+  closeProperties: () => void;
 
   // selection / focus / notices
   select: (selection: Selection) => void;
@@ -221,6 +226,7 @@ export const useModelStore = create<ModelStore>((set, get) => {
     relationshipDraft: null,
     linkDraft: null,
     canvasMode: "select",
+    propertiesOpen: false,
     _dragSnapshot: null,
 
     setModelName: (name) => {
@@ -280,6 +286,8 @@ export const useModelStore = create<ModelStore>((set, get) => {
         if ("description" in patch) e.description = patch.description || undefined;
         if ("tags" in patch) e.tags = patch.tags?.length ? patch.tags : undefined;
         if ("stereotype" in patch) e.stereotype = patch.stereotype || undefined;
+        if ("note" in patch) e.note = patch.note || undefined;
+        if ("udps" in patch) e.udps = patch.udps?.length ? patch.udps : undefined;
       });
     },
 
@@ -583,6 +591,9 @@ export const useModelStore = create<ModelStore>((set, get) => {
 
     setCanvasMode: (mode) => set({ canvasMode: mode }),
 
+    openProperties: () => set({ propertiesOpen: true }),
+    closeProperties: () => set({ propertiesOpen: false }),
+
     select: (selection) => set({ selection }),
 
     revealEntity: (id) =>
@@ -651,6 +662,7 @@ export const useModelStore = create<ModelStore>((set, get) => {
         relationshipDraft: null,
         linkDraft: null,
         canvasMode: "select",
+        propertiesOpen: false,
       }),
   };
 });

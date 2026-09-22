@@ -115,6 +115,7 @@ function EntityEditor({ entity }: { entity: Entity }) {
   const addField = useModelStore((s) => s.addField);
   const openRelationshipDraft = useModelStore((s) => s.openRelationshipDraft);
   const openLinkDraft = useModelStore((s) => s.openLinkDraft);
+  const openProperties = useModelStore((s) => s.openProperties);
 
   const [nameError, setNameError] = useState<string | null>(null);
 
@@ -129,6 +130,11 @@ function EntityEditor({ entity }: { entity: Entity }) {
 
   return (
     <div className="editor">
+      <div className="editor__section">
+        <button className="btn btn--small" onClick={openProperties}>
+          ⚙ Properties…
+        </button>
+      </div>
       <div className="editor__section">
         <label className="editor__label">Entity name</label>
         <IdentifierInput
@@ -602,6 +608,7 @@ function RelationshipEditor({ relId }: { relId: string }) {
   const entities = useModelStore((s) => s.model.entities);
   const updateRelationship = useModelStore((s) => s.updateRelationship);
   const deleteRelationship = useModelStore((s) => s.deleteRelationship);
+  const openProperties = useModelStore((s) => s.openProperties);
 
   if (!rel) return null;
   const parent = entities.find((e) => e.id === rel.parentEntity);
@@ -609,6 +616,11 @@ function RelationshipEditor({ relId }: { relId: string }) {
 
   return (
     <div className="editor">
+      <div className="editor__section">
+        <button className="btn btn--small" onClick={openProperties}>
+          ⚙ Properties…
+        </button>
+      </div>
       <div className="editor__section">
         <span className="editor__label">Relationship</span>
         <p className="editor__rel-summary">

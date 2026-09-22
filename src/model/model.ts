@@ -11,6 +11,15 @@ export interface Position {
   y: number;
 }
 
+/** A user-defined property (ERwin UDP): an arbitrary named value on any object. */
+export interface Udp {
+  name: string;
+  value: string;
+}
+
+/** Referential-integrity action on a foreign key (ERwin RI). */
+export type RiAction = "no action" | "cascade" | "restrict" | "set null" | "set default";
+
 export interface Field {
   id: string;
   name: string;
@@ -28,6 +37,8 @@ export interface Field {
   unique: boolean;
   default?: string;
   description?: string;
+  note?: string;
+  udps?: Udp[];
 }
 
 export type Stereotype = "fact" | "dimension";
@@ -43,6 +54,8 @@ export interface Entity {
   junction?: boolean;
   /** Dimensional-modeling role (star schema). */
   stereotype?: Stereotype;
+  note?: string;
+  udps?: Udp[];
 }
 
 export type Cardinality = "one-to-one" | "one-to-many" | "many-to-many";
@@ -72,6 +85,13 @@ export interface Relationship {
   foreignKeyFields: string[];
   /** Present only for many-to-many. */
   junctionEntity?: string;
+  /** Child→parent verb phrase (ERwin inverse verb phrase). `label` is parent→child. */
+  childVerbPhrase?: string;
+  /** Referential-integrity actions on the foreign key (ERwin RI). */
+  onDelete?: RiAction;
+  onUpdate?: RiAction;
+  note?: string;
+  udps?: Udp[];
 }
 
 export type Notation = "IE" | "IDEF1X";
