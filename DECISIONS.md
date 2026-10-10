@@ -54,10 +54,27 @@ groups were unconditional. Not stale state, not caching.
 - **Verified:** 8 new tests (terminology matrix incl. the Logical↔Physical flip,
   visibility gating, level-cycle identity integrity); **181 TS tests**; typecheck +
   build clean.
-- **Not done this pass (follow-ups):** canvas node titles still show the raw name
-  (no separate physical-vs-logical name field exists in the model yet, so there's
-  nothing to switch); validation messages are not yet reworded per level; a shared
-  command-capability registry (§8) beyond the current per-level gating.
+- **Extension (2026-10-10, §15 step 4 — properties + selection):**
+  - The modal **Properties dialog field editor** is now level-aware like the docked
+    SidePanel already was: Conceptual shows name + definition/note/UDP only (no
+    type/keys/default/domain/role); Logical shows a generic **logical-type** select
+    and relabels keys as *Primary identifier* / *Required*; Physical &
+    Physical-Logical show the full physical column editor. Hidden controls **never
+    delete the underlying data** (unit-tested: a decimal type + SQL default survive
+    being hidden at Conceptual).
+  - **Selection hygiene** (`setModelLevel`): switching to a level that hides
+    physical-only objects clears a selected view/index/sequence/raw object (and
+    closes the properties panel) so it never shows a no-longer-visible object;
+    entity/relationship/domain selections persist (visible at every level).
+  - SidePanel "Fields" heading + add button now use the level term (Attributes/
+    Columns). Validation was already level-gated (physical-type/PK/FK/measure rules
+    skip Conceptual; DDL export gated by `canExportDdl`) — confirmed, no change.
+  - Tests: selection-hygiene matrix + jsdom render tests proving the field editor
+    hides physical controls at Conceptual and preserves hidden data. 189 TS tests.
+- **Still open (future):** no separate physical-vs-logical *entity/attribute name*
+  fields in the model (the §6 Customer/dim_customer example needs an additive model
+  field — deferred, not invented); per-level validation *message wording*; a formal
+  shared command-capability registry (§8) beyond the current per-level gating.
 
 ## 2026-10-10 — UI: View menu, bottom + floating toolbars (§13)
 

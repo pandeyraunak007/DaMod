@@ -11,6 +11,7 @@ import {
   type LogicalTypeKind,
   type ModelLevel,
   isConceptual,
+  levelTerms,
   usesLogicalTypes,
   usesPhysicalTypes,
 } from "../model/levels";
@@ -196,9 +197,9 @@ function EntityEditor({ entity }: { entity: Entity }) {
 
       <div className="editor__section">
         <div className="editor__fields-head">
-          <span className="editor__label">Fields</span>
+          <span className="editor__label">{levelTerms(level).fieldPlural}</span>
           <button className="btn btn--small" onClick={() => addField(entity.id)}>
-            + Field
+            + {levelTerms(level).field}
           </button>
         </div>
         {isConceptual(level) && (

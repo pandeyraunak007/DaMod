@@ -6,7 +6,14 @@ import {
   type DataTypeKind,
 } from "../model/dataTypes";
 import { validateIdentifier } from "../model/identifiers";
-import { levelTerms } from "../model/levels";
+import {
+  LOGICAL_TYPE_KINDS,
+  type LogicalTypeKind,
+  isConceptual,
+  levelTerms,
+  usesLogicalTypes,
+  usesPhysicalTypes,
+} from "../model/levels";
 import type { Entity, Field, FieldRole, RiAction, Udp } from "../model/model";
 
 const RI_ACTIONS: RiAction[] = ["no action", "cascade", "restrict", "set null", "set default"];
@@ -173,14 +180,24 @@ function FieldsTab({ entity }: { entity: Entity }) {
   );
 }
 
+// The field editor is level-aware (§4/§7): Conceptual shows business meaning only
+// (no type/keys), Logical shows a generic logical type + identifiers, and
+// Physical / Physical-Logical show the full physical column editor. Hidden
+// properties are never deleted from the underlying field — just not shown.
 function FieldProps({ entityId, field }: { entityId: string; field: Field }) {
   const updateField = useModelStore((s) => s.updateField);
   const bindFieldDomain = useModelStore((s) => s.bindFieldDomain);
+  const level = useModelStore((s) => s.model.level);
   // Default outside the selector (see DomainsDialog) to avoid an infinite loop.
   const domains = useModelStore((s) => s.model.domains) ?? [];
   const patch = (p: Partial<Field>) => updateField(entityId, field.id, p);
   const shape = field.type ? paramShape(field.type) : "none";
   const boundDomain = field.domainId ? domains.find((d) => d.id === field.domainId) : undefined;
+
+  const conceptual = isConceptual(level);
+  const showPhysical = usesPhysicalTypes(level);
+  const showLogical = usesLogicalTypes(level);
+
   return (
     <div className="props__field-body">
       <div className="attr-row">
@@ -188,20 +205,33 @@ function FieldProps({ entityId, field }: { entityId: string; field: Field }) {
           defaultValue={field.name}
           onChange={(e) => !validateIdentifier(e.target.value) && patch({ name: e.target.value })}
         />
-        <select
-          value={field.type ?? "string"}
-          disabled={!!boundDomain}
-          title={boundDomain ? `Type governed by domain “${boundDomain.name}”` : undefined}
-          onChange={(e) => patch({ type: e.target.value as DataTypeKind })}
-        >
-          {DATA_TYPE_KINDS.map((k) => (
-            <option key={k} value={k}>
-              {k}
-            </option>
-          ))}
-        </select>
+        {showPhysical && (
+          <select
+            value={field.type ?? "string"}
+            disabled={!!boundDomain}
+            title={boundDomain ? `Type governed by domain “${boundDomain.name}”` : "Physical type"}
+            onChange={(e) => patch({ type: e.target.value as DataTypeKind })}
+          >
+            {DATA_TYPE_KINDS.map((k) => (
+              <option key={k} value={k}>{k}</option>
+            ))}
+          </select>
+        )}
+        {showLogical && (
+          <select
+            value={field.logicalType ?? "Text"}
+            title="Logical type"
+            onChange={(e) => patch({ logicalType: e.target.value as LogicalTypeKind })}
+          >
+            {LOGICAL_TYPE_KINDS.map((k) => (
+              <option key={k} value={k}>{k}</option>
+            ))}
+          </select>
+        )}
       </div>
-      {domains.length > 0 && (
+
+      {/* Physical-only: domain binding, type parameters, SQL default, dimensional role. */}
+      {showPhysical && domains.length > 0 && (
         <div className="field">
           <label>Domain</label>
           <select
@@ -210,20 +240,18 @@ function FieldProps({ entityId, field }: { entityId: string; field: Field }) {
           >
             <option value="">— none (free type) —</option>
             {domains.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
+              <option key={d.id} value={d.id}>{d.name}</option>
             ))}
           </select>
         </div>
       )}
-      {shape === "length" && (
+      {showPhysical && shape === "length" && (
         <label className="field-row__params">
           length
           <input type="number" value={field.length ?? 255} onChange={(e) => patch({ length: Number(e.target.value) })} />
         </label>
       )}
-      {shape === "decimal" && (
+      {showPhysical && shape === "decimal" && (
         <div className="field-row__params">
           <label>
             precision
@@ -235,35 +263,45 @@ function FieldProps({ entityId, field }: { entityId: string; field: Field }) {
           </label>
         </div>
       )}
-      <div className="field-row__flags">
-        <label className="checkbox">
-          <input type="checkbox" checked={field.primaryKey} onChange={(e) => patch({ primaryKey: e.target.checked, nullable: e.target.checked ? false : field.nullable })} />
-          PK
-        </label>
-        <label className="checkbox">
-          <input type="checkbox" checked={!field.nullable} onChange={(e) => patch({ nullable: !e.target.checked })} />
-          NOT NULL
-        </label>
-        <label className="checkbox">
-          <input type="checkbox" checked={field.unique} onChange={(e) => patch({ unique: e.target.checked })} />
-          Unique
-        </label>
-      </div>
-      <div className="field">
-        <label>Default (SQL)</label>
-        <input defaultValue={field.default ?? ""} onChange={(e) => patch({ default: e.target.value || undefined })} />
-      </div>
-      <div className="field">
-        <label>Dimensional role (fact tables)</label>
-        <select
-          value={field.role ?? ""}
-          onChange={(e) => patch({ role: (e.target.value || undefined) as FieldRole | undefined })}
-        >
-          <option value="">— none —</option>
-          <option value="measure">Measure (additive fact)</option>
-          <option value="degenerate">Degenerate dimension</option>
-        </select>
-      </div>
+
+      {/* Keys/identifiers are hidden at Conceptual (§4.1). */}
+      {!conceptual && (
+        <div className="field-row__flags">
+          <label className="checkbox">
+            <input type="checkbox" checked={field.primaryKey} onChange={(e) => patch({ primaryKey: e.target.checked, nullable: e.target.checked ? false : field.nullable })} />
+            {showPhysical ? "PK" : "Primary identifier"}
+          </label>
+          <label className="checkbox">
+            <input type="checkbox" checked={!field.nullable} onChange={(e) => patch({ nullable: !e.target.checked })} />
+            {showPhysical ? "NOT NULL" : "Required"}
+          </label>
+          <label className="checkbox">
+            <input type="checkbox" checked={field.unique} onChange={(e) => patch({ unique: e.target.checked })} />
+            Unique
+          </label>
+        </div>
+      )}
+
+      {showPhysical && (
+        <>
+          <div className="field">
+            <label>Default (SQL)</label>
+            <input defaultValue={field.default ?? ""} onChange={(e) => patch({ default: e.target.value || undefined })} />
+          </div>
+          <div className="field">
+            <label>Dimensional role (fact tables)</label>
+            <select
+              value={field.role ?? ""}
+              onChange={(e) => patch({ role: (e.target.value || undefined) as FieldRole | undefined })}
+            >
+              <option value="">— none —</option>
+              <option value="measure">Measure (additive fact)</option>
+              <option value="degenerate">Degenerate dimension</option>
+            </select>
+          </div>
+        </>
+      )}
+
       <div className="field">
         <label>Definition</label>
         <textarea rows={2} defaultValue={field.description ?? ""} onChange={(e) => patch({ description: e.target.value || undefined })} />

@@ -38,6 +38,7 @@ import {
 import {
   type ModelLevel,
   isConceptual,
+  showsPhysicalObjects,
   usesLogicalTypes,
   usesPhysicalTypes,
 } from "../model/levels";
@@ -261,11 +262,23 @@ export const useModelStore = create<ModelStore>((set, get) => {
 
     setModelLevel: (level) => {
       const result = relevelModel(get().model, level);
-      set((s) => ({
-        past: pushPast(s.past, s.model),
-        model: { ...result.model, updatedAt: nowIso() },
-        future: [],
-      }));
+      // If a physical-only object (view/index/sequence/raw) is selected and the
+      // new level hides those, drop the selection so the properties panel never
+      // shows an object that is no longer visible (§5/§7). Entity/relationship/
+      // domain selections stay — they are visible at every level.
+      const physicalKinds = ["view", "index", "sequence", "rawObject"];
+      set((s) => {
+        const hideSel =
+          !!s.selection &&
+          physicalKinds.includes(s.selection.kind) &&
+          !showsPhysicalObjects(level);
+        return {
+          past: pushPast(s.past, s.model),
+          model: { ...result.model, updatedAt: nowIso() },
+          future: [],
+          ...(hideSel ? { selection: null, propertiesOpen: false } : {}),
+        };
+      });
       return result.ambiguous;
     },
 
