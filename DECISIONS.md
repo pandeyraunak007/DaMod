@@ -75,8 +75,37 @@ need a documented raise as the platform grows.
   (metadata→model mapping reusing model factories, import preview, open on canvas,
   save offline). TLS, and real end-to-end author verification of connect→discover.
 
-**Next task:** Phase 3 — reverse-engineering integration (Connections workspace UI,
-canonical-metadata → `.model.json` mapping, import preview, canvas + offline save).
+**Phase 3 implemented — reverse-engineering integration:**
+- **`connectors/toModel.ts`** — pure `metadataToModel(metadata, name, now)` maps
+  canonical metadata into the existing `.model.json`: objects → entities (views
+  tagged), columns → fields (type from `normalizedType`, else `text` + warning),
+  `primaryKey` → PK flags, unique single-column indexes → `field.unique`, other
+  indexes → `model.indexes`, foreign keys → relationships (one-to-one + identifying
+  when the FK is the child's whole PK) with RI actions. **Reuses the model
+  factories** — no second model engine. Cross-object FKs to objects outside the
+  import are warned + skipped.
+- **Connections persistence** — `connections.json` (`connectionsPersist.ts`):
+  versioned, deterministic (profiles by id, params by key), and **credential-free**
+  (serialize/parse both refuse secret-like fields). Loaded on `openWorkspace`;
+  CRUD via `upsertConnection`/`deleteConnection` on the workspace store (delete also
+  removes the keychain secret).
+- **`connectors/ui/ConnectionsDialog.tsx`** (toolbar **Connect**) — manage
+  connections (create/test/save/delete; password stored in the **OS keychain** on
+  save, sent transiently only for a pre-save test) and the reverse-engineering
+  workflow: discover schemas → pick → discover objects → preview (entity/
+  relationship counts + warnings) → **import as a new model** via the existing
+  `importModel`, which opens it on the canvas and saves it offline like any model.
+- **Verified:** 8 new tests (`toModel` discover→model incl. composite PK, self-ref,
+  view tag, RI actions, unmappable-type warning, FK-to-missing-object; connections
+  determinism + redaction); **147 TS tests**; typecheck + build clean; app code
+  ~12.2k (under 15k). The live connect→discover→import path is **author-run** (needs
+  a running app + reachable Postgres + keychain).
+- **This completes the "first meaningful release" except refresh/drift (Phase 4)
+  and pipeline planning (Phase 5).**
+
+**Next task:** Phase 4 — schema refresh & drift (snapshot the source, diff vs the
+prior snapshot + model, review/approve, apply while preserving manual edits),
+reusing `export/migrate.ts`.
 
 ## 2026-10-10 — Domains, reverse-engineering and forward-engineering (beyond-spec, ERwin)
 

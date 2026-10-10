@@ -67,16 +67,8 @@ class PostgresConnector implements Connector {
     return CAPS;
   }
 
-  /** Pass a transient password only for the first test before a secret is stored. */
-  async testConnection(
-    profile: ConnectionProfile,
-    transientPassword?: string,
-  ): Promise<ConnectionTestResult> {
-    const res = await invoke<{ ok: boolean; message: string; product_version: string | null }>(
-      "pg_test_connection",
-      { config: toRustConfig(profile, transientPassword) },
-    );
-    return { ok: res.ok, message: res.message, productVersion: res.product_version ?? undefined };
+  testConnection(profile: ConnectionProfile): Promise<ConnectionTestResult> {
+    return pgTestConnection(profile);
   }
 
   async listSchemas(profile: ConnectionProfile): Promise<string[]> {
@@ -108,6 +100,21 @@ class PostgresConnector implements Connector {
 
 export function createPostgresConnector(): Connector {
   return new PostgresConnector();
+}
+
+/**
+ * Test a PostgreSQL connection. `transientPassword` is sent once for a pre-save
+ * test (before a secret is stored in the keychain); it is never persisted.
+ */
+export async function pgTestConnection(
+  profile: ConnectionProfile,
+  transientPassword?: string,
+): Promise<ConnectionTestResult> {
+  const res = await invoke<{ ok: boolean; message: string; product_version: string | null }>(
+    "pg_test_connection",
+    { config: toRustConfig(profile, transientPassword) },
+  );
+  return { ok: res.ok, message: res.message, productVersion: res.product_version ?? undefined };
 }
 
 /** Store a connection's password in the OS keychain under a reference. */

@@ -6,6 +6,7 @@ import { MODEL_LEVELS, type ModelLevel, exportDisabledReason } from "../model/le
 interface Props {
   onNewModel: () => void;
   onImport: () => void;
+  onOpenConnections: () => void;
   onOpenHistory: () => void;
   onOpenMap: () => void;
   onOpenExport: () => void;
@@ -17,6 +18,7 @@ interface Props {
 export function Toolbar({
   onNewModel,
   onImport,
+  onOpenConnections,
   onOpenHistory,
   onOpenMap,
   onOpenExport,
@@ -92,6 +94,14 @@ export function Toolbar({
           title="Reverse-engineer a model from SQL DDL"
         >
           Import SQL
+        </button>
+        <button
+          className="btn btn--small"
+          onClick={onOpenConnections}
+          disabled={!wsPath}
+          title="Connect to a database and reverse-engineer a model"
+        >
+          Connect
         </button>
         <button className="btn btn--small" onClick={onOpenMap} disabled={!wsPath}>
           Map

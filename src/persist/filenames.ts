@@ -6,6 +6,7 @@ export const MODEL_FILE_SUFFIX = ".model.json";
 export const WORKSPACE_FILE = "workspace.json";
 export const LINKS_FILE = "links.json";
 export const SEMANTIC_FILE = "semantic.json";
+export const CONNECTIONS_FILE = "connections.json";
 export const HISTORY_DIR = ".history";
 
 export function modelFileName(modelName: string): string {

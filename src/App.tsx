@@ -18,6 +18,7 @@ import { RelationshipDialog } from "./panels/RelationshipDialog";
 import { PropertiesDialog } from "./panels/PropertiesDialog";
 import { DomainsDialog } from "./panels/DomainsDialog";
 import { ImportDialog } from "./import/ImportDialog";
+import { ConnectionsDialog } from "./connectors/ui/ConnectionsDialog";
 import { LinkDialog } from "./links/LinkDialog";
 import { useModelStore } from "./store/modelStore";
 import { useWorkspaceStore } from "./store/workspaceStore";
@@ -38,6 +39,7 @@ export default function App() {
   const [exportOpen, setExportOpen] = useState(false);
   const [domainsOpen, setDomainsOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [semanticOpen, setSemanticOpen] = useState(false);
   const [deleteModel, setDeleteModel] = useState<{ id: string; name: string } | null>(null);
 
@@ -117,6 +119,7 @@ export default function App() {
       <Toolbar
         onNewModel={() => setNewModelOpen(true)}
         onImport={() => setImportOpen(true)}
+        onOpenConnections={() => setConnectionsOpen(true)}
         onOpenHistory={() => setHistoryOpen(true)}
         onOpenMap={() => setMapOpen(true)}
         onOpenExport={() => setExportOpen(true)}
@@ -188,6 +191,7 @@ export default function App() {
       {exportOpen && <ExportDialog onClose={() => setExportOpen(false)} />}
       {domainsOpen && <DomainsDialog onClose={() => setDomainsOpen(false)} />}
       {importOpen && <ImportDialog onClose={() => setImportOpen(false)} />}
+      {connectionsOpen && <ConnectionsDialog onClose={() => setConnectionsOpen(false)} />}
       {confirmDelete && selection && <DeleteConfirm onClose={() => setConfirmDelete(false)} />}
       {deleteModel && (
         <DeleteModelConfirm

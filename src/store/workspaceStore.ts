@@ -9,10 +9,19 @@ import {
   modelFileName,
   modelNameFromFile,
   isModelFile,
+  CONNECTIONS_FILE,
   LINKS_FILE,
   SEMANTIC_FILE,
   WORKSPACE_FILE,
 } from "../persist/filenames";
+import type { ConnectionProfile } from "../connectors/connection";
+import {
+  type ConnectionsDoc,
+  emptyConnectionsDoc,
+  parseConnectionsFile,
+  serializeConnections,
+} from "../connectors/connectionsPersist";
+import { secretDelete } from "../connectors/postgres/postgresConnector";
 import {
   type WorkspaceMeta,
   serializeWorkspace,
@@ -74,6 +83,7 @@ interface WorkspaceState {
   saving: boolean;
   links: LinksDoc;
   semantic: SemanticDoc;
+  connections: ConnectionProfile[];
 
   openWorkspacePicker: () => Promise<void>;
   openWorkspace: (path: string) => Promise<void>;
@@ -98,6 +108,11 @@ interface WorkspaceState {
   upsertConceptGroup: (group: ConceptGroup) => void;
   deleteConceptGroup: (id: string) => void;
   removeLinksForRef: (ref: Ref) => Link[];
+
+  // source connections (connector framework). Secrets live in the OS keychain,
+  // never in this state or connections.json — only a secretRef is stored.
+  upsertConnection: (profile: ConnectionProfile) => Promise<void>;
+  deleteConnection: (id: string) => Promise<void>;
 
   // semantic layer (FR-7)
   addTerm: (term: Term) => void;
@@ -163,6 +178,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     }
   }
 
+  /** Update connections state and persist connections.json (credential-free). */
+  async function commitConnections(doc: ConnectionsDoc): Promise<void> {
+    set({ connections: doc.connections });
+    const { path } = get();
+    if (path) await writeFile(joinPath(path, CONNECTIONS_FILE), serializeConnections(doc), false);
+  }
+
   /** Load a valid tab's model into the editor; sync the previously active tab back. */
   function activate(id: string): void {
     const { tabs, activeId } = get();
@@ -189,6 +211,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     saving: false,
     links: emptyLinksDoc(),
     semantic: emptySemanticDoc(),
+    connections: [],
 
     openWorkspacePicker: async () => {
       const dir = await pickWorkspaceFolder();
@@ -220,6 +243,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
         const parsedSem = parseSemanticFile(listing.semantic);
         if (parsedSem.ok) semantic = parsedSem.value;
         else useModelStore.getState().pushNotice(`semantic.json: ${parsedSem.error}`);
+      }
+
+      // Source connections (optional file; absent in older/plain workspaces).
+      let connections: ConnectionProfile[] = [];
+      try {
+        const connText = await readTextFile(joinPath(path, CONNECTIONS_FILE));
+        const parsedConn = parseConnectionsFile(connText);
+        if (parsedConn.ok) connections = parsedConn.value.connections;
+        else useModelStore.getState().pushNotice(`connections.json: ${parsedConn.error}`);
+      } catch {
+        // No connections.json yet — that's fine.
       }
 
       let meta: Partial<WorkspaceMeta> = {};
@@ -275,6 +309,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
         tabs,
         links,
         semantic,
+        connections,
         activeId: active?.id ?? tabs[0]?.id ?? null,
       });
       if (active?.model) useModelStore.getState().loadModel(active.model);
@@ -586,6 +621,26 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
           );
       commitLinks({ ...doc, links: kept, conceptGroups });
       return removed;
+    },
+
+    upsertConnection: async (profile) => {
+      const current = get().connections;
+      const exists = current.some((c) => c.id === profile.id);
+      const next = exists
+        ? current.map((c) => (c.id === profile.id ? profile : c))
+        : [...current, profile];
+      await commitConnections({ ...emptyConnectionsDoc(), connections: next });
+    },
+
+    deleteConnection: async (id) => {
+      const current = get().connections;
+      const target = current.find((c) => c.id === id);
+      await commitConnections({
+        ...emptyConnectionsDoc(),
+        connections: current.filter((c) => c.id !== id),
+      });
+      // Best-effort removal of the stored credential.
+      if (target?.secretRef) await secretDelete(target.secretRef).catch(() => {});
     },
 
     addTerm: (term) => {

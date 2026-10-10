@@ -1,9 +1,19 @@
 # Connector Framework & ETL Planning — Architecture
 
-Status: **Phase 1 (foundation) + Phase 2 (PostgreSQL discovery) implemented.**
-Phases 3+ (reverse-engineering UI/mapping, refresh/drift, pipeline planning) are
+Status: **Phases 1–3 implemented** (foundation, PostgreSQL discovery, reverse-
+engineering integration). Phases 4+ (refresh/drift, pipeline planning) are
 specified here but not yet built. This document is the contract reference;
 `DECISIONS.md` carries the dated decision log.
+
+Phase 3 (reverse-engineering): `toModel.ts` maps canonical metadata →
+`.model.json` reusing the model factories + the same FK→relationship logic as the
+SQL parser (no second model engine). Connection profiles persist in
+`connections.json` (`connectionsPersist.ts`, deterministic, credential-free — a
+guard refuses to write/read secrets). The `ConnectionsDialog`
+(`connectors/ui/`) manages connections (create/test/save/delete, password → OS
+keychain) and runs the reverse-engineering workflow: discover schemas → pick →
+discover objects → preview (entity/relationship counts + warnings) → import as a
+new model via the existing `importModel` (opens on the canvas, saved offline).
 
 PostgreSQL connector (Phase 2): the live driver (`tokio-postgres`, pure-Rust) runs
 in `src-tauri/src/pg.rs`, exposing `pg_test_connection` / `pg_list_schemas` /
