@@ -1,9 +1,19 @@
 # Connector Framework & ETL Planning — Architecture
 
-Status: **Phase 1 (connector foundation) implemented.** Phases 2+ (live
-PostgreSQL, reverse-engineering integration, refresh/drift, pipeline planning)
-are specified here but not yet built. This document is the contract reference;
+Status: **Phase 1 (foundation) + Phase 2 (PostgreSQL discovery) implemented.**
+Phases 3+ (reverse-engineering UI/mapping, refresh/drift, pipeline planning) are
+specified here but not yet built. This document is the contract reference;
 `DECISIONS.md` carries the dated decision log.
+
+PostgreSQL connector (Phase 2): the live driver (`tokio-postgres`, pure-Rust) runs
+in `src-tauri/src/pg.rs`, exposing `pg_test_connection` / `pg_list_schemas` /
+`pg_discover` plus `secret_store` / `secret_delete` (OS keychain via `keyring`).
+The TS client `src/connectors/postgres/` implements the `Connector` contract over
+`invoke` and normalizes the raw payload with the existing `mapSqlType`. Discovery
+is catalog-only (`pg_class`/`pg_attribute`/`pg_constraint`/`pg_index`) — no table
+reads. Verified: Rust compiles + unit tests; TS normalization tests; a gated
+`#[tokio::test]` integration test runs against `DAMOD_TEST_PG_URL` (docker
+`postgres:16`) — author-run.
 
 Guiding principle: **discover once, normalize once, reuse** across modeling,
 comparison, pipeline planning, and semantic modeling. There is exactly one

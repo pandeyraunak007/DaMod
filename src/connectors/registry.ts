@@ -5,6 +5,7 @@
 import type { Connector, ConnectorFactory } from "./connector";
 import type { SourceSystemType } from "./metadata";
 import { createMockConnector } from "./mock/mockConnector";
+import { createPostgresConnector } from "./postgres/postgresConnector";
 
 const registry = new Map<SourceSystemType, ConnectorFactory>();
 
@@ -20,5 +21,6 @@ export function registeredSystemTypes(): SourceSystemType[] {
   return [...registry.keys()];
 }
 
-// Built-in connectors. PostgreSQL registers here once the Rust adapter lands.
+// Built-in connectors.
 registerConnector("mock", createMockConnector);
+registerConnector("postgres", createPostgresConnector);

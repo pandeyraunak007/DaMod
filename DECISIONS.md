@@ -50,8 +50,33 @@ connections/pipelines) follow the existing versioned-JSON + deterministic-serial
 Rust shell (packaging/security/macOS), and acknowledging the 15k LOC budget will
 need a documented raise as the platform grows.
 
-**Next task:** Phase 2 — PostgreSQL connector (driver eval → Rust discovery via
-catalog queries → TS client over the contract → integration tests on a docker PG).
+**Phase 2 implemented — PostgreSQL connector (live):**
+- **Driver:** `tokio-postgres` (author-approved) — pure-Rust, no libpq, clean macOS
+  packaging. Connection future driven on Tauri's tokio runtime; `NoTls` for now
+  (TLS/sslmode is a follow-up). Added `tokio` + `keyring` crates.
+- **Rust (`src-tauri/src/pg.rs`):** commands `pg_test_connection`, `pg_list_schemas`,
+  `pg_discover`, and `secret_store` / `secret_delete`. Discovery is **catalog-only**
+  (`pg_class`/`pg_attribute`/`pg_constraint`/`pg_index`, `format_type` for native
+  types) — **never reads table rows**. Returns raw JSON (native types verbatim).
+- **Credentials:** stored in the **OS keychain** (`keyring`, service "DaMod") keyed
+  by the profile's `secretRef`; a transient password may be passed once for a
+  pre-save test. No secret is persisted in JSON/logs, nor returned to the renderer.
+- **TS (`src/connectors/postgres/`):** `PostgresConnector` implements the contract
+  over `invoke`; a **pure `normalizePgDiscovery`** maps the raw payload to canonical
+  metadata, reusing `mapSqlType` so native→fixed-type normalization lives in one
+  place (a native type with no confident mapping keeps `nativeType`, omits
+  `normalizedType`). Registered in the connector registry.
+- **Verification:** Rust `cargo build` + 3 unit tests pass; 5 TS normalization tests
+  (composite PKs, FKs + RI actions, unmappable native type, views/indexes); 139 TS
+  tests total; build clean. A gated `#[tokio::test]` (`DAMOD_TEST_PG_URL`, docker
+  `postgres:16`, fixture with composite PK + self-ref) is **author-run** — this
+  environment has no database or keychain to exercise live.
+- **Not done (next):** Phase 3 — Connections UI + reverse-engineering workflow
+  (metadata→model mapping reusing model factories, import preview, open on canvas,
+  save offline). TLS, and real end-to-end author verification of connect→discover.
+
+**Next task:** Phase 3 — reverse-engineering integration (Connections workspace UI,
+canonical-metadata → `.model.json` mapping, import preview, canvas + offline save).
 
 ## 2026-10-10 — Domains, reverse-engineering and forward-engineering (beyond-spec, ERwin)
 
