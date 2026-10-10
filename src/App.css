@@ -884,7 +884,7 @@ body,
   display: flex;
   align-items: center;
   gap: 0.2rem;
-  padding: 0.12rem 0.4rem 0.12rem 0;
+  padding: 0.18rem 0.5rem 0.18rem 0;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -893,6 +893,7 @@ body,
 }
 .tree-row--active {
   background: #e0ecff;
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 .tree-row__caret {
   border: none;
@@ -907,8 +908,12 @@ body,
   display: inline-block;
 }
 .tree-row__label {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
 }
 .tree__badge {
   font-size: 0.6rem;
@@ -929,13 +934,95 @@ body,
 .tree__error {
   color: var(--danger);
 }
+/* field row: [key] name ............ type */
+.tree__field {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  flex: 1;
+}
 .tree__field-key {
-  margin-right: 0.25rem;
+  width: 18px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.tree__field-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .tree__field-type {
   color: var(--muted);
-  margin-left: 0.4rem;
-  font-size: 0.74rem;
+  margin-left: auto;
+  padding-left: 0.5rem;
+  font-size: 0.72rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  flex-shrink: 0;
+}
+.tree__key--pk {
+  color: #d97706;
+}
+.tree__key-badge {
+  font-size: 0.56rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.12rem 0.18rem;
+  border-radius: 3px;
+  letter-spacing: 0.02em;
+}
+.tree__key--fk {
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+.tree__key--u {
+  color: #475569;
+  background: #e2e8f0;
+}
+.tree__key-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--border-strong);
+}
+/* group count pill */
+.tree__count {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: #eef1f5;
+  border-radius: 999px;
+  padding: 0.02rem 0.32rem;
+  margin-left: 0.15rem;
+}
+/* relationship row: [1:N] parent → child */
+.tree__rel {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.tree__card {
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: #0369a1;
+  background: #e0f2fe;
+  border-radius: 3px;
+  padding: 0.08rem 0.22rem;
+  flex-shrink: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.tree__rel-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.tree__rel-arrow {
+  color: var(--muted);
+  flex-shrink: 0;
 }
 .tree__rename {
   font: inherit;

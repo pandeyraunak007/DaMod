@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { KeyRound } from "lucide-react";
 import { useModelStore } from "../store/modelStore";
 import { useWorkspaceStore } from "../store/workspaceStore";
 import { fieldTypeLabel } from "../model/fieldDisplay";
@@ -346,6 +347,22 @@ function matches(text: string, q: string): boolean {
   return text.toLowerCase().includes(q);
 }
 
+/** Compact cardinality for a relationship badge (1:1 / 1:N / N:M). */
+function cardShort(c: string): string {
+  if (c === "one-to-one") return "1:1";
+  if (c === "many-to-many") return "N:M";
+  return "1:N";
+}
+
+/** The key marker cell for a field row. */
+function keyMark(primaryKey: boolean, isFk: boolean, unique: boolean, withKeys: boolean): ReactNode {
+  if (!withKeys) return <span className="tree__key-dot" />;
+  if (primaryKey) return <KeyRound size={11} className="tree__key tree__key--pk" aria-label="PK" />;
+  if (isFk) return <span className="tree__key-badge tree__key--fk">FK</span>;
+  if (unique) return <span className="tree__key-badge tree__key--u">U</span>;
+  return <span className="tree__key-dot" />;
+}
+
 function ModelBranch({
   tabId,
   model,
@@ -441,7 +458,11 @@ function ModelBranch({
             depth={2}
             open={isOpen(`m:${tabId}:ents`)}
             hasChildren
-            label={<span className="tree__group">{terms.entityPlural} ({model.entities.length})</span>}
+            label={
+              <span className="tree__group">
+                {terms.entityPlural} <span className="tree__count">{model.entities.length}</span>
+              </span>
+            }
             onToggle={() => toggle(`m:${tabId}:ents`)}
             actions={
               <RowAction title={`Add ${terms.entity.toLowerCase()}`} onClick={onAddEntity}>
@@ -473,7 +494,11 @@ function ModelBranch({
             depth={2}
             open={isOpen(`m:${tabId}:rels`)}
             hasChildren
-            label={<span className="tree__group">Relationships ({model.relationships.length})</span>}
+            label={
+              <span className="tree__group">
+                Relationships <span className="tree__count">{model.relationships.length}</span>
+              </span>
+            }
             onToggle={() => toggle(`m:${tabId}:rels`)}
             actions={
               <RowAction title="Add relationship" onClick={onAddRelationship}>
@@ -483,7 +508,16 @@ function ModelBranch({
           />
           {isOpen(`m:${tabId}:rels`) &&
             model.relationships.filter(relMatches).map((r) => (
-              <RelationshipRow key={r.id} tabId={tabId} relId={r.id} text={relText(r)} openMenu={openMenu} />
+              <RelationshipRow
+                key={r.id}
+                tabId={tabId}
+                relId={r.id}
+                parent={entityName(r.parentEntity)}
+                child={entityName(r.childEntity)}
+                card={cardShort(r.cardinality)}
+                title={relText(r)}
+                openMenu={openMenu}
+              />
             ))}
 
           {/* Physical-only objects — hidden at Conceptual/Logical (§4.1/§4.2). */}
@@ -492,7 +526,8 @@ function ModelBranch({
               <ObjectGroup
                 open={isOpen(`m:${tabId}:views`)}
                 onToggle={() => toggle(`m:${tabId}:views`)}
-                label={`Views (${model.views?.length ?? 0})`}
+                name="Views"
+                count={model.views?.length ?? 0}
                 onAdd={onAddView}
                 items={(model.views ?? []).filter((v) => !filtering || matches(v.name, q))}
                 onSelect={(id) => onSelectObject({ kind: "view", id })}
@@ -502,7 +537,8 @@ function ModelBranch({
               <ObjectGroup
                 open={isOpen(`m:${tabId}:indexes`)}
                 onToggle={() => toggle(`m:${tabId}:indexes`)}
-                label={`Indexes (${model.indexes?.length ?? 0})`}
+                name="Indexes"
+                count={model.indexes?.length ?? 0}
                 onAdd={onAddIndex}
                 items={(model.indexes ?? []).filter((v) => !filtering || matches(v.name, q))}
                 onSelect={(id) => onSelectObject({ kind: "index", id })}
@@ -512,7 +548,8 @@ function ModelBranch({
               <ObjectGroup
                 open={isOpen(`m:${tabId}:seqs`)}
                 onToggle={() => toggle(`m:${tabId}:seqs`)}
-                label={`Sequences (${model.sequences?.length ?? 0})`}
+                name="Sequences"
+                count={model.sequences?.length ?? 0}
                 onAdd={onAddSequence}
                 items={(model.sequences ?? []).filter((v) => !filtering || matches(v.name, q))}
                 onSelect={(id) => onSelectObject({ kind: "sequence", id })}
@@ -522,7 +559,8 @@ function ModelBranch({
               <ObjectGroup
                 open={isOpen(`m:${tabId}:raw`)}
                 onToggle={() => toggle(`m:${tabId}:raw`)}
-                label={`Raw objects (${model.rawObjects?.length ?? 0})`}
+                name="Raw objects"
+                count={model.rawObjects?.length ?? 0}
                 onAdd={onAddRaw}
                 items={(model.rawObjects ?? []).filter((v) => !filtering || matches(v.name, q))}
                 onSelect={(id) => onSelectObject({ kind: "rawObject", id })}
@@ -540,7 +578,8 @@ function ModelBranch({
 function ObjectGroup({
   open,
   onToggle,
-  label,
+  name,
+  count,
   onAdd,
   items,
   onSelect,
@@ -549,7 +588,8 @@ function ObjectGroup({
 }: {
   open: boolean;
   onToggle: () => void;
-  label: string;
+  name: string;
+  count: number;
   onAdd: () => void;
   items: { id: string; name: string }[];
   onSelect: (id: string) => void;
@@ -562,7 +602,11 @@ function ObjectGroup({
         depth={2}
         open={open}
         hasChildren
-        label={<span className="tree__group">{label}</span>}
+        label={
+          <span className="tree__group">
+            {name} <span className="tree__count">{count}</span>
+          </span>
+        }
         onToggle={onToggle}
         actions={
           <RowAction title={`Add`} onClick={onAdd}>
@@ -618,6 +662,11 @@ function EntityBranch({
 }) {
   const addFieldLabel = `Add ${terms.field.toLowerCase()}`;
   const withKeys = showsKeys(model.level);
+  // Foreign-key field ids for this entity (for FK markers, like the canvas).
+  const fkIds = new Set<string>();
+  for (const r of model.relationships) {
+    if (r.childEntity === entity.id) r.foreignKeyFields.forEach((id) => fkIds.add(id));
+  }
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState(entity.name);
   const switchTab = useWorkspaceStore((s) => s.switchTab);
@@ -712,9 +761,9 @@ function EntityBranch({
             label={
               <span className="tree__field">
                 <span className="tree__field-key">
-                  {withKeys ? (f.primaryKey ? "🔑" : f.unique ? "◈" : "•") : "•"}
+                  {keyMark(f.primaryKey, fkIds.has(f.id), f.unique, withKeys)}
                 </span>
-                {displayName(f, model.level)}
+                <span className="tree__field-name">{displayName(f, model.level)}</span>
                 <span className="tree__field-type">{fieldTypeLabel(f, model.level)}</span>
               </span>
             }
@@ -727,12 +776,18 @@ function EntityBranch({
 function RelationshipRow({
   tabId,
   relId,
-  text,
+  parent,
+  child,
+  card,
+  title,
   openMenu,
 }: {
   tabId: string;
   relId: string;
-  text: string;
+  parent: string;
+  child: string;
+  card: string;
+  title: string;
   openMenu: OpenMenu;
 }) {
   const switchTab = useWorkspaceStore((s) => s.switchTab);
@@ -763,7 +818,19 @@ function RelationshipRow({
     ]);
   };
   return (
-    <TreeRow depth={3} label={<span className="tree__rel">{text}</span>} onClick={reveal} onContextMenu={menu} />
+    <TreeRow
+      depth={3}
+      onClick={reveal}
+      onContextMenu={menu}
+      label={
+        <span className="tree__rel" title={title}>
+          <span className="tree__card">{card}</span>
+          <span className="tree__rel-name">{parent}</span>
+          <span className="tree__rel-arrow">→</span>
+          <span className="tree__rel-name">{child}</span>
+        </span>
+      }
+    />
   );
 }
 
