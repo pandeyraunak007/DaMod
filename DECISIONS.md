@@ -5,6 +5,30 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Req 21: Oracle driver decision = imported-metadata-only (+ file import)
+
+**Decision (author sign-off: "go with the easy fix for the driver"):** adopt the
+**imported-metadata-only** option and defer the native Rust Oracle adapter indefinitely.
+Rationale: the `oracle` crate needs Oracle Instant Client native libs (licensing +
+Apple-Silicon packaging + bundling burden) and a thin worker adds a second process — both
+are heavy and, crucially, unverifiable here (no Oracle instance; Claude can't drive a live
+DB). Imported-only adds ZERO native dependency, works fully offline, and is the path the
+spec explicitly blesses (§3C/§10: eTRM-derived / imported metadata packages when direct
+access is unavailable). This closes the long-standing driver gate for now.
+
+- **Made imported metadata a real workflow (not just the mock):** `parseMetadataFile`
+  (snapshot.ts) validates an exported/eTRM-derived canonical JSON package and **rejects
+  any file carrying a credential** (findSecretLeaks) before parsing. `metadataToModelForSource`
+  dispatches EBS vs plain. New **"Import metadata file…"** panel in the Connections dialog:
+  pick file → validate → preview (source identity, EBS release, table/relationship counts,
+  app-metadata counts, warnings) → import into a model + save a snapshot. No connection,
+  no driver.
+- Trade-offs accepted (documented in `docs/ORACLE_EBS.md`): point-in-time snapshots not a
+  live feed; someone must produce the package (eTRM scrape / FND extract / DBA dump →
+  canonical JSON) — that transform lives outside DaMod; only the object kinds we model are
+  imported. If a live feed is ever needed, the adapter can slot onto the same contract.
+- No new deps, no Rust. 313 TS tests (+6: `importMetadata.test.ts`); tsc/build/cargo clean.
+
 ## 2026-10-10 — Req 21 Phase 3 (offline): EBS application-dictionary metadata
 
 EBS application metadata (which product owns a table, concurrent programs, lookups,

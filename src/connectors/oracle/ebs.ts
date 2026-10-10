@@ -73,6 +73,12 @@ export function ebsApplicationSummary(md: CanonicalMetadata): EbsApplicationSumm
   };
 }
 
+/** Build a model from discovered/imported metadata, dispatching on the source
+ *  system: EBS gets the product-tagged enrichment, everything else the plain map. */
+export function metadataToModelForSource(md: CanonicalMetadata, name: string, now: string): ToModelResult {
+  return md.source.systemType === "oracle-ebs" ? ebsSnapshotToModel(md, name, now) : metadataToModel(md, name, now);
+}
+
 export interface EbsToModelResult extends ToModelResult {
   products: EbsProduct[];
 }

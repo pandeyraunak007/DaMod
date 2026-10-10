@@ -45,7 +45,8 @@ snapshot, awaits the live driver · **Live** = needs an accessible Oracle/EBS in
 | Snapshot compare / refresh preserving manual edits | **Done (engine)** | `computeDrift` reports changes; `reconcileDiscoveredModel` merges preserving manual edits. EBS refresh *UX* wiring is Phase 4. |
 | Copilot EBS context + reviewed actions | **Deferred** | Phase 5. |
 | Pipeline planning from EBS metadata | **Deferred** | Phase 6 — the planner already consumes canonical metadata, so this is mostly wiring + Oracle→target type mapping. |
-| Live Rust Oracle adapter | **Deferred (sign-off)** | See the driver decision below. |
+| Offline metadata-file import (UI) | **Done** | "Import metadata file…" in the Connections dialog: validates an exported/eTRM-derived canonical JSON (`parseMetadataFile`, rejects credential leaks), previews it, reverse-engineers into a model + snapshot. No connection, no driver. |
+| Live Rust Oracle adapter | **Deferred (decided against for now)** | Driver decision made: imported-only (see below). The adapter can slot onto the same contract later if a live feed is needed. |
 
 ## Delivered files (Phase 1)
 
@@ -57,17 +58,20 @@ snapshot, awaits the live driver · **Live** = needs an accessible Oracle/EBS in
 - `src/connectors/registry.ts` — registers `oracle-ebs` → mock connector.
 - `src/connectors/oracle/oracleEbs.test.ts` — 12 tests (type mapping, discovery, provenance, RE→model, round-trip, idempotency).
 
-## Driver decision (needs author sign-off before the live connector)
+## Driver decision — DECIDED (2026-10-11): imported-metadata-only
 
-| Option | Pros | Cons |
-|---|---|---|
-| `oracle` crate (ODPI-C) | Mature, full-featured | Requires Oracle **Instant Client** native libs at build + runtime → bundle/licensing/Apple-Silicon packaging burden |
-| Thin external worker (e.g. a small JDBC/Python sidecar) | Isolates the native dependency; easier licensing story | Extra process to ship + manage; IPC surface |
-| Imported-metadata-only (no live driver) | Zero native deps; works offline today | No live discovery/refresh; relies on eTRM/exported metadata |
+| Option | Pros | Cons | Chosen |
+|---|---|---|---|
+| `oracle` crate (ODPI-C) | Mature, full-featured | Requires Oracle **Instant Client** native libs at build + runtime → bundle/licensing/Apple-Silicon packaging burden | — |
+| Thin external worker (JDBC/Python sidecar) | Isolates the native dependency; easier licensing | Extra process to ship + manage; IPC surface | — |
+| **Imported-metadata-only (no live driver)** | **Zero native deps; works offline today; no sign-off/packaging risk** | Point-in-time snapshots, not a live feed; someone must produce the package | **✅ chosen** |
 
-**Recommendation to evaluate:** start with imported-metadata-only (already working) +
-decide `oracle` crate vs worker when a live instance is available to test against.
-Document the final choice here and in `DECISIONS.md` before adding any dependency.
+**Decision (author):** imported-metadata-only. The native Rust Oracle adapter is deferred
+indefinitely — no new dependency is added. Offline import is implemented ("Import metadata
+file…" in the Connections dialog). If a live feed is ever required, an adapter can be added
+later onto the **same canonical contract** without reworking anything downstream (toModel,
+reconcile, drift, Explorer all already consume canonical metadata). The transform from
+eTRM/FND/DBA export → canonical JSON lives outside DaMod.
 
 ## Phased roadmap (Req 21 §12) — build later
 

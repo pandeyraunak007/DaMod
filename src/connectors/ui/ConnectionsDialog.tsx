@@ -7,12 +7,13 @@ import type { ConnectionProfile } from "../connection";
 import { getConnector } from "../registry";
 import { pgTestConnection, secretStore } from "../postgres/postgresConnector";
 import { metadataToModel, type ToModelResult } from "../toModel";
-import { ebsSnapshotToModel, ebsApplicationSummary } from "../oracle/ebs";
+import { ebsSnapshotToModel, ebsApplicationSummary, metadataToModelForSource } from "../oracle/ebs";
 import { computeDrift, applyDrift, type DriftChange } from "../drift";
 import type { ModelDiff } from "../../export/migrate";
 import type { Model } from "../../model/model";
 import type { CanonicalMetadata, SourceSystemType } from "../metadata";
-import type { SourceSnapshot } from "../snapshot";
+import { parseMetadataFile, type SourceSnapshot } from "../snapshot";
+import { pickFile, readTextFile } from "../../persist/fs";
 import type { Connector, DiscoveryResult } from "../connector";
 
 /** Resolve the connector for a profile's system type. */
@@ -79,6 +80,9 @@ export function ConnectionsDialog({
     (startReverse && readyConn?.id) || connections[0]?.id || null,
   );
   const [mode, setMode] = useState<Mode>(startReverse && readyConn ? "reverse" : "edit");
+  // Offline metadata-file import (Req 21 — the "imported-only" driver path): no live
+  // connection; load an eTRM-derived / exported metadata package and model it.
+  const [importing, setImporting] = useState(false);
 
   const selected = connections.find((c) => c.id === selectedId) ?? null;
 
@@ -129,9 +133,21 @@ export function ConnectionsDialog({
             {connections.length === 0 && <p className="side__hint">No connections yet.</p>}
             <button className="btn btn--small" onClick={newPgConnection}>+ PostgreSQL connection</button>
             <button className="btn btn--small" onClick={newEbsConnection}>+ Oracle EBS (mock)</button>
+            <button
+              className={`conn__item ${importing ? "conn__item--active" : ""}`}
+              onClick={() => {
+                setImporting(true);
+                setSelectedId(null);
+              }}
+            >
+              <strong>Import metadata file…</strong>
+              <span className="field__hint">Offline eTRM / exported EBS metadata</span>
+            </button>
           </div>
           <div className="conn__panel">
-            {!selected ? (
+            {importing ? (
+              <ImportFilePanel onBack={() => setImporting(false)} onClose={onClose} />
+            ) : !selected ? (
               <p className="side__hint">Select or create a connection.</p>
             ) : mode === "edit" ? (
               <ConnectionEditor
@@ -596,6 +612,131 @@ function RefreshPanel({
         </>
       )}
       {status && <p className="field__hint">{status}</p>}
+    </div>
+  );
+}
+
+// Offline metadata-file import (Req 21 — the "imported-only" driver path). Loads an
+// eTRM-derived / exported EBS (or any canonical) metadata package from disk, validates
+// it (rejecting credential leaks), previews it, and reverse-engineers it into a model.
+// No live connection, no Oracle driver.
+function ImportFilePanel({ onBack, onClose }: { onBack: () => void; onClose: () => void }) {
+  const importModel = useWorkspaceStore((s) => s.importModel);
+  const saveSnapshot = useWorkspaceStore((s) => s.saveSnapshot);
+  const [metadata, setMetadata] = useState<CanonicalMetadata | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [modelName, setModelName] = useState("imported_ebs");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const choose = async () => {
+    setError(null);
+    const path = await pickFile(["json"], "Open an EBS metadata package (.json)");
+    if (!path) return;
+    setBusy(true);
+    try {
+      const text = await readTextFile(path);
+      const parsed = parseMetadataFile(text);
+      if (!parsed.ok) {
+        setError(parsed.error);
+        setMetadata(null);
+        return;
+      }
+      setMetadata(parsed.value);
+      setFileName(path.split("/").pop() ?? "metadata.json");
+      setModelName(validateIdentifier(parsed.value.source.name) ? "imported_ebs" : parsed.value.source.name);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const preview = metadata ? metadataToModelForSource(metadata, modelName || "imported", new Date().toISOString()) : null;
+  const appSummary = metadata ? ebsApplicationSummary(metadata) : null;
+  const nameError = validateIdentifier(modelName);
+
+  const doImport = async () => {
+    if (!preview || !metadata) return;
+    setBusy(true);
+    const err = await importModel(preview.model, modelName);
+    if (!err) {
+      await saveSnapshot(modelName, {
+        snapshotVersion: 1,
+        id: newId("snapshot"),
+        connectionRef: `file:${fileName ?? modelName}`,
+        metadata,
+        provenance: {
+          connectorId: "file-import",
+          connectorVersion: "1",
+          discoveredAt: new Date().toISOString(),
+          schemasDiscovered: metadata.catalogs.flatMap((c) => c.schemas.map((s) => s.name)),
+          capabilitiesUsed: [],
+        },
+      });
+    }
+    setBusy(false);
+    if (err) setError(err);
+    else onClose();
+  };
+
+  return (
+    <div>
+      <button className="btn btn--small" onClick={onBack}>← Back</button>
+      <h3 className="modal__subtitle">Import metadata file</h3>
+      <p className="field__hint">
+        Model an EBS source offline from an exported / eTRM-derived metadata package
+        (canonical JSON). No live connection required. Credentials in the file are rejected.
+      </p>
+      <button className="btn btn--small" onClick={choose} disabled={busy}>Choose metadata file…</button>
+      {error && <p className="field__hint field__hint--warn">{error}</p>}
+
+      {metadata && preview && (
+        <>
+          <div className="import-preview">
+            <p className="field__hint">
+              <strong>{fileName}</strong> — {metadata.source.systemType}
+              {metadata.source.ebsRelease ? ` · EBS ${metadata.source.ebsRelease}` : ""}
+              {metadata.source.productVersion ? ` · ${metadata.source.productVersion}` : ""}
+            </p>
+            <p className="field__hint">
+              <strong>{preview.model.entities.length}</strong> tables ·{" "}
+              <strong>{preview.model.relationships.length}</strong> relationships
+            </p>
+            {appSummary && (appSummary.concurrentPrograms || appSummary.lookups || appSummary.programUnits) ? (
+              <p className="field__hint">
+                EBS application metadata: {appSummary.concurrentPrograms} concurrent programs ·{" "}
+                {appSummary.lookups} lookups · {appSummary.programUnits} program units (stored with the snapshot).
+              </p>
+            ) : null}
+            {preview.warnings.length > 0 && (
+              <details>
+                <summary className="field__hint">{preview.warnings.length} note(s)</summary>
+                <ul className="import-warnings">
+                  {preview.warnings.map((w, i) => (
+                    <li key={i} className="field__hint field__hint--warn">{w}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+          <div className="modal__row modal__row--pair">
+            <div className="field">
+              <label>New model name</label>
+              <input className={nameError ? "is-error" : ""} value={modelName} onChange={(e) => setModelName(e.target.value)} />
+            </div>
+            <div className="field conn__import-action">
+              <button
+                className="btn btn--primary"
+                onClick={doImport}
+                disabled={busy || preview.model.entities.length === 0 || !!nameError}
+              >
+                Import {preview.model.entities.length} tables →
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

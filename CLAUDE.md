@@ -9,11 +9,15 @@
 
 ## NEXT SESSION — START HERE
 
-**Current status:** Branch `main`. Pushed: `a0f14c1` (Req 21 Phase 2 do-now 3) and the
-rest of Phase 1/2, Reqs 17–20. **Req 21 Phase 3 (offline EBS application-dictionary
-metadata) just landed — uncommitted in the working tree.** Author commits/pushes
-explicitly, do not commit or push unless asked. **307 TS tests pass · typecheck clean ·
+**Current status:** Branch `main`. Pushed: `6c041d0` (Req 21 Phase 3) and the rest of
+Reqs 17–21 Phases 1–3. **Req 21 driver decision — imported-metadata-only — + offline
+file import just landed, uncommitted in the working tree.** Author commits/pushes
+explicitly, do not commit or push unless asked. **313 TS tests pass · typecheck clean ·
 `npm run build` clean · `cargo build` clean.** See the top DECISIONS entries:
+- **Req 21 driver decision (2026-10-11):** imported-metadata-only — no native Oracle
+  driver (deferred indefinitely). "Import metadata file…" in the Connections dialog loads
+  an exported/eTRM canonical JSON (rejects credential leaks), previews + imports it. The
+  **driver gate that blocked the connector roadmap for the whole project is now closed.**
 - **Req 21 (Phase 1)** — Oracle **EBS offline/mock** foundation (no live driver, no Rust,
   no deps): mock `oracle-ebs` connector + eTRM-style fixture, `mapOracleType`,
   `ebsSnapshotToModel` (reuses `metadataToModel`), FK provenance/confidence + EBS release
@@ -32,64 +36,40 @@ explicitly, do not commit or push unless asked. **307 TS tests pass · typecheck
 - **Req 17** — New Model dialog's required Target database selector; `model.dialect`
   persisted + authoritative (ExportDialog + Inspector SQL tab); optional Zod field.
 
-**Highest-priority next task: Req 21 Phase 2 — Oracle EBS live discovery + EBS-aware
-Explorer.** Phase 1 (offline/mock foundation) is done and pushed (`1769aaa`): the
-`oracle-ebs` mock connector, `mapOracleType`, `ebsSnapshotToModel`, FK provenance/
-confidence, EBS-release-vs-DB-version, and `docs/ORACLE_EBS.md` (capability matrix +
-driver trade-off + roadmap). Phase 2 has a **driver-gated track** and a **do-now track**
-— start with the do-now track since it needs no sign-off and no Oracle instance.
+**Req 21 (Oracle EBS) — offline track COMPLETE.** Shipped: Phase 1 (mock connector,
+`mapOracleType`, `ebsSnapshotToModel`, FK provenance, EBS-release-vs-DB-version), Phase 2
+(`Entity.source` + `reconcileDiscoveredModel` idempotent re-discovery, EBS-aware Explorer
+view, connector-generic Connections UI), Phase 3 (app-dictionary metadata: concurrent
+programs / lookups / program units on the snapshot + the metadataToPlain serialization
+fix), and the **driver decision — imported-metadata-only** with a working "Import metadata
+file…" flow. The native Rust Oracle adapter is **deferred indefinitely** (decided against;
+the contract is ready if a live feed is ever needed). No open EBS blockers.
 
-**Do-now track (no driver, testable against the mock snapshot):**
-1. ✅ **DONE** — Source-identifier provenance (`Entity.source`) + idempotent in-place
-   re-discovery (`connectors/reconcile.ts` `reconcileDiscoveredModel`).
-2. ✅ **DONE** — EBS-aware Explorer view (`explorer/EbsExplorer.tsx` + `ebsTree.ts`):
-   Model/EBS toggle, product/schema grouping, counts, search, click-to-reveal, scoped to
-   the active tab; `entity.source` provenance surfaced read-only in the Inspector.
-3. ✅ **DONE** — connector-generic Connections UI: "+ Oracle EBS (mock)" connection,
-   EBS-specific editor, Test (EBS release + DB version), reverse-engineer (EBS-enriched),
-   refresh & compare. The whole mock EBS path is now reachable end-to-end in the app.
+**Highest-priority next task — author's choice between two good options (ask if unsure):**
+- **A) PostgreSQL type-system expansion (Req 19 §4)** — the best offline ROI, improves the
+  ONLY live connector. Replace the fixed generic 10 types with real PG types
+  (`smallint`/`real`/`bytea`/geometric/network/`bit`/`jsonb`/`xml`/…): extend
+  `DATA_TYPE_KINDS` (`model/dataTypes.ts`), a type-aware Inspector, dialect renderers
+  (`export/dialects.ts`), and `mapSqlType`/`mapOracleType`. Bounded + fully testable.
+  Catalogued in `docs/POSTGRES_OBJECTS.md` (§4).
+- **B) Req 21 Phase 4+ (still offline-testable on the mock/imported path):** logical/
+  conceptual generation + subject areas by EBS product; EBS Copilot context + reviewed
+  actions (Phase 5); pipeline planning from EBS metadata (Phase 6); a snapshot browser
+  that shows app metadata for an imported model. All catalogued in `docs/ORACLE_EBS.md`.
 
-**Do-now track + Phase 3 (offline app-dictionary metadata) are complete.** Remaining
-Req 21 work is driver-gated or later-phase:
-- **Live Oracle adapter (needs driver sign-off + an Oracle instance):** pick the driver
-  (trade-off in `docs/ORACLE_EBS.md`), document in DECISIONS, then mirror `pg.rs` →
-  Oracle catalog-view discovery; register it for `oracle`/`oracle-ebs`. A gated
-  integration test behind `DAMOD_TEST_ORACLE_URL`.
-- **Phase 3+ (app awareness, Copilot, pipeline):** FND dictionary / concurrent programs /
-  lookups; new canonical object kinds (packages/procedures/triggers/synonyms/types); EBS
-  Copilot context + reviewed actions; pipeline planning from EBS metadata. All catalogued
-  in `docs/ORACLE_EBS.md`.
+**Verification reality (important for whoever's next):** Reqs 17–21 are **author-verified
+only** — Claude cannot drive the native Tauri window or a live DB, and the sandboxed
+Chrome can't reach the dev server. Everything is tsc/test/build/cargo-green and a clean
+`tauri dev` boot, but the UI click-throughs (New Model dialog, EBS Explorer toggle,
+Connections + Import flows) have NOT been visually verified — worth a hands-on pass.
 
-**Driver-gated track (needs author sign-off FIRST, then an Oracle instance to verify):**
-4. Pick the Oracle driver approach (the `oracle` crate + Instant Client vs a thin worker
-   vs imported-only) — trade-off table is in `docs/ORACLE_EBS.md`. **Document the choice
-   in `DECISIONS.md` and get sign-off before adding the dependency** (NFR-8 gate).
-5. Mirror `src-tauri/src/pg.rs` → an Oracle module (`test_connection`/`list_schemas`/
-   `discover` via `ALL_TAB_COLUMNS`/`ALL_CONSTRAINTS`/`ALL_CONS_COLUMNS`/`ALL_INDEXES`/
-   `ALL_VIEWS` — **metadata only, never rows**). TS `oracleConnector.ts` implements the
-   `Connector` contract over `invoke`, normalizing via `mapOracleType`; register it for
-   `oracle` (and back `oracle-ebs` with it). A gated integration test behind
-   `DAMOD_TEST_ORACLE_URL` that skips cleanly without a DB.
+**Files to inspect first (for either option):** `docs/ORACLE_EBS.md` and
+`docs/POSTGRES_OBJECTS.md` (matrices + roadmaps), `src/connectors/oracle/` (EBS layer),
+`src/connectors/{metadata,toModel,reconcile,snapshot,drift}.ts`, `src/model/dataTypes.ts`
++ `src/export/dialects.ts` (for option A), `src/model/objectRegistry.ts`.
 
-**Files to inspect first:** `docs/ORACLE_EBS.md` (matrix + roadmap), `src/connectors/oracle/`
-(Phase 1 foundation), `src/connectors/{metadata,connector,registry,toModel,drift}.ts`,
-`src-tauri/src/pg.rs` (reference connector), `src/explorer/ModelExplorer.tsx` (Req 18
-active-model scoping to extend), `src/model/objectRegistry.ts`.
-
-**Acceptance (do-now track):** re-running `ebsSnapshotToModel` over an unchanged snapshot
-updates in place (no duplicate entities) via `source.nativeId`; EBS Explorer shows
-products→schemas→objects for the active tab only; snapshot refresh preserves manual
-edits; all existing tests stay green.
-
-**Blockers / unresolved decisions:**
-- Oracle driver/licensing/packaging on macOS — **must decide + document + get sign-off
-  before adding the dependency** (gates only the driver-gated track above).
-- **15k LOC budget was raised to ~20k** (documented in DECISIONS, NFR-10).
-- **Req 16 Phase 4 is deferred:** deeper Inspector↔Copilot integration polish.
-
-**Smaller alternative tasks:** Req 19 next objects (functions/procedures/triggers, UDTs,
-or the §4 PostgreSQL type-system expansion — all catalogued in `docs/POSTGRES_OBJECTS.md`);
-Req 16 Phase 4; connector Phase 6 (authorized full-load *execution* proof).
+**Standing constraints:** ~20k LOC budget (NFR-10). **Req 16 Phase 4 deferred** (deeper
+Inspector↔Copilot integration). Secrets only in the OS keychain; metadata-only discovery.
 
 ---
 

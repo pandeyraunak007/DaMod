@@ -12,6 +12,7 @@ import { findSecretLeaks } from "./connection";
 import {
   type CanonicalMetadata,
   type ParseResult,
+  parseMetadata,
   zCanonicalMetadata,
 } from "./metadata";
 
@@ -181,6 +182,25 @@ function firstIssue(err: z.ZodError): string {
   const issue = err.issues[0];
   const path = issue.path.join(".");
   return path ? `${path}: ${issue.message}` : issue.message;
+}
+
+/**
+ * Validate an imported METADATA-package file (Req 21 §3C/§10: offline modeling from
+ * eTRM-derived / exported metadata when no live connection is available). Rejects any
+ * file carrying a credential, then validates against the canonical contract.
+ */
+export function parseMetadataFile(text: string): ParseResult<CanonicalMetadata> {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch (e) {
+    return { ok: false, error: `Invalid JSON: ${(e as Error).message}` };
+  }
+  const leaks = findSecretLeaks(raw);
+  if (leaks.length) {
+    return { ok: false, error: `Refusing to import: the file appears to contain a credential (${leaks[0]}).` };
+  }
+  return parseMetadata(raw);
 }
 
 /** Validate snapshot file text (§7: validate every imported snapshot). */
