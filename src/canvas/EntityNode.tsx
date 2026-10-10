@@ -92,7 +92,7 @@ function EntityNodeImpl({ data, selected }: NodeProps) {
     f.primaryKey ? "PK" : fkIds.has(f.id) ? "FK" : f.unique ? "U" : "";
 
   const renderField = (f: Field) => (
-    <li key={f.id} className="entity__field">
+    <li key={f.id} className="entity__field" title={f.description || undefined}>
       <span className="entity__key">{keyMark(f)}</span>
       <span className="entity__field-name">
         {displayName(f, level)}

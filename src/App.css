@@ -1991,3 +1991,20 @@ body,
 .copilot__actions li {
   margin: 0.12rem 0;
 }
+
+.field-row__desc {
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.2rem 0.4rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  background: #fcfcfd;
+}
+.field-row__desc:focus {
+  color: var(--text);
+  border-style: solid;
+  outline: none;
+  border-color: var(--accent);
+}

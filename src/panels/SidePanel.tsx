@@ -596,6 +596,13 @@ function FieldRow({
       </div>
       )}
 
+      <input
+        className="field-row__desc"
+        placeholder="description…"
+        value={field.description ?? ""}
+        onChange={(e) => updateField(entity.id, field.id, { description: e.target.value || undefined })}
+      />
+
       {nameError && <p className="editor__error">{nameError}</p>}
       {!nameError && duplicate && (
         <p className="editor__error editor__error--warn">Duplicate field name.</p>
