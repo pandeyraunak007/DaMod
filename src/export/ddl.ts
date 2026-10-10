@@ -18,12 +18,20 @@ interface FkCol {
   fk: string; // child field name
   pk: string; // parent field name
 }
-interface Fk {
+export interface Fk {
   child: Entity;
   parent: Entity;
   cols: FkCol[];
   onDelete?: RiAction;
   onUpdate?: RiAction;
+}
+
+/** Schema-generation options for a forward-engineered CREATE script. */
+export interface DdlOptions {
+  /** Emit `DROP TABLE IF EXISTS … CASCADE;` for every table first. */
+  dropFirst?: boolean;
+  /** Emit `CREATE TABLE IF NOT EXISTS` instead of `CREATE TABLE`. */
+  ifNotExists?: boolean;
 }
 
 /** Referential-integrity clause for a foreign key (Postgres only; other engines
@@ -121,14 +129,16 @@ function tableRef(d: Dialect, name: string, schema?: string): string {
   return schema ? `${d.quote(schema)}.${d.quote(name)}` : d.quote(name);
 }
 
-function tableDDL(
+export function tableDDL(
   d: Dialect,
   entity: Entity,
   inlineFks: Fk[],
   schema: string | undefined,
+  opts: DdlOptions = {},
 ): string {
   const q = d.quote;
   const ref = tableRef(d, entity.name, schema);
+  const create = opts.ifNotExists ? "CREATE TABLE IF NOT EXISTS" : "CREATE TABLE";
   const lines: string[] = [];
   for (const f of entity.fields) {
     let line = `  ${q(f.name)} ${d.type(f)}`;
@@ -150,9 +160,15 @@ function tableDDL(
         .join(", ")})${riClause(d, fk)}`,
     );
   }
-  let ddl = `CREATE TABLE ${ref} (\n${lines.join(",\n")}\n)`;
+  let ddl = `${create} ${ref} (\n${lines.join(",\n")}\n)`;
   if (d.commentStyle === "inline" && entity.description) ddl += ` COMMENT ${sqlString(entity.description)}`;
   return ddl + ";";
+}
+
+/** `DROP TABLE IF EXISTS <ref> CASCADE;` for a forward-engineered script. */
+export function dropTableSql(d: Dialect, name: string, schema?: string): string {
+  const cascade = d.id === "databricks" ? "" : " CASCADE";
+  return `DROP TABLE IF EXISTS ${tableRef(d, name, schema)}${cascade};`;
 }
 
 function commentStatements(d: Dialect, entity: Entity, schema?: string): string[] {
@@ -168,7 +184,7 @@ function commentStatements(d: Dialect, entity: Entity, schema?: string): string[
   return out;
 }
 
-function alterFk(d: Dialect, fk: Fk, schema?: string): string {
+export function alterFk(d: Dialect, fk: Fk, schema?: string): string {
   const childRef = tableRef(d, fk.child.name, schema);
   const parentRef = tableRef(d, fk.parent.name, schema);
   return `ALTER TABLE ${childRef} ADD FOREIGN KEY (${fk.cols
@@ -252,7 +268,7 @@ function objectBlocks(model: Model, d: Dialect, schema?: string): { pre: string[
 }
 
 /** Export a single model as DDL. */
-export function exportModelDDL(model: Model, d: Dialect): string {
+export function exportModelDDL(model: Model, d: Dialect, opts: DdlOptions = {}): string {
   const fks = foreignKeys(model);
   const { order, deferred } = orderTables(model.entities, fks);
   const deferredSet = new Set(deferred);
@@ -260,8 +276,12 @@ export function exportModelDDL(model: Model, d: Dialect): string {
   const { pre, post } = objectBlocks(model, d);
 
   const blocks: string[] = [`-- DaMod DDL export: ${model.name} (${d.label})`];
+  if (opts.dropFirst) {
+    // Drop in reverse dependency order so referencing tables go first.
+    blocks.push([...order].reverse().map((e) => dropTableSql(d, e.name)).join("\n"));
+  }
   blocks.push(...pre); // sequences first (defaults may reference them)
-  const tables = order.map((e) => tableDDL(d, e, inlineFks, undefined));
+  const tables = order.map((e) => tableDDL(d, e, inlineFks, undefined, opts));
   blocks.push(tables.join("\n\n"));
 
   const comments = order.flatMap((e) => commentStatements(d, e));
@@ -281,6 +301,7 @@ export function exportWorkspaceDDL(
   models: { id: string; name: string; model: Model }[],
   links: Link[],
   d: Dialect,
+  opts: DdlOptions = {},
 ): string {
   const sortedModels = [...models].sort((a, b) => a.name.localeCompare(b.name));
   const blocks: string[] = [`-- DaMod workspace DDL export (${d.label})`];
@@ -295,7 +316,12 @@ export function exportWorkspaceDDL(
     const deferredSet = new Set(deferred);
     const inlineFks = fks.filter((fk) => !deferredSet.has(fk));
     const { pre, post } = objectBlocks(model, d, model.name);
-    const tables = order.map((e) => tableDDL(d, e, inlineFks, model.name));
+    if (opts.dropFirst) {
+      blocks.push(
+        [...order].reverse().map((e) => dropTableSql(d, e.name, model.name)).join("\n"),
+      );
+    }
+    const tables = order.map((e) => tableDDL(d, e, inlineFks, model.name, opts));
     const parts = [`-- schema: ${model.name}`, ...pre, tables.join("\n\n")];
     const comments = order.flatMap((e) => commentStatements(d, e, model.name));
     if (comments.length) parts.push(comments.join("\n"));

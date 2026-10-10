@@ -5,14 +5,18 @@ import { validateWorkspace } from "../validation/rules";
 import { canExportDdl } from "../model/levels";
 import { DIALECTS, DIALECT_IDS, type DialectId } from "./dialects";
 import { exportModelDDL, exportWorkspaceDDL } from "./ddl";
+import { generateMigration } from "./migrate";
 import { exportSemanticYaml } from "./semanticExport";
-import { joinPath, writeFile } from "../persist/fs";
+import { parseDdl } from "../import/reverse";
+import type { Model } from "../model/model";
+import { joinPath, pickFile, readTextFile, writeFile } from "../persist/fs";
 
-type Scope = "model" | "workspace" | "semantic";
+type Scope = "model" | "workspace" | "semantic" | "migration";
 
-// Export dialog (FR-8/FR-9). Runs validation first and blocks on errors
-// (FR-8.7). DDL is offered per dialect; DDL scopes are disabled for
-// Conceptual/Logical models (FR-11.8).
+// Export dialog (FR-8/FR-9) plus forward-engineering. Runs validation first and
+// blocks on errors (FR-8.7). DDL is offered per dialect with schema options (drop
+// first / if not exists); the migration scope diffs the active model against a
+// baseline (another model, or a reverse-engineered .sql) to an ALTER script.
 export function ExportDialog({ onClose }: { onClose: () => void }) {
   const path = useWorkspaceStore((s) => s.path);
   const allModels = useWorkspaceStore((s) => s.allModels);
@@ -22,9 +26,15 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
 
   const [dialect, setDialect] = useState<DialectId>("postgres");
   const [scope, setScope] = useState<Scope>("model");
+  const [dropFirst, setDropFirst] = useState(false);
+  const [ifNotExists, setIfNotExists] = useState(false);
+  const [baselineSel, setBaselineSel] = useState<string>(""); // model id, or "" / "sql"
+  const [sqlBaseline, setSqlBaseline] = useState<Model | null>(null);
+  const [sqlBaselineName, setSqlBaselineName] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
 
   const models = allModels();
+  const otherModels = models.filter((m) => m.id !== activeModel.id);
 
   const issues = useMemo(
     () =>
@@ -37,8 +47,26 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     [models, links, semantic],
   );
   const errors = issues.filter((i) => i.severity === "error");
-
   const modelExportable = canExportDdl(activeModel.level);
+
+  const loadSqlBaseline = async () => {
+    const file = await pickFile(["sql"], "Open a baseline .sql file");
+    if (!file) return;
+    const content = await readTextFile(file);
+    const { model } = parseDdl(content, "baseline", "2026-01-01T00:00:00Z");
+    setSqlBaseline(model);
+    setSqlBaselineName(file.split("/").pop() ?? "baseline.sql");
+    setBaselineSel("sql");
+  };
+
+  const baselineModel: Model | null = useMemo(() => {
+    if (scope !== "migration") return null;
+    if (baselineSel === "sql") return sqlBaseline;
+    const found = otherModels.find((m) => m.id === baselineSel);
+    return found?.model ?? null;
+  }, [scope, baselineSel, sqlBaseline, otherModels]);
+
+  const opts = { dropFirst, ifNotExists };
 
   const text = useMemo(() => {
     try {
@@ -46,28 +74,40 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
       const d = DIALECTS[dialect];
       if (scope === "workspace") {
         const exportable = models.filter((m) => canExportDdl(m.model.level));
-        return exportWorkspaceDDL(exportable, links.links, d);
+        return exportWorkspaceDDL(exportable, links.links, d, opts);
       }
-      return exportModelDDL(activeModel, d);
+      if (scope === "migration") {
+        if (!baselineModel) return "-- choose a baseline model or load a .sql file to compare against.";
+        return generateMigration(baselineModel, activeModel, d);
+      }
+      return exportModelDDL(activeModel, d, opts);
     } catch (e) {
       return `-- export error: ${(e as Error).message}`;
     }
-  }, [scope, dialect, activeModel, models, links, semantic]);
+  }, [scope, dialect, activeModel, models, links, semantic, dropFirst, ifNotExists, baselineModel]);
 
   const fileName =
     scope === "semantic"
       ? "semantic.yaml"
       : scope === "workspace"
         ? "workspace.sql"
-        : `${activeModel.name}.sql`;
+        : scope === "migration"
+          ? `${activeModel.name}.migration.sql`
+          : `${activeModel.name}.sql`;
 
-  const blocked = errors.length > 0 || (scope === "model" && !modelExportable);
+  const blocked =
+    errors.length > 0 ||
+    (scope === "model" && !modelExportable) ||
+    (scope === "migration" && (!modelExportable || !baselineModel));
 
   const doExport = async () => {
     if (!path || blocked) return;
     await writeFile(joinPath(path, fileName), text, false);
     setSaved(joinPath(path, fileName));
   };
+
+  const showDialect = scope !== "semantic";
+  const showSchemaOpts = scope === "model" || scope === "workspace";
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -80,10 +120,11 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             <select value={scope} onChange={(e) => setScope(e.target.value as Scope)}>
               <option value="model">Active model — DDL</option>
               <option value="workspace">Whole workspace — DDL</option>
+              <option value="migration">Migration — ALTER script</option>
               <option value="semantic">Semantic layer — YAML</option>
             </select>
           </div>
-          {scope !== "semantic" && (
+          {showDialect && (
             <div className="field">
               <label>Dialect</label>
               <select value={dialect} onChange={(e) => setDialect(e.target.value as DialectId)}>
@@ -97,9 +138,51 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        {scope === "model" && !modelExportable && (
+        {showSchemaOpts && (
+          <div className="modal__row modal__row--pair">
+            <label className="checkbox">
+              <input type="checkbox" checked={dropFirst} onChange={(e) => setDropFirst(e.target.checked)} />
+              DROP TABLE IF EXISTS first
+            </label>
+            <label className="checkbox">
+              <input type="checkbox" checked={ifNotExists} onChange={(e) => setIfNotExists(e.target.checked)} />
+              CREATE TABLE IF NOT EXISTS
+            </label>
+          </div>
+        )}
+
+        {scope === "migration" && (
+          <div className="modal__row modal__row--pair">
+            <div className="field">
+              <label>Baseline to compare against</label>
+              <select value={baselineSel} onChange={(e) => setBaselineSel(e.target.value)}>
+                <option value="">— choose a baseline —</option>
+                {otherModels.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    model: {m.name}
+                  </option>
+                ))}
+                {sqlBaseline && <option value="sql">file: {sqlBaselineName}</option>}
+              </select>
+            </div>
+            <div className="field">
+              <label>Or a database dump</label>
+              <button className="btn btn--small" onClick={loadSqlBaseline}>
+                Load baseline .sql…
+              </button>
+            </div>
+          </div>
+        )}
+
+        {(scope === "model" || scope === "migration") && !modelExportable && (
           <p className="field__hint field__hint--warn">
-            {activeModel.name} is a {activeModel.level} model — raise it to Physical to export DDL.
+            {activeModel.name} is a {activeModel.level} model — raise it to Physical to generate SQL.
+          </p>
+        )}
+        {scope === "migration" && (
+          <p className="field__hint">
+            The migration turns the chosen baseline into <strong>{activeModel.name}</strong>. Tip:
+            reverse-engineer your live database with “Import SQL”, keep it as the baseline, then diff.
           </p>
         )}
         {errors.length > 0 && (

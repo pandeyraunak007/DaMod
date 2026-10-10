@@ -56,6 +56,32 @@ unit tests; UI verified by typecheck/build/clean boot (author runs the app).
   reconstruction; no M:N collapse (a junction table imports as a plain entity
   with two one-to-many relationships, which matches DaMod's own representation).
 
+### Forward-engineering: ALTER migration + schema options
+- **What:** The Export dialog gains (1) **schema options** for the CREATE scripts —
+  `DROP TABLE IF EXISTS … CASCADE` first and `CREATE TABLE IF NOT EXISTS` — and
+  (2) a **Migration** scope that diffs the active model against a *baseline* and
+  emits an `ALTER`-based migration. The baseline is either another model in the
+  workspace or a reverse-engineered `.sql` file. This closes the loop with RE:
+  dump a live DB → Import SQL as the baseline → edit the model → generate the
+  ALTER script that migrates the DB to match.
+- **Diff** (`export/migrate.ts`) matches entities and fields **by name** (the SQL
+  identifier), not internal id, because a RE'd baseline has different ids. It
+  reports added/removed/changed entities, added/removed/changed fields (type,
+  nullability, default, PK, unique), and added/removed foreign keys (matched by a
+  name signature). `generateMigration` renders CREATE TABLE for new entities
+  (FKs added afterward once all tables exist), DROP TABLE for removed ones, and
+  ADD/DROP/ALTER COLUMN for field changes.
+- **Dialect:** ALTER statements target **Postgres** (the reference dialect);
+  other dialects get the same output with a review note, since their ALTER COLUMN
+  syntax diverges. PK changes and FK/UNIQUE drops of unnamed constraints are
+  emitted as comments (they need a manual constraint-name edit), rather than
+  guessing a name — safer than a wrong `DROP CONSTRAINT`.
+- **Determinism:** with no schema options set, `exportModelDDL` is byte-identical
+  to before (FR-8.6 preserved; unit-tested). `ddl.ts` now exports `tableDDL`,
+  `alterFk`, `dropTableSql`, `foreignKeys`, `Fk`, `DdlOptions` for reuse.
+- **Not done:** No live-DB connection (scripts are generated, not executed); no
+  data migration (schema only); index/sequence/view diffs not included yet.
+
 ## 2026-09-22 — Phase 4: semantic layer (FR-7) + export (FR-8/FR-9), multi-dialect
 
 84 unit tests cover the pure logic (semantic persistence, DDL across 3 dialects,
