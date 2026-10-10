@@ -1,18 +1,33 @@
 import { useState } from "react";
 import { useWorkspaceStore } from "../../store/workspaceStore";
+import { useModelStore } from "../../store/modelStore";
 import { newId } from "../../lib/ids";
 import { validateIdentifier } from "../../model/identifiers";
 import type { ConnectionProfile } from "../connection";
 import { getConnector } from "../registry";
 import { pgTestConnection, secretStore } from "../postgres/postgresConnector";
 import { metadataToModel } from "../toModel";
+import { computeDrift, applyDrift, type DriftChange } from "../drift";
+import type { ModelDiff } from "../../export/migrate";
+import type { Model } from "../../model/model";
+import type { SourceSnapshot } from "../snapshot";
 import type { Connector, DiscoveryResult } from "../connector";
+
+function buildSnapshot(connectionRef: string, d: DiscoveryResult): SourceSnapshot {
+  return {
+    snapshotVersion: 1,
+    id: newId("snapshot"),
+    connectionRef,
+    metadata: d.metadata,
+    provenance: d.provenance,
+  };
+}
 
 // Connections workspace (§6.A) + reverse-engineering workflow (§6.B). A left list
 // of saved connections; the right panel edits one and runs discovery → preview →
 // import into a new model. Credentials entered here are stored in the OS keychain
 // (never in workspace JSON).
-type Mode = "edit" | "reverse";
+type Mode = "edit" | "reverse" | "refresh";
 
 export function ConnectionsDialog({ onClose }: { onClose: () => void }) {
   const connections = useWorkspaceStore((s) => s.connections);
@@ -76,9 +91,12 @@ export function ConnectionsDialog({ onClose }: { onClose: () => void }) {
                   setSelectedId(null);
                 }}
                 onReverse={() => setMode("reverse")}
+                onRefresh={() => setMode("refresh")}
               />
-            ) : (
+            ) : mode === "reverse" ? (
               <ReversePanel profile={selected} onBack={() => setMode("edit")} onClose={onClose} />
+            ) : (
+              <RefreshPanel profile={selected} onBack={() => setMode("edit")} onClose={onClose} />
             )}
           </div>
         </div>
@@ -96,11 +114,13 @@ function ConnectionEditor({
   onSave,
   onDelete,
   onReverse,
+  onRefresh,
 }: {
   profile: ConnectionProfile;
   onSave: (p: ConnectionProfile) => Promise<void>;
   onDelete: () => Promise<void>;
   onReverse: () => void;
+  onRefresh: () => void;
 }) {
   const [name, setName] = useState(profile.name);
   const [params, setParams] = useState<Record<string, string>>({ ...profile.params });
@@ -181,6 +201,9 @@ function ConnectionEditor({
         <button className="btn btn--danger btn--small" onClick={onDelete} disabled={busy}>Delete</button>
         <button className="btn btn--small" onClick={test} disabled={busy}>Test</button>
         <button className="btn btn--small" onClick={save} disabled={busy || !!nameError}>Save</button>
+        <button className="btn btn--small" onClick={onRefresh} disabled={busy}>
+          Refresh &amp; compare →
+        </button>
         <button className="btn btn--primary btn--small" onClick={onReverse} disabled={busy}>
           Reverse-engineer →
         </button>
@@ -200,6 +223,7 @@ function ReversePanel({
   onClose: () => void;
 }) {
   const importModel = useWorkspaceStore((s) => s.importModel);
+  const saveSnapshot = useWorkspaceStore((s) => s.saveSnapshot);
   const [schemas, setSchemas] = useState<string[] | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [discovery, setDiscovery] = useState<DiscoveryResult | null>(null);
@@ -247,9 +271,13 @@ function ReversePanel({
   const preview = discovery ? metadataToModel(discovery.metadata, modelName || "imported", new Date().toISOString()) : null;
 
   const doImport = async () => {
-    if (!preview) return;
+    if (!preview || !discovery) return;
     setBusy(true);
     const err = await importModel(preview.model, modelName);
+    if (!err) {
+      // Persist the snapshot so a later refresh can compare against it.
+      await saveSnapshot(profile.name, buildSnapshot(profile.id, discovery));
+    }
     setBusy(false);
     if (err) setStatus(err);
     else onClose();
@@ -322,6 +350,122 @@ function ReversePanel({
           3 · Import as new model
         </button>
       </div>
+    </div>
+  );
+}
+
+// Refresh & compare (§6.C): discover the source again, diff it against the saved
+// snapshot (pure source drift), let the user approve changes, and apply them to
+// the ACTIVE model — preserving unrelated manual edits.
+function RefreshPanel({
+  profile,
+  onBack,
+  onClose,
+}: {
+  profile: ConnectionProfile;
+  onBack: () => void;
+  onClose: () => void;
+}) {
+  const loadSnapshot = useWorkspaceStore((s) => s.loadSnapshot);
+  const saveSnapshot = useWorkspaceStore((s) => s.saveSnapshot);
+  const saveActive = useWorkspaceStore((s) => s.saveActive);
+  const activeModelName = useModelStore((s) => s.model.name);
+  const loadModel = useModelStore((s) => s.loadModel);
+
+  const [state, setState] = useState<{
+    changes: DriftChange[];
+    diff: ModelDiff;
+    nextModel: Model;
+    discovery: DiscoveryResult;
+  } | null>(null);
+  const [accepted, setAccepted] = useState<Set<string>>(new Set());
+  const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const refresh = async () => {
+    const c = pgConnector();
+    if (!c) return;
+    setBusy(true);
+    setStatus("Discovering and comparing…");
+    try {
+      const prev = await loadSnapshot(profile.name);
+      const discovery = await c.discover(profile, { includeViews: true, includeIndexes: true });
+      if (!prev) {
+        // Nothing to compare against — record the first snapshot.
+        await saveSnapshot(profile.name, buildSnapshot(profile.id, discovery));
+        setStatus("No previous snapshot — saved the first one. Re-run after the source changes.");
+        setBusy(false);
+        return;
+      }
+      const { changes, diff, nextModel } = computeDrift(
+        prev.metadata,
+        discovery.metadata,
+        new Date().toISOString(),
+      );
+      setState({ changes, diff, nextModel, discovery });
+      setAccepted(new Set(changes.filter((ch) => ch.kind !== "possible-rename").map((ch) => ch.key)));
+      setStatus(changes.length ? `${changes.length} change(s) since the last snapshot.` : "No changes since the last snapshot.");
+    } catch (e) {
+      setStatus(`Failed: ${(e as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const apply = async () => {
+    if (!state) return;
+    setBusy(true);
+    const current = useModelStore.getState().model;
+    const updated = applyDrift(current, state.nextModel, state.diff, accepted);
+    loadModel(updated);
+    await saveActive(true);
+    await saveSnapshot(profile.name, buildSnapshot(profile.id, state.discovery));
+    setBusy(false);
+    onClose();
+  };
+
+  const toggle = (key: string) => {
+    const next = new Set(accepted);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    setAccepted(next);
+  };
+
+  return (
+    <div>
+      <button className="btn btn--small" onClick={onBack}>← Connection</button>
+      <h3 className="modal__subtitle">Refresh “{profile.name}” → model “{activeModelName}”</h3>
+      <p className="field__hint">
+        Changes apply to the active model on the canvas. Unrelated manual edits are preserved.
+      </p>
+
+      {!state ? (
+        <button className="btn btn--small" onClick={refresh} disabled={busy}>Discover &amp; compare</button>
+      ) : state.changes.length === 0 ? (
+        <p className="side__hint">The model is already in sync with the source.</p>
+      ) : (
+        <>
+          <div className="conn__schemas drift__list">
+            {state.changes.map((ch) => (
+              <label key={ch.key} className="checkbox drift__row">
+                <input
+                  type="checkbox"
+                  disabled={ch.kind === "possible-rename"}
+                  checked={accepted.has(ch.key)}
+                  onChange={() => toggle(ch.key)}
+                />
+                <span className={ch.kind === "possible-rename" ? "field__hint--warn" : ""}>{ch.label}</span>
+              </label>
+            ))}
+          </div>
+          <div className="modal__actions">
+            <button className="btn btn--primary" onClick={apply} disabled={busy || accepted.size === 0}>
+              Apply {accepted.size} change{accepted.size === 1 ? "" : "s"}
+            </button>
+          </div>
+        </>
+      )}
+      {status && <p className="field__hint">{status}</p>}
     </div>
   );
 }

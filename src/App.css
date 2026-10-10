@@ -1329,6 +1329,17 @@ body,
   margin: 0.5rem 0;
   font-size: 0.95rem;
 }
+.drift__list {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  max-height: 240px;
+  gap: 0.2rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+}
+.drift__row {
+  align-items: flex-start;
+}
 
 /* ---- workspace map ---- */
 .modal--map {

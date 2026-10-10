@@ -103,9 +103,38 @@ need a documented raise as the platform grows.
 - **This completes the "first meaningful release" except refresh/drift (Phase 4)
   and pipeline planning (Phase 5).**
 
-**Next task:** Phase 4 — schema refresh & drift (snapshot the source, diff vs the
-prior snapshot + model, review/approve, apply while preserving manual edits),
-reusing `export/migrate.ts`.
+**Phase 4 implemented — schema refresh & drift:**
+- **Snapshots persist** at `sources/<connection>.snapshot.json` (deterministic,
+  credential-free; the Rust atomic-write creates the `sources/` dir, and
+  `list_workspace` only treats `*.model.json` as models, so snapshots are never
+  loaded as models). Saved on import and after a refresh; store gains
+  `saveSnapshot`/`loadSnapshot`.
+- **`connectors/drift.ts`** — `computeDrift(prev, next)` projects both the previous
+  snapshot and the fresh discovery to models via `metadataToModel` and diffs them
+  with **`export/migrate.ts`'s `diffModels` (reuse)**. Because both sides are pure
+  source projections, the diff is **purely source drift, never the user's edits**.
+  `applyDrift(userModel, nextModel, diff, accepted)` applies only approved changes,
+  matched **by name**, so **unrelated manual edits are preserved** (unit-tested).
+- **Possible renames:** a removed+added entity pair sharing ≥2 column names is
+  flagged for review and **never auto-applied** (§3.7 — no rename claims on thin
+  evidence); a lone `id` match is not enough.
+- **`RefreshPanel`** (in `ConnectionsDialog`): discover → compare vs the saved
+  snapshot → per-change checkboxes (renames disabled) → **apply to the active
+  model** + save + write the new snapshot. First refresh with no prior snapshot
+  just records one.
+- **Verified:** 5 new drift tests (added/removed/changed detection, possible-rename
+  flagging, apply-only-accepted **with manual-edit preservation**, accepted type
+  change, no-op); **152 TS tests**; typecheck + build clean; app code ~12.6k.
+- **Known limits:** refresh applies to the *active* model (user picks which is open)
+  and uses `loadModel` (resets that model's undo stack — the `.history/` snapshot on
+  save is the recovery path); live refresh is author-run.
+
+**This delivers the full "first meaningful release" loop except Phase 5 (ETL
+pipeline planning).**
+
+**Next task:** Phase 5 — ETL pipeline specification + planner (source/target
+mapping, type-compat + required-field validation, deterministic plan export),
+consuming the saved snapshot/metadata without re-discovery.
 
 ## 2026-10-10 — Domains, reverse-engineering and forward-engineering (beyond-spec, ERwin)
 

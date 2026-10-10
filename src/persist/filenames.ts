@@ -7,7 +7,13 @@ export const WORKSPACE_FILE = "workspace.json";
 export const LINKS_FILE = "links.json";
 export const SEMANTIC_FILE = "semantic.json";
 export const CONNECTIONS_FILE = "connections.json";
+export const SOURCES_DIR = "sources";
 export const HISTORY_DIR = ".history";
+
+/** Snapshot file path (relative to the workspace) for a connection's source. */
+export function snapshotFileName(connectionName: string): string {
+  return `${SOURCES_DIR}/${connectionName}.snapshot.json`;
+}
 
 export function modelFileName(modelName: string): string {
   return `${modelName}${MODEL_FILE_SUFFIX}`;

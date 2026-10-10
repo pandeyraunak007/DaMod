@@ -9,11 +9,17 @@ import {
   modelFileName,
   modelNameFromFile,
   isModelFile,
+  snapshotFileName,
   CONNECTIONS_FILE,
   LINKS_FILE,
   SEMANTIC_FILE,
   WORKSPACE_FILE,
 } from "../persist/filenames";
+import {
+  type SourceSnapshot,
+  parseSnapshot,
+  serializeSnapshot,
+} from "../connectors/snapshot";
 import type { ConnectionProfile } from "../connectors/connection";
 import {
   type ConnectionsDoc,
@@ -113,6 +119,8 @@ interface WorkspaceState {
   // never in this state or connections.json — only a secretRef is stored.
   upsertConnection: (profile: ConnectionProfile) => Promise<void>;
   deleteConnection: (id: string) => Promise<void>;
+  saveSnapshot: (connectionName: string, snapshot: SourceSnapshot) => Promise<void>;
+  loadSnapshot: (connectionName: string) => Promise<SourceSnapshot | null>;
 
   // semantic layer (FR-7)
   addTerm: (term: Term) => void;
@@ -641,6 +649,26 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       });
       // Best-effort removal of the stored credential.
       if (target?.secretRef) await secretDelete(target.secretRef).catch(() => {});
+    },
+
+    saveSnapshot: async (connectionName, snapshot) => {
+      const { path } = get();
+      if (!path) return;
+      await writeFile(joinPath(path, snapshotFileName(connectionName)), serializeSnapshot(snapshot), true);
+    },
+
+    loadSnapshot: async (connectionName) => {
+      const { path } = get();
+      if (!path) return null;
+      try {
+        const text = await readTextFile(joinPath(path, snapshotFileName(connectionName)));
+        const parsed = parseSnapshot(text);
+        if (parsed.ok) return parsed.value;
+        useModelStore.getState().pushNotice(`snapshot for ${connectionName}: ${parsed.error}`);
+        return null;
+      } catch {
+        return null; // no prior snapshot
+      }
     },
 
     addTerm: (term) => {

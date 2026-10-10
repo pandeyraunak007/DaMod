@@ -1,9 +1,18 @@
 # Connector Framework & ETL Planning — Architecture
 
-Status: **Phases 1–3 implemented** (foundation, PostgreSQL discovery, reverse-
-engineering integration). Phases 4+ (refresh/drift, pipeline planning) are
+Status: **Phases 1–4 implemented** (foundation, PostgreSQL discovery, reverse-
+engineering integration, schema refresh & drift). Phase 5+ (pipeline planning) is
 specified here but not yet built. This document is the contract reference;
 `DECISIONS.md` carries the dated decision log.
+
+Phase 4 (refresh & drift): snapshots persist at `sources/<connection>.snapshot.json`
+(saved on import and on refresh). `drift.ts` projects the previous snapshot and a
+fresh discovery to models and diffs them with `export/migrate.ts` — so the
+differences are pure *source* drift, not user edits. `applyDrift` applies only the
+user-approved changes onto the active model, matched by name, preserving unrelated
+manual edits; a removed+added pair sharing ≥2 columns is surfaced as a *possible
+rename* (never auto-applied). The `RefreshPanel` in `ConnectionsDialog` runs
+discover → compare → review (per-change checkboxes) → apply + save.
 
 Phase 3 (reverse-engineering): `toModel.ts` maps canonical metadata →
 `.model.json` reusing the model factories + the same FK→relationship logic as the
