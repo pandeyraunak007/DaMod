@@ -20,6 +20,7 @@ import { DomainsDialog } from "./panels/DomainsDialog";
 import { ImportDialog } from "./import/ImportDialog";
 import { ConnectionsDialog } from "./connectors/ui/ConnectionsDialog";
 import { PipelineDialog } from "./connectors/pipeline/PipelineDialog";
+import { CopilotPanel } from "./copilot/CopilotPanel";
 import { LinkDialog } from "./links/LinkDialog";
 import { useModelStore } from "./store/modelStore";
 import { useWorkspaceStore } from "./store/workspaceStore";
@@ -44,6 +45,7 @@ export default function App() {
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [connectionsReverse, setConnectionsReverse] = useState(false);
   const [pipelinesOpen, setPipelinesOpen] = useState(false);
+  const [copilotOpen, setCopilotOpen] = useState(false);
   const [semanticOpen, setSemanticOpen] = useState(false);
   const [deleteModel, setDeleteModel] = useState<{ id: string; name: string } | null>(null);
 
@@ -141,6 +143,8 @@ export default function App() {
         onOpenExport={() => setExportOpen(true)}
         onOpenDomains={() => setDomainsOpen(true)}
         onToggleSemantic={() => setSemanticOpen((v) => !v)}
+        onToggleCopilot={() => setCopilotOpen((v) => !v)}
+        copilotActive={copilotOpen}
         semanticActive={semanticOpen}
       />
       <TabBar onDeleteModel={(id, name) => setDeleteModel({ id, name })} />
@@ -159,6 +163,7 @@ export default function App() {
             />
           )}
           <SemanticView />
+          {copilotOpen && <CopilotPanel onClose={() => setCopilotOpen(false)} />}
         </div>
       ) : (
         <div className="app__body">
@@ -196,6 +201,7 @@ export default function App() {
             )}
           </div>
           {showProperties && <SidePanel />}
+          {copilotOpen && <CopilotPanel onClose={() => setCopilotOpen(false)} />}
         </div>
       )}
       {wsPath && showValidation && <ValidationPanel />}

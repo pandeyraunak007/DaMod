@@ -163,6 +163,9 @@ interface ModelStore {
   canUndo: () => boolean;
   canRedo: () => boolean;
 
+  // Run several existing ops as ONE undo step (e.g. an accepted Copilot plan).
+  applyAsOne: (fn: () => void) => void;
+
   // testing / reset
   loadModel: (model: Model) => void;
 }
@@ -795,6 +798,18 @@ export const useModelStore = create<ModelStore>((set, get) => {
 
     canUndo: () => get().past.length > 0,
     canRedo: () => get().future.length > 0,
+
+    // Each op below pushes its own history entry; after `fn` runs we collapse all
+    // of those into the single pre-batch snapshot, so the whole plan undoes in one
+    // step (§14.9). Reuses the exact same domain ops as manual editing.
+    applyAsOne: (fn) => {
+      const pastLen = get().past.length;
+      fn();
+      set((s) => {
+        if (s.past.length <= pastLen) return {}; // fn made no change
+        return { past: s.past.slice(0, pastLen + 1), future: [] };
+      });
+    },
 
     loadModel: (model) =>
       set({

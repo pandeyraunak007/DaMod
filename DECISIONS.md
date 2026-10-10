@@ -94,6 +94,54 @@ groups were unconditional. Not stale state, not caching.
 - **Still open (future):** per-level validation *message wording*; a formal shared
   command-capability registry (§8) beyond the current per-level gating.
 
+## 2026-10-10 — AI Modeling Copilot (§14) — Stages 1–4 foundation
+
+Optional BYOLLM copilot that proposes structured, reviewable plans applied through
+the EXISTING modeling command layer — never a second modeling engine, never direct
+JSON/state mutation. Entirely optional: all deterministic modeling works with
+Copilot off. Implemented per §14.13 as a bounded vertical slice (not all stages).
+
+- **Stage 1 — command layer** (`copilot/actions.ts`, `execute.ts`): Zod action
+  schemas (`create_entity`, `update_description`, `create_relationship`); the
+  executor resolves names→ids and applies actions via the **existing modelStore
+  ops**, idempotently (skips duplicates), re-validates, and reports per-action
+  results. New `modelStore.applyAsOne(fn)` collapses the batch into **one undo
+  step**. A rejected plan is simply never executed → model byte-identical.
+- **Stage 2 — provider + privacy** (`provider.ts`, `privacy.ts`, `settings.ts`):
+  BYOLLM `Provider` interface + OpenAI-compatible adapter (endpoint-validated,
+  https/localhost only) + `MockProvider` for tests. **API key only in the OS
+  keychain** (new Rust `secret_get` + `lib/secrets.ts`), read just-in-time in the
+  network layer, never in React state/JSON/localStorage/logs. Privacy policy
+  (`verified`/`unverified`/`unsupported` no-training; `require-verified` blocks
+  confidential context when unverified); hard secret-leak guard on context;
+  context categories shown before sending. No telemetry.
+- **Stage 3–4 — context + panel** (`context.ts`, `orchestrate.ts`,
+  `CopilotPanel.tsx`): minimal non-secret context (names/types/relationships/
+  domains for the chosen scope); orchestrator gates privacy → builds context →
+  calls provider → Zod-validates the plan. Panel (toolbar **Copilot** toggle):
+  prompt, provider/privacy status, plan preview with assumptions, approve/reject,
+  result summary, one-click undo. End-to-end example working: **update entity
+  descriptions through a reviewed plan**.
+- **Reused, not duplicated**: all mutations go through existing ops; validation via
+  `validateWorkspace`; secrets via the keychain commands built for Postgres;
+  redaction via `findSecretLeaks`.
+- **Verified**: 20 new tests (plan Zod validation, execute incl. single-undo
+  atomicity + idempotency + reject=unchanged, privacy enforcement, redaction,
+  endpoint safety, context minimisation, no-key persistence, mock end-to-end,
+  panel render). **216 TS tests; Rust compiles; typecheck/build clean.** No live
+  API key needed for tests.
+- **Not done (later stages)**: naming-standard/domain/semantic AI actions,
+  streaming, conflict-regeneration UI beyond the updatedAt check, a Rust-side LLM
+  proxy (current adapter reads the key just-in-time in JS — documented trade-off;
+  hardening is Stage 7). Honest privacy: the app never claims no-training/retention
+  the provider can't substantiate.
+
+### Code-size budget raised (NFR-10)
+App code reached ~15k, the original Phase-4 target. **Justified raise:** the product
+has grown well past the original spec — a full connector framework, ETL pipeline
+planner, and now an AI copilot, each in small isolated modules that don't touch the
+modeling core. New working target **~20k**; the modeling core itself remains compact.
+
 ## 2026-10-10 — UI: View menu, bottom + floating toolbars (§13)
 
 Professional IDE-style workspace controls, added as an extension (canvas, model

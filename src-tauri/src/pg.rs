@@ -182,6 +182,19 @@ pub fn secret_store(reference: String, secret: String) -> Result<(), String> {
     entry.set_password(&secret).map_err(|e| format!("keyring set failed: {e}"))
 }
 
+/// Read a stored credential from the OS secure store (used just-in-time to make
+/// an authenticated request; the caller must not persist it). Returns None when
+/// no credential is stored under `reference`.
+#[tauri::command]
+pub fn secret_get(reference: String) -> Result<Option<String>, String> {
+    let entry = keyring::Entry::new(KEYRING_SERVICE, &reference).map_err(|e| format!("keyring: {e}"))?;
+    match entry.get_password() {
+        Ok(p) => Ok(Some(p)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(e) => Err(format!("keyring get failed: {e}")),
+    }
+}
+
 #[tauri::command]
 pub fn secret_delete(reference: String) -> Result<(), String> {
     let entry = keyring::Entry::new(KEYRING_SERVICE, &reference).map_err(|e| format!("keyring: {e}"))?;

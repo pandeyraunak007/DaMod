@@ -22,6 +22,7 @@ pub fn run() {
             pg::pg_list_schemas,
             pg::pg_discover,
             pg::secret_store,
+            pg::secret_get,
             pg::secret_delete,
         ])
         .run(tauri::generate_context!())

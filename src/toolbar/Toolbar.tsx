@@ -19,6 +19,7 @@ import {
   Scan,
   Search,
   Shapes,
+  Sparkles,
   Star,
   Table,
   Undo2,
@@ -44,6 +45,8 @@ interface Props {
   onOpenExport: () => void;
   onOpenDomains: () => void;
   onToggleSemantic: () => void;
+  onToggleCopilot: () => void;
+  copilotActive: boolean;
   semanticActive: boolean;
 }
 
@@ -51,7 +54,7 @@ type RibbonTab = "File" | "Home" | "Diagram" | "Data";
 const TABS: RibbonTab[] = ["File", "Home", "Diagram", "Data"];
 
 export function Toolbar(props: Props) {
-  const { onToggleSemantic, semanticActive } = props;
+  const { onToggleSemantic, semanticActive, onToggleCopilot, copilotActive } = props;
   const [tab, setTab] = useState<RibbonTab>("Home");
 
   const modelName = useModelStore((s) => s.model.name);
@@ -88,6 +91,13 @@ export function Toolbar(props: Props) {
         </nav>
 
         <div className="ribbon__bar-right">
+          <button
+            className={`btn btn--small ${copilotActive ? "btn--primary" : ""}`}
+            onClick={onToggleCopilot}
+            title="AI Modeling Copilot"
+          >
+            <Sparkles size={13} strokeWidth={1.8} aria-hidden /> Copilot
+          </button>
           <ViewMenu />
           <SearchBox />
         </div>
