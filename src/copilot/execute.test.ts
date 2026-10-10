@@ -175,10 +175,13 @@ describe("create_subject_area action (Req 21/22 §6)", () => {
     expect(s().model.subjectAreas).toHaveLength(1);
   });
 
-  it("validates the area name", () => {
-    const plan = parsePlan({ summary: "x", actions: [{ kind: "create_subject_area", name: "1bad name", tables: [] }] });
+  it("allows free-form names with spaces (not a SQL identifier)", () => {
+    withTables();
+    const plan = parsePlan({ summary: "x", actions: [{ kind: "create_subject_area", name: "Customer Order Management", tables: ["Invoice"] }] });
     if (!plan.ok) return;
-    expect(executePlan(plan.value).failed).toBe(1);
+    const res = executePlan(plan.value);
+    expect(res.applied).toBe(1);
+    expect(s().model.subjectAreas![0].name).toBe("Customer Order Management");
   });
 });
 

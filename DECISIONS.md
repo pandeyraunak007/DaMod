@@ -28,6 +28,11 @@ AI path matches what the manual UI can do.
 - 344 TS tests (+5: semantic + model-object Copilot execute tests); tsc/build/cargo clean.
 - Still Copilot-only-create (no update/delete) for these new object types — the
   high-value path; deeper edit/delete actions are a follow-up if needed.
+- **Fix:** `create_subject_area` wrongly ran `validateIdentifier`, so a natural name like
+  "Customer Order Management" failed ("invalid name") and nothing appeared in the tree.
+  Subject areas (and terms/dimensions/metrics) are **free-form business names** (spaces
+  allowed), not SQL identifiers — now only non-empty is required (matches the manual
+  "+ area" path). The metric `key` stays identifier-safe via `deriveKey`.
 
 ## 2026-10-11 — Copilot can create subject areas (closing a reported gap)
 

@@ -147,7 +147,9 @@ function applyAction(action: CopilotAction): ActionResult {
     }
 
     case "create_subject_area": {
-      if (validateIdentifier(action.name)) return fail(`“${action.name}”: invalid name`);
+      // Subject areas use free-form business names (spaces allowed) — NOT SQL
+      // identifiers. Only require that the name is non-empty.
+      if (!action.name.trim()) return fail("subject area needs a name");
       // Derive from an EBS product / Fusion family when no explicit tables are given.
       if (action.product && !action.tables?.length) {
         const id = store.createSubjectAreaFromProduct(action.product, action.name);
