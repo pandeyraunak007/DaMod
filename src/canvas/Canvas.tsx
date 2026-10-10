@@ -16,6 +16,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useModelStore } from "../store/modelStore";
+import { diagramEntityIds } from "./subjectAreaDiagram";
 import { EntityNode } from "./EntityNode";
 import { ViewNode } from "./ViewNode";
 import {
@@ -160,16 +161,27 @@ function CanvasInner() {
   const selectedViewId = selection?.kind === "view" ? selection.id : null;
   const views = model.views;
 
+  // Subject-area diagrams (erwin-style): when a subject area is the active diagram,
+  // the canvas shows ONLY its member entities + the relationships among them. Views
+  // are hidden in a subject-area diagram. null = the whole model diagram.
+  const activeDiagram = useModelStore((s) => s.activeDiagram);
+  const setActiveDiagram = useModelStore((s) => s.setActiveDiagram);
+  const subjectAreas = model.subjectAreas ?? [];
+  const activeArea = activeDiagram ? subjectAreas.find((a) => a.id === activeDiagram) : undefined;
+  const visibleIds = useMemo(() => diagramEntityIds(model, activeDiagram), [model, activeDiagram]);
+
   const nodes: Node[] = useMemo(() => {
-    const entityNodes: Node[] = entities.map((e) => ({
-      id: e.id,
-      type: "entity",
-      position: e.position,
-      data: { entityId: e.id },
-      selected: e.id === selectedEntityId,
-      className: connectFrom === e.id ? "rf-connect-source" : undefined,
-    }));
-    const viewNodes: Node[] = (views ?? []).map((v) => ({
+    const entityNodes: Node[] = entities
+      .filter((e) => !visibleIds || visibleIds.has(e.id))
+      .map((e) => ({
+        id: e.id,
+        type: "entity",
+        position: e.position,
+        data: { entityId: e.id },
+        selected: e.id === selectedEntityId,
+        className: connectFrom === e.id ? "rf-connect-source" : undefined,
+      }));
+    const viewNodes: Node[] = (activeArea ? [] : views ?? []).map((v) => ({
       id: v.id,
       type: "view",
       position: v.position,
@@ -177,9 +189,13 @@ function CanvasInner() {
       selected: v.id === selectedViewId,
     }));
     return [...entityNodes, ...viewNodes];
-  }, [entities, views, selectedEntityId, selectedViewId, connectFrom]);
+  }, [entities, views, activeArea, visibleIds, selectedEntityId, selectedViewId, connectFrom]);
 
-  const edges = useMemo(() => buildEdges(model, selectedRelId), [model, selectedRelId]);
+  const edges = useMemo(() => {
+    const all = buildEdges(model, selectedRelId);
+    if (!visibleIds) return all;
+    return all.filter((ed) => visibleIds.has(ed.source) && visibleIds.has(ed.target));
+  }, [model, selectedRelId, visibleIds]);
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -244,6 +260,33 @@ function CanvasInner() {
 
   return (
     <div className={`canvas-wrap canvas-wrap--${canvasMode}`}>
+      {/* Diagram selector (erwin-style subject-area diagrams). */}
+      <div className="diagram-bar">
+        <span className="diagram-bar__label">Diagram</span>
+        <select
+          className="diagram-bar__select"
+          value={activeArea ? activeArea.id : ""}
+          onChange={(e) => setActiveDiagram(e.target.value || null)}
+        >
+          <option value="">Main model ({entities.length})</option>
+          {subjectAreas.length > 0 && <option disabled>── Subject areas ──</option>}
+          {subjectAreas.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name} ({a.entities.length})
+            </option>
+          ))}
+        </select>
+        {activeArea && (
+          <>
+            <span className="diagram-bar__scope" title="Showing only this subject area">
+              ▦ {activeArea.name}
+            </span>
+            <button className="diagram-bar__exit" title="Back to the full model" onClick={() => setActiveDiagram(null)}>
+              ✕
+            </button>
+          </>
+        )}
+      </div>
       {canvasMode === "add-relationship" && (
         <div className="connect-hint">
           {connectFrom ? (

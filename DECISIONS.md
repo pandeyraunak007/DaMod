@@ -5,6 +5,27 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Subject-area diagrams (erwin-style scoped canvas views)
+
+Users can now view a subject area as its own diagram, separate from the main model
+diagram — the erwin "subject area" experience.
+
+- **Transient diagram scope** on `modelStore` (`activeDiagram: string | null`, reset on
+  `loadModel` so it clears per tab — same pattern as `canvasMode`/`focus`; NOT model
+  state, creates no undo). `setActiveDiagram(id|null)`.
+- **Canvas** filters to the active area: only its member entities + the relationships
+  AMONG them render; views are hidden in a subject-area diagram. Pure helper
+  `canvas/subjectAreaDiagram.diagramEntityIds` (tested) — and it falls back to the whole
+  model for an unknown/empty area or deleted members, so a stale scope never blanks the
+  canvas.
+- **UI:** a diagram selector bar on the canvas (Main model / each subject area, with
+  counts) + a scope badge and ✕ to exit. Clicking a subject area in the Explorer (or its
+  "Open diagram" context item) opens that diagram.
+- **Deliberate MVP:** subject-area diagrams reuse the entities' shared model positions
+  (a filtered view), not independent per-area layouts. erwin stores separate coordinates
+  per subject area; that (per-diagram positions) is a documented future enhancement.
+- 350 TS tests (+6: `subjectAreaDiagram.test.ts`); tsc/build/cargo clean.
+
 ## 2026-10-11 — Copilot action parity: semantic layer + all remaining object types
 
 Reported: the Copilot refused to create semantic-layer objects (terms/dimensions/metrics)

@@ -88,6 +88,9 @@ interface ModelStore {
   linkDraft: Ref | null;
   canvasMode: CanvasMode;
   propertiesOpen: boolean;
+  /** The subject-area diagram currently shown on the canvas, or null = whole model
+   *  (Req: erwin-style subject-area diagrams). Transient view state; resets per tab. */
+  activeDiagram: string | null;
   _dragSnapshot: Model | null;
 
   // model
@@ -170,6 +173,8 @@ interface ModelStore {
 
   // canvas interaction mode (floating toolbar)
   setCanvasMode: (mode: CanvasMode) => void;
+  /** Switch the canvas to a subject-area diagram (id) or the whole model (null). */
+  setActiveDiagram: (id: string | null) => void;
 
   // ERwin-style properties dialog
   openProperties: () => void;
@@ -278,6 +283,7 @@ export const useModelStore = create<ModelStore>((set, get) => {
     linkDraft: null,
     canvasMode: "select",
     propertiesOpen: false,
+    activeDiagram: null,
     _dragSnapshot: null,
 
     setModelName: (name) => {
@@ -854,6 +860,7 @@ export const useModelStore = create<ModelStore>((set, get) => {
     },
 
     setCanvasMode: (mode) => set({ canvasMode: mode }),
+    setActiveDiagram: (id) => set({ activeDiagram: id }),
 
     openProperties: () => set({ propertiesOpen: true }),
     closeProperties: () => set({ propertiesOpen: false }),
@@ -933,6 +940,7 @@ export const useModelStore = create<ModelStore>((set, get) => {
         past: [],
         future: [],
         selection: null,
+        activeDiagram: null,
         notices: [],
         focus: null,
         relationshipDraft: null,

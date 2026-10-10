@@ -137,6 +137,40 @@ body,
   position: absolute;
   inset: 0;
 }
+/* Subject-area diagram selector (erwin-style). */
+.diagram-bar {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.5rem;
+  background: var(--panel, #f6f6f6);
+  border: 1px solid var(--border, #d9d9d9);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  font-size: 0.78rem;
+}
+.diagram-bar__label {
+  color: var(--muted, #8a8a8a);
+}
+.diagram-bar__select {
+  font-size: 0.78rem;
+  max-width: 220px;
+}
+.diagram-bar__scope {
+  color: #9333ea;
+  font-weight: 600;
+}
+.diagram-bar__exit {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--muted, #8a8a8a);
+  line-height: 1;
+}
 .canvas-wrap--add-entity .react-flow__pane {
   cursor: crosshair;
 }

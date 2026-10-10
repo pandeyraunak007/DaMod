@@ -714,7 +714,9 @@ function SubjectAreaRow({
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState(area.name);
   const entityName = (id: string) => model.entities.find((e) => e.id === id)?.name ?? "?";
-  const revealFirst = () => area.entities[0] && useModelStore.getState().revealEntity(area.entities[0]);
+  // Clicking a subject area OPENS its diagram (erwin-style) — the canvas scopes to
+  // just this area's tables. Expand the row to see/reveal individual members.
+  const openDiagram = () => useModelStore.getState().setActiveDiagram(area.id);
   const addSelected = () => {
     const sel = useModelStore.getState().selection;
     if (sel?.kind === "entity") useModelStore.getState().addEntityToSubjectArea(area.id, sel.id);
@@ -727,6 +729,7 @@ function SubjectAreaRow({
   const menu = (e: React.MouseEvent) => {
     e.preventDefault();
     openMenu(e.clientX, e.clientY, [
+      { label: "Open diagram", onClick: openDiagram },
       { label: "Add selected table", onClick: addSelected },
       { label: "Rename", onClick: () => (setDraft(area.name), setRenaming(true)) },
       { label: "Delete subject area", danger: true, onClick: () => useModelStore.getState().deleteSubjectArea(area.id) },
@@ -739,7 +742,7 @@ function SubjectAreaRow({
         open={open}
         hasChildren={area.entities.length > 0}
         onToggle={onToggle}
-        onClick={revealFirst}
+        onClick={openDiagram}
         onContextMenu={menu}
         actions={
           <>

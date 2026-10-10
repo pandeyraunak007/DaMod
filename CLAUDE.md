@@ -20,6 +20,11 @@ See the top DECISIONS entries:
   convenience. Store op `addEntityToSubjectArea`. **Copilot** has a matching
   `create_subject_area` action (by table names or product/family code; reviewed/approved
   like other actions).
+- **Subject-area diagrams (erwin-style):** a subject area can be viewed as its own
+  scoped canvas diagram (member entities + relationships among them; views hidden), via a
+  canvas diagram-selector bar and clicking a subject area in the Explorer. Transient
+  `modelStore.activeDiagram` (resets per tab); pure filter `canvas/subjectAreaDiagram.ts`.
+  MVP reuses shared entity positions — independent per-area layouts are a future item.
 - **Copilot action parity:** the Copilot can now also create **semantic-layer** objects
   (`create_term`/`create_dimension`/`create_metric`) and all remaining model objects
   (`create_schema`/`create_view`/`create_index`/`create_sequence`/`create_domain`/
