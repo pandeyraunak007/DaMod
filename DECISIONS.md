@@ -82,6 +82,32 @@ unit tests; UI verified by typecheck/build/clean boot (author runs the app).
 - **Not done:** No live-DB connection (scripts are generated, not executed); no
   data migration (schema only); index/sequence/view diffs not included yet.
 
+### Dimensional modeling: SCD-2 scaffolding + fact column roles (Kimball)
+- **What:** Two additions make star-schema work more opinionated.
+  (1) **SCD-2 scaffolding** — a *Make SCD-2 dimension* button in an entity's
+  Properties (General) runs `applyScd2`: it adds a `<Entity>_key` **surrogate**
+  bigint primary key, **demotes** the existing natural key(s) to business keys,
+  and appends `valid_from` (NOT NULL), `valid_to`, `is_current` (default true),
+  `version` (default 1); it defaults the entity's stereotype to `dimension` and
+  realigns dependent fact foreign keys to the new surrogate type (FR-3.7, with a
+  notice). It is **idempotent** (keyed on the surrogate's presence) and a single
+  undo step.
+  (2) **Fact column roles** — a field can be flagged `measure` (additive numeric
+  fact) or `degenerate` (dimension attribute stored on the fact). Set in the
+  field editor; shown on the canvas as `∑` / `⬦` markers.
+- **Why:** The tool already had fact/dimension stereotypes, a star layout, and an
+  OLAP semantic layer (cubes/hierarchies/time dimensions/metrics). These close
+  the two biggest Kimball gaps: surrogate-key/SCD-2 dimension structure, and
+  marking which fact columns are measures vs degenerate dimensions.
+- **Validation:** a `measure` role on a non-numeric field is a warning
+  (`measureRoleFit`).
+- **Design choices:** the surrogate is `bigint` with **no auto-default** (the
+  author picks identity vs a sequence — DaMod already has sequences — keeping it
+  dialect-neutral). Roles are **model metadata** used by the canvas + validation;
+  they do not change DDL output (a measure is still just its column).
+- **Not done:** no SCD Type 1/3/6 variants; no automatic surrogate-key sequence/
+  identity wiring; roles are not yet surfaced in `semantic.yaml` export.
+
 ## 2026-09-22 — Phase 4: semantic layer (FR-7) + export (FR-8/FR-9), multi-dialect
 
 84 unit tests cover the pure logic (semantic persistence, DDL across 3 dialects,

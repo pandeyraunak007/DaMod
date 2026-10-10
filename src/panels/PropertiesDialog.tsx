@@ -6,7 +6,7 @@ import {
   type DataTypeKind,
 } from "../model/dataTypes";
 import { validateIdentifier } from "../model/identifiers";
-import type { Entity, Field, RiAction, Udp } from "../model/model";
+import type { Entity, Field, FieldRole, RiAction, Udp } from "../model/model";
 
 const RI_ACTIONS: RiAction[] = ["no action", "cascade", "restrict", "set null", "set default"];
 
@@ -85,8 +85,10 @@ function UdpEditor({ udps, onChange }: { udps: Udp[] | undefined; onChange: (u: 
 function EntityProperties({ entity, onClose }: { entity: Entity; onClose: () => void }) {
   const renameEntity = useModelStore((s) => s.renameEntity);
   const updateEntity = useModelStore((s) => s.updateEntity);
+  const applyScd2 = useModelStore((s) => s.applyScd2);
   const [tab, setTab] = useState("General");
   const patch = (p: Parameters<typeof updateEntity>[1]) => updateEntity(entity.id, p);
+  const hasSurrogate = entity.fields.some((f) => f.name.toLowerCase() === `${entity.name.toLowerCase()}_key`);
 
   return (
     <>
@@ -122,6 +124,17 @@ function EntityProperties({ entity, onClose }: { entity: Entity; onClose: () => 
                 defaultValue={entity.tags?.join(", ") ?? ""}
                 onChange={(e) => patch({ tags: e.target.value.split(",").map((t) => t.trim()).filter(Boolean) })}
               />
+            </div>
+            <div className="field">
+              <label>Dimensional modeling (Kimball)</label>
+              <button className="btn btn--small" onClick={() => applyScd2(entity.id)}>
+                {hasSurrogate ? "Re-apply SCD-2 columns" : "Make SCD-2 dimension"}
+              </button>
+              <p className="field__hint">
+                Adds a <code>{entity.name}_key</code> surrogate primary key (demoting the natural key
+                to a business key) plus <code>valid_from</code>, <code>valid_to</code>,{" "}
+                <code>is_current</code> and <code>version</code>. Idempotent.
+              </p>
             </div>
           </>
         )}
@@ -235,6 +248,17 @@ function FieldProps({ entityId, field }: { entityId: string; field: Field }) {
       <div className="field">
         <label>Default (SQL)</label>
         <input defaultValue={field.default ?? ""} onChange={(e) => patch({ default: e.target.value || undefined })} />
+      </div>
+      <div className="field">
+        <label>Dimensional role (fact tables)</label>
+        <select
+          value={field.role ?? ""}
+          onChange={(e) => patch({ role: (e.target.value || undefined) as FieldRole | undefined })}
+        >
+          <option value="">— none —</option>
+          <option value="measure">Measure (additive fact)</option>
+          <option value="degenerate">Degenerate dimension</option>
+        </select>
       </div>
       <div className="field">
         <label>Definition</label>

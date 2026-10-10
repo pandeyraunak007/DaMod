@@ -48,6 +48,7 @@ function serializeField(f: Field): Record<string, unknown> {
   if (f.unique) out.unique = true;
   if (f.default != null && f.default !== "") out.default = f.default;
   if (f.domainId) out.domainId = f.domainId;
+  if (f.role) out.role = f.role;
   if (f.description) out.description = f.description;
   udpsOut(out, f.note, f.udps);
   return out;

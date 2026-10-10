@@ -22,6 +22,14 @@ export interface Udp {
 /** Referential-integrity action on a foreign key (ERwin RI). */
 export type RiAction = "no action" | "cascade" | "restrict" | "set null" | "set default";
 
+/**
+ * Dimensional role of a column on a fact table (Kimball):
+ *   measure    — an additive numeric fact column (the thing you aggregate)
+ *   degenerate — a dimension attribute stored on the fact with no separate
+ *                dimension table (e.g. order_number, invoice_id)
+ */
+export type FieldRole = "measure" | "degenerate";
+
 export interface Field {
   id: string;
   name: string;
@@ -42,6 +50,8 @@ export interface Field {
   /** Bound reusable domain (ERwin). When set, the field's physical type is
    *  governed by the domain and changes to the domain propagate here. */
   domainId?: string;
+  /** Dimensional role on a fact table (Kimball measure / degenerate dimension). */
+  role?: FieldRole;
   note?: string;
   udps?: Udp[];
 }

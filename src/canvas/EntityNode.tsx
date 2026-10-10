@@ -82,7 +82,15 @@ function EntityNodeImpl({ data, selected }: NodeProps) {
   const renderField = (f: Field) => (
     <li key={f.id} className="entity__field">
       <span className="entity__key">{keyMark(f)}</span>
-      <span className="entity__field-name">{f.name}</span>
+      <span className="entity__field-name">
+        {f.name}
+        {f.role === "measure" && (
+          <span className="entity__role entity__role--measure" title="Measure (additive fact)"> ∑</span>
+        )}
+        {f.role === "degenerate" && (
+          <span className="entity__role entity__role--dd" title="Degenerate dimension"> ⬦</span>
+        )}
+      </span>
       <span className="entity__field-type">
         {fieldTypeLabel(f, level)}
         {!f.nullable && <span className="entity__notnull" title="NOT NULL"> •</span>}

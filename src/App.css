@@ -309,6 +309,15 @@ body,
 .entity__notnull {
   color: var(--warn);
 }
+.entity__role {
+  font-weight: 700;
+}
+.entity__role--measure {
+  color: #2563eb;
+}
+.entity__role--dd {
+  color: #9333ea;
+}
 /* ---- view node ---- */
 .view-node {
   min-width: 170px;

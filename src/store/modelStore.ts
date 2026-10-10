@@ -23,7 +23,7 @@ import {
   newSequence,
   newView,
 } from "../model/model";
-import { paramShape, withTypeDefaults } from "../model/dataTypes";
+import { type DataTypeKind, paramShape, withTypeDefaults } from "../model/dataTypes";
 import {
   type AmbiguousField,
   type CreateRelationshipInput,
@@ -102,6 +102,8 @@ interface ModelStore {
   deleteField: (entityId: string, fieldId: string) => void;
   reorderField: (entityId: string, from: number, to: number) => void;
   syncFields: (entityId: string, sourceFields: Field[]) => number;
+  /** Add surrogate key + SCD-2 temporal columns to a dimension (Kimball). */
+  applyScd2: (entityId: string) => void;
 
   // other database objects (views, indexes, sequences, raw objects)
   createView: (position?: Position) => string;
@@ -412,6 +414,42 @@ export const useModelStore = create<ModelStore>((set, get) => {
         }
       });
       return added;
+    },
+
+    applyScd2: (entityId) => {
+      set((s) => {
+        const next = structuredClone(s.model);
+        const e = findEntity(next, entityId);
+        if (!e) return {};
+        const has = (n: string) => e.fields.some((f) => f.name.toLowerCase() === n.toLowerCase());
+        const surName = `${e.name}_key`;
+        // Only add the surrogate (and demote natural keys to business keys) once.
+        if (!has(surName)) {
+          for (const f of e.fields) f.primaryKey = false;
+          e.fields.unshift(
+            newField(surName, "bigint", {
+              primaryKey: true,
+              nullable: false,
+              description: "Surrogate key (SCD-2)",
+            }),
+          );
+        }
+        const addCol = (n: string, kind: DataTypeKind, overrides: Partial<Field>) => {
+          if (!has(n)) e.fields.push(newField(n, kind, overrides));
+        };
+        addCol("valid_from", "timestamp", { nullable: false, description: "SCD-2 effective start" });
+        addCol("valid_to", "timestamp", { nullable: true, description: "SCD-2 effective end (null = current)" });
+        addCol("is_current", "boolean", { nullable: false, default: "true", description: "SCD-2 current-row flag" });
+        addCol("version", "integer", { nullable: false, default: "1", description: "SCD-2 row version" });
+        if (!e.stereotype) e.stereotype = "dimension";
+        // The surrogate key becomes the PK, so dependent fact FKs realign (FR-3.7).
+        const changes = reconcileForeignKeyTypes(next);
+        next.updatedAt = nowIso();
+        const notices = changes.length
+          ? [...s.notices, { id: newId("field"), message: typeNoticeMessage(changes) }]
+          : s.notices;
+        return { past: pushPast(s.past, s.model), model: next, future: [], notices };
+      });
     },
 
     createView: (position) => {

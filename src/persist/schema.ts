@@ -29,6 +29,7 @@ const zField = z.object({
   unique: z.boolean().optional().default(false),
   default: z.string().optional(),
   domainId: z.string().optional(),
+  role: z.enum(["measure", "degenerate"]).optional(),
   description: z.string().optional(),
   note: z.string().optional(),
   udps: z.array(zUdp).optional(),

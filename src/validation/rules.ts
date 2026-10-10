@@ -469,6 +469,27 @@ function duplicateSemanticNames(ctx: ValidationContext): Issue[] {
   return issues;
 }
 
+function measureRoleFit(ctx: ValidationContext): Issue[] {
+  const issues: Issue[] = [];
+  for (const { id, model } of ctx.models) {
+    if (isConceptual(model.level)) continue;
+    for (const e of model.entities) {
+      for (const f of e.fields) {
+        if (f.role === "measure" && !isNumeric(f)) {
+          issues.push({
+            id: `measureType:${id}:${e.id}:${f.id}`,
+            rule: "measureRoleFit",
+            severity: "warning",
+            message: `${model.name}.${e.name}.${f.name} is marked a measure but is not numeric`,
+            target: { model: id, entity: e.id, field: f.id },
+          });
+        }
+      }
+    }
+  }
+  return issues;
+}
+
 function domainIssues(ctx: ValidationContext): Issue[] {
   const issues: Issue[] = [];
   for (const { id, model } of ctx.models) {
@@ -532,6 +553,7 @@ const RULES: ((ctx: ValidationContext) => Issue[])[] = [
   semanticBindingDangling,
   duplicateSemanticNames,
   domainIssues,
+  measureRoleFit,
 ];
 
 /** Run every rule over the workspace and return all issues (FR-10.1). */
