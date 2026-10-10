@@ -38,6 +38,16 @@ state, persistence, connector architecture all untouched).
 - **Verified:** 12 new tests (placement, per-panel visibility, grid/snap,
   model-state-untouched, prefs merge/round-trip, clamp incl. resize/oversize);
   **173 TS tests**; typecheck + build clean.
+- **ERwin-style ribbon** (follow-up to author feedback — the old single-row text
+  toolbar overflowed the window): `toolbar/Toolbar.tsx` is now a two-row ribbon —
+  a bar (brand · workspace chip · `/ model` breadcrumb · **File/Home/Diagram/Data**
+  tabs · View menu · icon search) over a contextual content row of lucide
+  **icon+label** buttons grouped with captions (ERwin ribbon groups). File = model
+  lifecycle (new/duplicate/import/export/history); Home = model name/level/notation
+  + add entity/domains + arrange/star + undo/redo; Diagram = map/semantic + grid/
+  snap/zoom/fit/reset (via the canvas-controls bridge); Data = connect/pipelines.
+  The `Props` interface is unchanged, so `App.tsx` was untouched. All actions wire
+  to the same existing commands.
 - **Not done:** no per-action global keyboard shortcuts beyond the existing
   ⌘S/⌘Z/⌘⇧Z/Esc/Enter/Delete (tooltips document those); snap uses a fixed 16px grid.
 

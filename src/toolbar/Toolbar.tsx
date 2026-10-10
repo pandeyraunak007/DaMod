@@ -1,7 +1,35 @@
 import { useEffect, useState } from "react";
+import {
+  type LucideIcon,
+  Copy,
+  Database,
+  Download,
+  FileInput,
+  FilePlus2,
+  FolderOpen,
+  Grid3x3,
+  History,
+  Layers,
+  LayoutGrid,
+  Magnet,
+  Map as MapIcon,
+  Maximize2,
+  Redo2,
+  Scan,
+  Search,
+  Shapes,
+  Star,
+  Table,
+  Undo2,
+  Workflow,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
 import { ViewMenu } from "./ViewMenu";
 import { useModelStore } from "../store/modelStore";
 import { useWorkspaceStore } from "../store/workspaceStore";
+import { useUiStore } from "../store/uiStore";
+import { canvasControls } from "../canvas/canvasControls";
 import { MODEL_LEVELS, type ModelLevel, exportDisabledReason } from "../model/levels";
 
 interface Props {
@@ -17,24 +45,141 @@ interface Props {
   semanticActive: boolean;
 }
 
-export function Toolbar({
-  onNewModel,
-  onImport,
-  onOpenConnections,
-  onOpenPipelines,
-  onOpenHistory,
-  onOpenMap,
-  onOpenExport,
-  onOpenDomains,
-  onToggleSemantic,
-  semanticActive,
-}: Props) {
+type RibbonTab = "File" | "Home" | "Diagram" | "Data";
+const TABS: RibbonTab[] = ["File", "Home", "Diagram", "Data"];
+
+export function Toolbar(props: Props) {
+  const { onToggleSemantic, semanticActive } = props;
+  const [tab, setTab] = useState<RibbonTab>("Home");
+
+  const modelName = useModelStore((s) => s.model.name);
+  const wsName = useWorkspaceStore((s) => s.name);
+  const wsPath = useWorkspaceStore((s) => s.path);
+  const openPicker = useWorkspaceStore((s) => s.openWorkspacePicker);
+
+  return (
+    <div className="ribbon">
+      <div className="ribbon__bar">
+        <span className="ribbon__brand">DaMod</span>
+        <button
+          className="ribbon__ws"
+          onClick={openPicker}
+          title={wsPath ?? "Open a workspace folder"}
+        >
+          <FolderOpen size={14} strokeWidth={1.75} aria-hidden />
+          {wsPath ? wsName : "Open workspace"}
+        </button>
+        {wsPath && <span className="ribbon__crumb">/ {modelName}</span>}
+
+        <nav className="ribbon__tabs" role="tablist" aria-label="Ribbon tabs">
+          {TABS.map((t) => (
+            <button
+              key={t}
+              role="tab"
+              aria-selected={tab === t}
+              className={`ribbon__tab ${tab === t ? "ribbon__tab--active" : ""}`}
+              onClick={() => setTab(t)}
+            >
+              {t}
+            </button>
+          ))}
+        </nav>
+
+        <div className="ribbon__bar-right">
+          <ViewMenu />
+          <SearchBox />
+        </div>
+      </div>
+
+      <div className="ribbon__content" role="tabpanel">
+        {tab === "File" && <FileTab {...props} />}
+        {tab === "Home" && <HomeTab onOpenDomains={props.onOpenDomains} />}
+        {tab === "Diagram" && <DiagramTab onOpenMap={props.onOpenMap} onToggleSemantic={onToggleSemantic} semanticActive={semanticActive} />}
+        {tab === "Data" && <DataTab onOpenConnections={props.onOpenConnections} onOpenPipelines={props.onOpenPipelines} />}
+      </div>
+    </div>
+  );
+}
+
+// ---- shared ribbon primitives -----------------------------------------------
+
+function RibbonButton({
+  Icon,
+  label,
+  onClick,
+  disabled,
+  active,
+  title,
+}: {
+  Icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  active?: boolean;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      className={`rbtn ${active ? "rbtn--active" : ""}`}
+      onClick={onClick}
+      disabled={disabled}
+      title={title ?? label}
+      aria-label={label}
+      aria-pressed={active ?? undefined}
+    >
+      <Icon size={18} strokeWidth={1.6} aria-hidden />
+      <span className="rbtn__label">{label}</span>
+    </button>
+  );
+}
+
+function RGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rgroup">
+      <div className="rgroup__row">{children}</div>
+      <div className="rgroup__title">{title}</div>
+    </div>
+  );
+}
+
+// ---- tabs -------------------------------------------------------------------
+
+function FileTab(props: Props) {
+  const wsPath = useWorkspaceStore((s) => s.path);
+  const activeId = useWorkspaceStore((s) => s.activeId);
+  const duplicateModel = useWorkspaceStore((s) => s.duplicateModel);
+  const level = useModelStore((s) => s.model.level);
+  const exportReason = exportDisabledReason(level);
+  return (
+    <>
+      <RGroup title="Model">
+        <RibbonButton Icon={FilePlus2} label="New model" onClick={props.onNewModel} disabled={!wsPath} />
+        <RibbonButton Icon={Copy} label="Duplicate" onClick={() => activeId && duplicateModel(activeId)} disabled={!wsPath || !activeId} />
+        <RibbonButton Icon={FileInput} label="Import SQL" title="Reverse-engineer a model from SQL DDL" onClick={props.onImport} disabled={!wsPath} />
+      </RGroup>
+      <RGroup title="Share">
+        <RibbonButton
+          Icon={Download}
+          label="Export"
+          title={exportReason ? `${exportReason} (workspace + semantic export still available)` : "Export DDL / YAML"}
+          onClick={props.onOpenExport}
+          disabled={!wsPath}
+        />
+        <RibbonButton Icon={History} label="History" onClick={props.onOpenHistory} disabled={!wsPath} />
+      </RGroup>
+    </>
+  );
+}
+
+function HomeTab({ onOpenDomains }: { onOpenDomains: () => void }) {
   const modelName = useModelStore((s) => s.model.name);
   const level = useModelStore((s) => s.model.level);
   const notation = useModelStore((s) => s.model.notation ?? "IE");
   const setModelName = useModelStore((s) => s.setModelName);
   const setModelLevel = useModelStore((s) => s.setModelLevel);
   const setNotation = useModelStore((s) => s.setNotation);
+  const pushNotice = useModelStore((s) => s.pushNotice);
   const createEntity = useModelStore((s) => s.createEntity);
   const arrange = useModelStore((s) => s.arrange);
   const arrangeStar = useModelStore((s) => s.arrangeStar);
@@ -43,20 +188,9 @@ export function Toolbar({
   const redo = useModelStore((s) => s.redo);
   const canUndo = useModelStore((s) => s.past.length > 0);
   const canRedo = useModelStore((s) => s.future.length > 0);
-  const search = useModelStore((s) => s.search);
-  const pushNotice = useModelStore((s) => s.pushNotice);
-
-  const wsName = useWorkspaceStore((s) => s.name);
-  const wsPath = useWorkspaceStore((s) => s.path);
-  const openPicker = useWorkspaceStore((s) => s.openWorkspacePicker);
-  const duplicateModel = useWorkspaceStore((s) => s.duplicateModel);
-  const activeId = useWorkspaceStore((s) => s.activeId);
 
   const [nameDraft, setNameDraft] = useState(modelName);
   const [nameError, setNameError] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [noMatch, setNoMatch] = useState(false);
-
   useEffect(() => {
     setNameDraft(modelName);
     setNameError(null);
@@ -70,141 +204,106 @@ export function Toolbar({
     }
   };
 
-  const exportReason = exportDisabledReason(level);
-
   return (
-    <div className="toolbar">
-      <div className="toolbar__group">
-        <span className="toolbar__brand">DaMod</span>
-        <button className="btn btn--small" onClick={openPicker} title="Open a workspace folder">
-          {wsPath ? "Change…" : "Open workspace"}
-        </button>
-        {wsPath && <span className="toolbar__ws" title={wsPath}>{wsName}</span>}
-        <button className="btn btn--small" onClick={onNewModel} disabled={!wsPath}>
-          + Model
-        </button>
-        <button
-          className="btn btn--small"
-          onClick={() => activeId && duplicateModel(activeId)}
-          disabled={!wsPath || !activeId}
-        >
-          Duplicate
-        </button>
-        <button
-          className="btn btn--small"
-          onClick={onImport}
-          disabled={!wsPath}
-          title="Reverse-engineer a model from SQL DDL"
-        >
-          Import SQL
-        </button>
-        <button
-          className="btn btn--small"
-          onClick={onOpenConnections}
-          disabled={!wsPath}
-          title="Connect to a database and reverse-engineer a model"
-        >
-          Connect
-        </button>
-        <button
-          className="btn btn--small"
-          onClick={onOpenPipelines}
-          disabled={!wsPath}
-          title="Design an ETL pipeline from a model"
-        >
-          Pipelines
-        </button>
-        <button className="btn btn--small" onClick={onOpenMap} disabled={!wsPath}>
-          Map
-        </button>
-        <button
-          className={`btn btn--small ${semanticActive ? "btn--primary" : ""}`}
-          onClick={onToggleSemantic}
-          disabled={!wsPath}
-        >
-          {semanticActive ? "Canvas" : "Semantic"}
-        </button>
-        <button className="btn btn--small" onClick={onOpenHistory} disabled={!wsPath}>
-          History
-        </button>
-        <ViewMenu />
-      </div>
-
-      <div className="toolbar__group">
-        <input
-          className={`toolbar__model-input ${nameError ? "is-error" : ""}`}
-          value={nameDraft}
-          onChange={(e) => {
-            setNameDraft(e.target.value);
-            setNameError(setModelName(e.target.value));
-          }}
-          title="Model name"
-        />
-        {nameError && <span className="toolbar__model-error">{nameError}</span>}
-        <select
-          className="toolbar__level"
-          value={level}
-          onChange={(e) => changeLevel(e.target.value as ModelLevel)}
-          title="Modeling level"
-        >
-          {MODEL_LEVELS.map((l) => (
-            <option key={l} value={l}>
-              {l}
-            </option>
-          ))}
-        </select>
-        <button
-          className="btn btn--small"
-          onClick={() => setNotation(notation === "IE" ? "IDEF1X" : "IE")}
-          title="Toggle diagram notation"
-        >
-          {notation}
-        </button>
-      </div>
-
-      <div className="toolbar__group">
-        <button className="btn" onClick={() => createEntity()}>
-          + Entity
-        </button>
-        <button className="btn" onClick={arrange} title="Auto-arrange layout">
-          Arrange
-        </button>
-        <button className="btn" onClick={onOpenDomains} title="Reusable named types">
-          Domains
-        </button>
-        {hasStereotypes && (
-          <button className="btn" onClick={arrangeStar} title="Star-schema layout (facts centre)">
-            Star
+    <>
+      <div className="rgroup">
+        <div className="rgroup__row rgroup__row--form">
+          <input
+            className={`ribbon__model-input ${nameError ? "is-error" : ""}`}
+            value={nameDraft}
+            title={nameError ?? "Model name"}
+            onChange={(e) => {
+              setNameDraft(e.target.value);
+              setNameError(setModelName(e.target.value));
+            }}
+          />
+          <select className="ribbon__select" value={level} title="Modeling level" onChange={(e) => changeLevel(e.target.value as ModelLevel)}>
+            {MODEL_LEVELS.map((l) => (
+              <option key={l} value={l}>{l}</option>
+            ))}
+          </select>
+          <button className="ribbon__chip" title="Toggle diagram notation" onClick={() => setNotation(notation === "IE" ? "IDEF1X" : "IE")}>
+            {notation}
           </button>
-        )}
-        <button className="btn" onClick={undo} disabled={!canUndo} title="Undo (⌘Z)">
-          Undo
-        </button>
-        <button className="btn" onClick={redo} disabled={!canRedo} title="Redo (⇧⌘Z)">
-          Redo
-        </button>
-        <button
-          className="btn"
-          title={exportReason ? `${exportReason} (workspace + semantic export still available)` : "Export DDL / YAML"}
-          onClick={onOpenExport}
-        >
-          Export
-        </button>
+        </div>
+        <div className="rgroup__title">Model</div>
       </div>
+      <RGroup title="Add">
+        <RibbonButton Icon={Table} label="Entity" onClick={() => createEntity()} />
+        <RibbonButton Icon={Shapes} label="Domains" title="Reusable named types" onClick={onOpenDomains} />
+      </RGroup>
+      <RGroup title="Layout">
+        <RibbonButton Icon={LayoutGrid} label="Arrange" title="Auto-arrange layout" onClick={arrange} />
+        {hasStereotypes && <RibbonButton Icon={Star} label="Star" title="Star-schema layout (facts centre)" onClick={arrangeStar} />}
+      </RGroup>
+      <RGroup title="Edit">
+        <RibbonButton Icon={Undo2} label="Undo" title="Undo (⌘Z)" onClick={undo} disabled={!canUndo} />
+        <RibbonButton Icon={Redo2} label="Redo" title="Redo (⇧⌘Z)" onClick={redo} disabled={!canRedo} />
+      </RGroup>
+    </>
+  );
+}
 
-      <div className="toolbar__group toolbar__group--right">
-        <input
-          className={`toolbar__search ${noMatch ? "is-error" : ""}`}
-          placeholder="Search entities…"
-          value={query}
-          onChange={(e) => {
-            const v = e.target.value;
-            setQuery(v);
-            if (v.trim()) setNoMatch(!search(v));
-            else setNoMatch(false);
-          }}
-        />
-      </div>
+function DiagramTab({
+  onOpenMap,
+  onToggleSemantic,
+  semanticActive,
+}: {
+  onOpenMap: () => void;
+  onToggleSemantic: () => void;
+  semanticActive: boolean;
+}) {
+  const showGrid = useUiStore((s) => s.showGrid);
+  const toggleGrid = useUiStore((s) => s.toggleGrid);
+  const snapToGrid = useUiStore((s) => s.snapToGrid);
+  const toggleSnap = useUiStore((s) => s.toggleSnap);
+  const z = (fn: "zoomIn" | "zoomOut" | "fitView" | "resetZoom") => () => canvasControls()?.[fn]();
+  return (
+    <>
+      <RGroup title="Views">
+        <RibbonButton Icon={MapIcon} label="Map" title="Workspace map" onClick={onOpenMap} />
+        <RibbonButton Icon={Layers} label={semanticActive ? "Canvas" : "Semantic"} active={semanticActive} onClick={onToggleSemantic} />
+      </RGroup>
+      <RGroup title="Canvas">
+        <RibbonButton Icon={Grid3x3} label="Grid" active={showGrid} onClick={toggleGrid} />
+        <RibbonButton Icon={Magnet} label="Snap" active={snapToGrid} onClick={toggleSnap} />
+        <RibbonButton Icon={ZoomOut} label="Zoom out" onClick={z("zoomOut")} />
+        <RibbonButton Icon={ZoomIn} label="Zoom in" onClick={z("zoomIn")} />
+        <RibbonButton Icon={Maximize2} label="Fit" onClick={z("fitView")} />
+        <RibbonButton Icon={Scan} label="Reset" onClick={z("resetZoom")} />
+      </RGroup>
+    </>
+  );
+}
+
+function DataTab({ onOpenConnections, onOpenPipelines }: { onOpenConnections: () => void; onOpenPipelines: () => void }) {
+  const wsPath = useWorkspaceStore((s) => s.path);
+  return (
+    <RGroup title="Sources & pipelines">
+      <RibbonButton Icon={Database} label="Connect" title="Connect to a database and reverse-engineer" onClick={onOpenConnections} disabled={!wsPath} />
+      <RibbonButton Icon={Workflow} label="Pipelines" title="Design an ETL pipeline" onClick={onOpenPipelines} disabled={!wsPath} />
+    </RGroup>
+  );
+}
+
+function SearchBox() {
+  const search = useModelStore((s) => s.search);
+  const [query, setQuery] = useState("");
+  const [noMatch, setNoMatch] = useState(false);
+  return (
+    <div className={`ribbon__search ${noMatch ? "is-error" : ""}`}>
+      <Search size={14} strokeWidth={1.75} aria-hidden />
+      <input
+        placeholder="Search entities…"
+        aria-label="Search entities"
+        value={query}
+        onChange={(e) => {
+          const v = e.target.value;
+          setQuery(v);
+          if (v.trim()) setNoMatch(!search(v));
+          else setNoMatch(false);
+        }}
+      />
     </div>
   );
 }
