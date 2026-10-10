@@ -9,7 +9,10 @@ import type { Domain } from "../model/model";
 // fields from the entity Properties dialog; editing a domain here propagates its
 // type to every field that uses it.
 export function DomainsDialog({ onClose }: { onClose: () => void }) {
-  const domains = useModelStore((s) => s.model.domains ?? []);
+  // Default OUTSIDE the selector: `s.model.domains ?? []` inside a Zustand
+  // selector returns a fresh [] each render → "getSnapshot should be cached"
+  // infinite loop (blank screen) when the model has no domains yet.
+  const domains = useModelStore((s) => s.model.domains) ?? [];
   const entities = useModelStore((s) => s.model.entities);
   const createDomain = useModelStore((s) => s.createDomain);
   const [openId, setOpenId] = useState<string | null>(domains[0]?.id ?? null);

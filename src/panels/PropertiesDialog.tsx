@@ -176,7 +176,8 @@ function FieldsTab({ entity }: { entity: Entity }) {
 function FieldProps({ entityId, field }: { entityId: string; field: Field }) {
   const updateField = useModelStore((s) => s.updateField);
   const bindFieldDomain = useModelStore((s) => s.bindFieldDomain);
-  const domains = useModelStore((s) => s.model.domains ?? []);
+  // Default outside the selector (see DomainsDialog) to avoid an infinite loop.
+  const domains = useModelStore((s) => s.model.domains) ?? [];
   const patch = (p: Partial<Field>) => updateField(entityId, field.id, p);
   const shape = field.type ? paramShape(field.type) : "none";
   const boundDomain = field.domainId ? domains.find((d) => d.id === field.domainId) : undefined;

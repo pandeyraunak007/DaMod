@@ -1,11 +1,13 @@
 import { defineConfig } from "vitest/config";
 
-// Unit tests only for now (file format, type mapping, DDL export, validation
-// rules per NFR-9). These are pure-logic modules, so the default node
-// environment is enough — no DOM needed.
+// Mostly pure-logic unit tests run in the default `node` environment (file
+// format, type mapping, DDL export, validation — NFR-9). A few component render
+// smoke tests (`*.render.test.tsx`) opt into jsdom per-file via the
+// `// @vitest-environment jsdom` pragma, so they can mount a dialog and catch
+// render-time regressions (e.g. the Zustand selector infinite loop).
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
   },
 });

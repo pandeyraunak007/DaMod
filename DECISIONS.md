@@ -5,6 +5,24 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-10 — Fix a class of Zustand selector infinite loops (blank screen)
+
+Two components crashed to a blank screen via "getSnapshot should be cached →
+Maximum update depth exceeded": a selector that builds a NEW value each render
+(`useStore((s) => s.model.domains ?? [])` returns a fresh `[]`; same with
+`levelTerms(s.model.level)` returning a fresh object) makes `useSyncExternalStore`
+think the store changed every render. **Rule:** a Zustand selector must return a
+stable reference — select the raw primitive/reference and derive (`?? []`, map,
+object build) OUTSIDE the selector, in the render body. Fixed in `DomainsDialog`,
+`PropertiesDialog` (field editor) and earlier in `Toolbar`/`PropertiesDialog`
+(levelTerms). Audited the whole tree; no other new-array/object selectors remain.
+- **New dev dep `jsdom`** + widened vitest `include` to `*.test.tsx`: added a
+  component render smoke test (`DomainsDialog.render.test.tsx`) that mounts the
+  dialogs against a domain-less model. Verified it *reproduces* the bug (reverting
+  the fix throws "Maximum update depth exceeded") and passes once fixed. This locks
+  the whole loop class, not just the one symptom. Test-only dep (NFR-8 ok).
+- 183 TS tests; typecheck + build clean.
+
 ## 2026-10-10 — Level-aware presentation (erwin terminology per modeling level)
 
 Reported bug: switching a model between Logical and Physical did not change the
