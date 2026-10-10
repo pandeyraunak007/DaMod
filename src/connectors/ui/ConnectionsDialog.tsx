@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useModelStore } from "../../store/modelStore";
 import { newId } from "../../lib/ids";
@@ -242,6 +242,9 @@ function ConnectionEditor({
   );
 }
 
+// Streamlined reverse-engineering: opening the panel auto-discovers the whole
+// source (all user schemas); the user sees a live preview and clicks Import.
+// Narrowing to specific schemas is optional (re-discovers on toggle).
 function ReversePanel({
   profile,
   onBack,
@@ -257,128 +260,147 @@ function ReversePanel({
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [discovery, setDiscovery] = useState<DiscoveryResult | null>(null);
   const [modelName, setModelName] = useState(profile.params.database || "imported");
-  const [status, setStatus] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const loadSchemas = async () => {
+  const runDiscover = async (sel: Set<string>) => {
     const c = pgConnector();
     if (!c) return;
     setBusy(true);
-    setStatus("Discovering schemas…");
+    setError(null);
     try {
-      const list = await c.listSchemas(profile);
-      setSchemas(list);
-      setPicked(new Set(list));
-      setStatus(`${list.length} schema(s) found.`);
-    } catch (e) {
-      setStatus(`Failed: ${(e as Error).message}`);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const discover = async () => {
-    const c = pgConnector();
-    if (!c) return;
-    setBusy(true);
-    setStatus("Discovering objects…");
-    try {
-      const res = await c.discover(profile, { schemas: [...picked], includeViews: true, includeIndexes: true });
+      const res = await c.discover(profile, {
+        schemas: [...sel],
+        includeViews: true,
+        includeIndexes: true,
+      });
       setDiscovery(res);
-      const n = res.metadata.catalogs.reduce(
-        (a, cat) => a + cat.schemas.reduce((b, s) => b + s.objects.length, 0),
-        0,
-      );
-      setStatus(`${n} object(s) discovered. Review and import.`);
     } catch (e) {
-      setStatus(`Failed: ${(e as Error).message}`);
+      setError((e as Error).message);
     } finally {
       setBusy(false);
     }
   };
 
-  const preview = discovery ? metadataToModel(discovery.metadata, modelName || "imported", new Date().toISOString()) : null;
+  // Auto-discover everything on open.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const c = pgConnector();
+      if (!c) return;
+      try {
+        const list = await c.listSchemas(profile);
+        if (cancelled) return;
+        setSchemas(list);
+        const all = new Set(list);
+        setPicked(all);
+        await runDiscover(all);
+      } catch (e) {
+        if (!cancelled) {
+          setError((e as Error).message);
+          setBusy(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const toggleSchema = (s: string) => {
+    const next = new Set(picked);
+    next.has(s) ? next.delete(s) : next.add(s);
+    setPicked(next);
+    if (next.size) void runDiscover(next);
+    else setDiscovery(null);
+  };
+
+  const preview = discovery
+    ? metadataToModel(discovery.metadata, modelName || "imported", new Date().toISOString())
+    : null;
+  const nameError = validateIdentifier(modelName);
 
   const doImport = async () => {
     if (!preview || !discovery) return;
     setBusy(true);
     const err = await importModel(preview.model, modelName);
-    if (!err) {
-      // Persist the snapshot so a later refresh can compare against it.
-      await saveSnapshot(profile.name, buildSnapshot(profile.id, discovery));
-    }
+    if (!err) await saveSnapshot(profile.name, buildSnapshot(profile.id, discovery));
     setBusy(false);
-    if (err) setStatus(err);
+    if (err) setError(err);
     else onClose();
   };
-
-  const nameError = validateIdentifier(modelName);
 
   return (
     <div>
       <button className="btn btn--small" onClick={onBack}>← Connection</button>
       <h3 className="modal__subtitle">Reverse-engineer “{profile.name}”</h3>
 
-      {!schemas ? (
-        <button className="btn btn--small" onClick={loadSchemas} disabled={busy}>1 · Discover schemas</button>
-      ) : (
-        <>
-          <div className="field">
-            <label>Schemas to import</label>
-            <div className="conn__schemas">
-              {schemas.map((s) => (
-                <label key={s} className="checkbox">
-                  <input
-                    type="checkbox"
-                    checked={picked.has(s)}
-                    onChange={(e) => {
-                      const next = new Set(picked);
-                      if (e.target.checked) next.add(s);
-                      else next.delete(s);
-                      setPicked(next);
-                    }}
-                  />
-                  {s}
-                </label>
-              ))}
-            </div>
-          </div>
-          <button className="btn btn--small" onClick={discover} disabled={busy || picked.size === 0}>
-            2 · Discover objects
-          </button>
-        </>
-      )}
+      {error && <p className="field__hint field__hint--warn">{error}</p>}
+      {busy && !preview && <p className="field__hint">Discovering the database…</p>}
 
-      {preview && (
-        <div className="import-preview">
-          <div className="field">
-            <label>New model name</label>
-            <input className={nameError ? "is-error" : ""} value={modelName} onChange={(e) => setModelName(e.target.value)} />
+      {/* Optional: narrow to specific schemas (only when there's more than one). */}
+      {schemas && schemas.length > 1 && (
+        <div className="field">
+          <label>Schemas {busy && <span className="field__hint">· discovering…</span>}</label>
+          <div className="conn__schemas">
+            {schemas.map((s) => (
+              <label key={s} className="checkbox">
+                <input type="checkbox" checked={picked.has(s)} onChange={() => toggleSchema(s)} />
+                {s}
+              </label>
+            ))}
           </div>
-          <p className="field__hint">
-            {preview.model.entities.length} entities · {preview.model.relationships.length} relationships
-          </p>
-          {preview.warnings.length > 0 && (
-            <ul className="import-warnings">
-              {preview.warnings.map((w, i) => (
-                <li key={i} className="field__hint field__hint--warn">{w}</li>
-              ))}
-            </ul>
-          )}
         </div>
       )}
 
-      {status && <p className="field__hint">{status}</p>}
+      {preview && (
+        <>
+          <div className="import-preview">
+            <p className="field__hint">
+              <strong>{preview.model.entities.length}</strong> tables ·{" "}
+              <strong>{preview.model.relationships.length}</strong> relationships
+              {preview.model.entities.length > 0 && (
+                <>
+                  {" "}
+                  — {preview.model.entities.slice(0, 8).map((e) => e.name).join(", ")}
+                  {preview.model.entities.length > 8 ? "…" : ""}
+                </>
+              )}
+            </p>
+            {preview.warnings.length > 0 && (
+              <details>
+                <summary className="field__hint">{preview.warnings.length} note(s)</summary>
+                <ul className="import-warnings">
+                  {preview.warnings.map((w, i) => (
+                    <li key={i} className="field__hint field__hint--warn">{w}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
 
-      <div className="modal__actions">
-        <button
-          className="btn btn--primary"
-          onClick={doImport}
-          disabled={busy || !preview || preview.model.entities.length === 0 || !!nameError}
-        >
-          3 · Import as new model
-        </button>
-      </div>
+          <div className="modal__row modal__row--pair">
+            <div className="field">
+              <label>New model name</label>
+              <input
+                className={nameError ? "is-error" : ""}
+                value={modelName}
+                onChange={(e) => setModelName(e.target.value)}
+              />
+            </div>
+            <div className="field conn__import-action">
+              <button
+                className="btn btn--primary"
+                onClick={doImport}
+                disabled={busy || preview.model.entities.length === 0 || !!nameError}
+              >
+                Import {preview.model.entities.length} tables →
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

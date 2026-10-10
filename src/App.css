@@ -1802,3 +1802,11 @@ body,
 .ribbon__chip:hover {
   background: #eef2f7;
 }
+
+.conn__import-action {
+  display: flex;
+  align-items: flex-end;
+}
+.conn__import-action .btn {
+  width: 100%;
+}
