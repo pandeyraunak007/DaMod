@@ -1,0 +1,450 @@
+{
+  "metadataVersion": 1,
+  "source": {
+    "systemType": "oracle-ebs",
+    "name": "VIS",
+    "productVersion": "Oracle Database 19c Enterprise Edition 19.3.0.0.0",
+    "ebsRelease": "12.2.9",
+    "ebsInstance": "VIS"
+  },
+  "capabilities": [
+    "detectSchemaChanges",
+    "discoverColumns",
+    "discoverForeignKeys",
+    "discoverIndexes",
+    "discoverPrimaryKeys",
+    "discoverTables",
+    "discoverViews",
+    "listSchemas",
+    "testConnection"
+  ],
+  "catalogs": [
+    {
+      "name": "VIS",
+      "schemas": [
+        {
+          "name": "AP",
+          "objects": [
+            {
+              "name": "AP_INVOICE_LINES_ALL",
+              "kind": "table",
+              "columns": [
+                {
+                  "name": "INVOICE_ID",
+                  "ordinal": 0,
+                  "nativeType": "NUMBER(15)",
+                  "normalizedType": {
+                    "type": "bigint"
+                  },
+                  "nullable": false
+                },
+                {
+                  "name": "LINE_NUMBER",
+                  "ordinal": 1,
+                  "nativeType": "NUMBER",
+                  "normalizedType": {
+                    "type": "decimal",
+                    "precision": 38,
+                    "scale": 0
+                  },
+                  "nullable": false
+                },
+                {
+                  "name": "AMOUNT",
+                  "ordinal": 2,
+                  "nativeType": "NUMBER(15,2)",
+                  "normalizedType": {
+                    "type": "decimal",
+                    "precision": 15,
+                    "scale": 2
+                  },
+                  "nullable": true
+                },
+                {
+                  "name": "CODE_COMBINATION_ID",
+                  "ordinal": 3,
+                  "nativeType": "NUMBER(15)",
+                  "normalizedType": {
+                    "type": "bigint"
+                  },
+                  "nullable": true
+                }
+              ],
+              "primaryKey": [
+                "INVOICE_ID",
+                "LINE_NUMBER"
+              ],
+              "foreignKeys": [
+                {
+                  "name": "AP_INV_LINES_INVOICE",
+                  "columns": [
+                    "INVOICE_ID"
+                  ],
+                  "refSchema": "AP",
+                  "refObject": "AP_INVOICES_ALL",
+                  "refColumns": [
+                    "INVOICE_ID"
+                  ],
+                  "provenance": "declared-fk"
+                }
+              ],
+              "indexes": [],
+              "nativeId": "AP.AP_INVOICE_LINES_ALL",
+              "native": {
+                "ebs": {
+                  "product": "AP",
+                  "productName": "Payables",
+                  "businessDescription": "Distribution lines of a supplier invoice.",
+                  "verified": true
+                }
+              }
+            },
+            {
+              "name": "AP_INVOICES_ALL",
+              "kind": "table",
+              "columns": [
+                {
+                  "name": "INVOICE_ID",
+                  "ordinal": 0,
+                  "nativeType": "NUMBER(15)",
+                  "normalizedType": {
+                    "type": "bigint"
+                  },
+                  "nullable": false
+                },
+                {
+                  "name": "VENDOR_ID",
+                  "ordinal": 1,
+                  "nativeType": "NUMBER(15)",
+                  "normalizedType": {
+                    "type": "bigint"
+                  },
+                  "nullable": false
+                },
+                {
+                  "name": "INVOICE_NUM",
+                  "ordinal": 2,
+                  "nativeType": "VARCHAR2(50)",
+                  "normalizedType": {
+                    "type": "string",
+                    "length": 50
+                  },
+                  "nullable": false
+                },
+                {
+                  "name": "INVOICE_AMOUNT",
+                  "ordinal": 3,
+                  "nativeType": "NUMBER(15,2)",
+                  "normalizedType": {
+                    "type": "decimal",
+                    "precision": 15,
+                    "scale": 2
+                  },
+                  "nullable": true
+                },
+                {
+                  "name": "INVOICE_DATE",
+                  "ordinal": 4,
+                  "nativeType": "DATE",
+                  "normalizedType": {
+                    "type": "timestamp"
+                  },
+                  "nullable": false
+                },
+                {
+                  "name": "CODE_COMBINATION_ID",
+                  "ordinal": 5,
+                  "nativeType": "NUMBER(15)",
+                  "normalizedType": {
+                    "type": "bigint"
+                  },
+                  "nullable": true,
+                  "comment": "Default GL account."
+                },
+                {
+                  "name": "ATTACHMENT",
+                  "ordinal": 6,
+                  "nativeType": "BLOB",
+                  "nullable": true
+                }
+              ],
+              "primaryKey": [
+                "INVOICE_ID"
+              ],
+              "foreignKeys": [
+                {
+                  "name": "AP_INVOICES_VENDOR",
+                  "columns": [
+                    "VENDOR_ID"
+                  ],
+                  "refSchema": "AP",
+                  "refObject": "AP_SUPPLIERS",
+                  "refColumns": [
+                    "VENDOR_ID"
+                  ],
+                  "provenance": "ebs-metadata",
+                  "confidence": 0.95
+                }
+              ],
+              "indexes": [],
+              "comment": "Supplier invoices (operating-unit striped: _ALL).",
+              "nativeId": "AP.AP_INVOICES_ALL",
+              "native": {
+                "ebs": {
+                  "product": "AP",
+                  "productName": "Payables",
+                  "businessDescription": "Invoices entered against suppliers for payment.",
+                  "verified": true
+                }
+              }
+            },
+            {
+              "name": "AP_SUPPLIERS",
+              "kind": "table",
+              "columns": [
+                {
+                  "name": "VENDOR_ID",
+                  "ordinal": 0,
+                  "nativeType": "NUMBER(15)",
+                  "normalizedType": {
+                    "type": "bigint"
+                  },
+                  "nullable": false,
+                  "comment": "Supplier unique identifier."
+                },
+                {
+                  "name": "VENDOR_NAME",
+                  "ordinal": 1,
+                  "nativeType": "VARCHAR2(240)",
+                  "normalizedType": {
+                    "type": "string",
+                    "length": 240
+                  },
+                  "nullable": false
+                },
+                {
+                  "name": "SEGMENT1",
+                  "ordinal": 2,
+                  "nativeType": "VARCHAR2(30)",
+                  "normalizedType": {
+                    "type": "string",
+                    "length": 30
+                  },
+                  "nullable": true,
+                  "comment": "Supplier number."
+                },
+                {
+                  "name": "CREATION_DATE",
+                  "ordinal": 3,
+                  "nativeType": "DATE",
+                  "normalizedType": {
+                    "type": "timestamp"
+                  },
+                  "nullable": false
+                }
+              ],
+              "primaryKey": [
+                "VENDOR_ID"
+              ],
+              "foreignKeys": [],
+              "indexes": [
+                {
+                  "name": "AP_SUPPLIERS_U1",
+                  "columns": [
+                    "VENDOR_ID"
+                  ],
+                  "unique": true
+                }
+              ],
+              "comment": "Supplier (vendor) master.",
+              "nativeId": "AP.AP_SUPPLIERS",
+              "native": {
+                "ebs": {
+                  "product": "AP",
+                  "productName": "Payables",
+                  "businessDescription": "Suppliers from whom the enterprise purchases goods and services.",
+                  "verified": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "GL",
+          "objects": [
+            {
+              "name": "GL_CODE_COMBINATIONS",
+              "kind": "table",
+              "columns": [
+                {
+                  "name": "CODE_COMBINATION_ID",
+                  "ordinal": 0,
+                  "nativeType": "NUMBER(15)",
+                  "normalizedType": {
+                    "type": "bigint"
+                  },
+                  "nullable": false
+                },
+                {
+                  "name": "SEGMENT1",
+                  "ordinal": 1,
+                  "nativeType": "VARCHAR2(25)",
+                  "normalizedType": {
+                    "type": "string",
+                    "length": 25
+                  },
+                  "nullable": true
+                },
+                {
+                  "name": "SEGMENT2",
+                  "ordinal": 2,
+                  "nativeType": "VARCHAR2(25)",
+                  "normalizedType": {
+                    "type": "string",
+                    "length": 25
+                  },
+                  "nullable": true
+                },
+                {
+                  "name": "ENABLED_FLAG",
+                  "ordinal": 3,
+                  "nativeType": "VARCHAR2(1)",
+                  "normalizedType": {
+                    "type": "string",
+                    "length": 1
+                  },
+                  "nullable": false,
+                  "default": "'Y'"
+                }
+              ],
+              "primaryKey": [
+                "CODE_COMBINATION_ID"
+              ],
+              "foreignKeys": [],
+              "indexes": [],
+              "comment": "Accounting flexfield combinations (GL accounts).",
+              "nativeId": "GL.GL_CODE_COMBINATIONS",
+              "native": {
+                "ebs": {
+                  "product": "GL",
+                  "productName": "General Ledger",
+                  "businessDescription": "Valid account code combinations of the accounting flexfield.",
+                  "verified": true
+                }
+              }
+            },
+            {
+              "name": "GL_JE_HEADERS",
+              "kind": "table",
+              "columns": [
+                {
+                  "name": "JE_HEADER_ID",
+                  "ordinal": 0,
+                  "nativeType": "NUMBER(15)",
+                  "normalizedType": {
+                    "type": "bigint"
+                  },
+                  "nullable": false
+                },
+                {
+                  "name": "NAME",
+                  "ordinal": 1,
+                  "nativeType": "VARCHAR2(100)",
+                  "normalizedType": {
+                    "type": "string",
+                    "length": 100
+                  },
+                  "nullable": false
+                },
+                {
+                  "name": "DEFAULT_EFFECTIVE_DATE",
+                  "ordinal": 2,
+                  "nativeType": "DATE",
+                  "normalizedType": {
+                    "type": "timestamp"
+                  },
+                  "nullable": false
+                }
+              ],
+              "primaryKey": [
+                "JE_HEADER_ID"
+              ],
+              "foreignKeys": [],
+              "indexes": [],
+              "comment": "Journal entry headers.",
+              "nativeId": "GL.GL_JE_HEADERS",
+              "native": {
+                "ebs": {
+                  "product": "GL",
+                  "productName": "General Ledger",
+                  "businessDescription": "Headers of General Ledger journal entries.",
+                  "verified": true
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "application": {
+    "concurrentPrograms": [
+      {
+        "shortName": "APXINWKB",
+        "name": "Invoice Workbench",
+        "product": "AP",
+        "description": "Enter and manage supplier invoices."
+      },
+      {
+        "shortName": "APXPAWKB",
+        "name": "Payments Workbench",
+        "product": "AP"
+      },
+      {
+        "shortName": "GLXJEENT",
+        "name": "Enter Journals",
+        "product": "GL",
+        "description": "Enter General Ledger journal entries."
+      }
+    ],
+    "lookups": [
+      {
+        "type": "INVOICE TYPE",
+        "product": "AP",
+        "description": "Standard, Credit Memo, Prepayment, …"
+      },
+      {
+        "type": "JE SOURCE",
+        "product": "GL"
+      }
+    ],
+    "programUnits": [
+      {
+        "name": "AP_INVOICES",
+        "kind": "synonym",
+        "schema": "APPS",
+        "product": "AP",
+        "description": "Public synonym for AP.AP_INVOICES_ALL."
+      },
+      {
+        "name": "AP_INVOICES_PKG",
+        "kind": "package",
+        "schema": "APPS",
+        "product": "AP",
+        "description": "Invoice validation and accounting."
+      },
+      {
+        "name": "AP_WEB_OA_UTIL_PKG",
+        "kind": "package",
+        "schema": "APPS",
+        "product": "AP"
+      },
+      {
+        "name": "GL_JOURNAL_IMPORT_PKG",
+        "kind": "package",
+        "schema": "APPS",
+        "product": "GL"
+      }
+    ]
+  }
+}
