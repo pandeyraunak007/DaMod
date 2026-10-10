@@ -17,6 +17,7 @@ import { SidePanel } from "./panels/SidePanel";
 import { RelationshipDialog } from "./panels/RelationshipDialog";
 import { PropertiesDialog } from "./panels/PropertiesDialog";
 import { DomainsDialog } from "./panels/DomainsDialog";
+import { ImportDialog } from "./import/ImportDialog";
 import { LinkDialog } from "./links/LinkDialog";
 import { useModelStore } from "./store/modelStore";
 import { useWorkspaceStore } from "./store/workspaceStore";
@@ -36,6 +37,7 @@ export default function App() {
   const [mapOpen, setMapOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [domainsOpen, setDomainsOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [semanticOpen, setSemanticOpen] = useState(false);
   const [deleteModel, setDeleteModel] = useState<{ id: string; name: string } | null>(null);
 
@@ -114,6 +116,7 @@ export default function App() {
     <div className="app">
       <Toolbar
         onNewModel={() => setNewModelOpen(true)}
+        onImport={() => setImportOpen(true)}
         onOpenHistory={() => setHistoryOpen(true)}
         onOpenMap={() => setMapOpen(true)}
         onOpenExport={() => setExportOpen(true)}
@@ -184,6 +187,7 @@ export default function App() {
       {mapOpen && <WorkspaceMap onClose={() => setMapOpen(false)} />}
       {exportOpen && <ExportDialog onClose={() => setExportOpen(false)} />}
       {domainsOpen && <DomainsDialog onClose={() => setDomainsOpen(false)} />}
+      {importOpen && <ImportDialog onClose={() => setImportOpen(false)} />}
       {confirmDelete && selection && <DeleteConfirm onClose={() => setConfirmDelete(false)} />}
       {deleteModel && (
         <DeleteModelConfirm

@@ -1260,6 +1260,19 @@ body,
   border-radius: 4px;
 }
 
+.import-preview {
+  margin: 0.4rem 0;
+}
+.import-warnings {
+  margin: 0.3rem 0 0;
+  padding-left: 1.1rem;
+  max-height: 140px;
+  overflow: auto;
+}
+.import-warnings li {
+  margin: 0.1rem 0;
+}
+
 /* ---- workspace map ---- */
 .modal--map {
   width: 720px;

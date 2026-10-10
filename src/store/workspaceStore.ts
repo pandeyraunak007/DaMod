@@ -79,6 +79,7 @@ interface WorkspaceState {
   openWorkspace: (path: string) => Promise<void>;
   restoreLastWorkspace: () => Promise<void>;
   newModel: (name: string, level?: ModelLevel) => Promise<string | null>;
+  importModel: (model: Model, name: string) => Promise<string | null>;
   duplicateModel: (id: string) => Promise<void>;
   deleteModel: (id: string) => Promise<void>;
   switchTab: (id: string) => Promise<void>;
@@ -318,6 +319,38 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       };
       set((s) => ({ tabs: [...s.tabs, tab] }));
       activate(model.id);
+      await writeWorkspaceMeta();
+      return null;
+    },
+
+    // Add a fully-built model (e.g. reverse-engineered from DDL) to the workspace.
+    importModel: async (model, name) => {
+      const { path, tabs } = get();
+      if (!path) return "Open a workspace first";
+      const err = validateIdentifier(name);
+      if (err) return err;
+      if (tabs.some((t) => modelNameFromFile(t.fileName) === name)) {
+        return `A model named ${name} already exists`;
+      }
+      const toAdd: Model = { ...model, id: newId("model"), name, createdAt: nowIso(), updatedAt: nowIso() };
+      const fileName = modelFileName(name);
+      const text = serializeModel(toAdd);
+      const mt = await writeFile(joinPath(path, fileName), text, false);
+      set((s) => ({
+        tabs: [
+          ...s.tabs,
+          {
+            id: toAdd.id,
+            fileName,
+            model: toAdd,
+            lastSavedText: text,
+            savedMtime: mt,
+            externalChange: false,
+            loadError: null,
+          },
+        ],
+      }));
+      activate(toAdd.id);
       await writeWorkspaceMeta();
       return null;
     },

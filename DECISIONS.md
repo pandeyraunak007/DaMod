@@ -32,6 +32,30 @@ unit tests; UI verified by typecheck/build/clean boot (author runs the app).
 - **Not done:** No cross-model/shared domain library; no domain-level CHECK
   constraints (only type + optional default + logical type).
 
+### Reverse-engineering: SQL DDL → model
+- **What:** A **Import SQL** toolbar action (`src/import/`) parses a `.sql` file
+  (or pasted DDL) into a new Physical model. It reads `CREATE TABLE` with column
+  definitions, table-level and inline `PRIMARY KEY` / `UNIQUE` / `FOREIGN KEY` /
+  `REFERENCES`, and standalone `ALTER TABLE … ADD FOREIGN KEY`. Columns become
+  fields, FKs become one-to-many relationships (one-to-one + identifying when the
+  FK is the child's whole primary key, which also covers subtype tables). SQL
+  types map back to the fixed DaMod set; unknown types fall back to `text` with a
+  warning. The dialog shows a live preview (table/relationship counts + warnings).
+- **Type mapping** is deliberately multi-dialect-tolerant (Postgres, Snowflake
+  `NUMBER`/`VARIANT`/`STRING`, common MySQL/SQL-Server spellings) so it accepts
+  real-world DDL, not only DaMod's own export. It is the inverse of
+  `export/dialects.ts`; a model → Postgres DDL → model round-trip is unit-tested.
+- **Why:** Round-trip (ERwin "reverse engineer") makes the tool usable against
+  existing databases, not just greenfield models.
+- **Parser scope:** hand-written, paren/quote/comment-aware scanner (no SQL
+  grammar dependency, per NFR-8). `CREATE VIEW/INDEX/SEQUENCE/SCHEMA`, `INSERT`
+  and `CHECK`/`EXCLUDE` constraints are ignored (not errors). Composite FKs and
+  schema-qualified names are handled; a FK to an unknown table is a warning, not
+  a failure.
+- **Not done:** No column comments → descriptions yet; no index/sequence/view
+  reconstruction; no M:N collapse (a junction table imports as a plain entity
+  with two one-to-many relationships, which matches DaMod's own representation).
+
 ## 2026-09-22 — Phase 4: semantic layer (FR-7) + export (FR-8/FR-9), multi-dialect
 
 84 unit tests cover the pure logic (semantic persistence, DDL across 3 dialects,

@@ -33,6 +33,17 @@ export async function pickWorkspaceFolder(): Promise<string | null> {
   return typeof res === "string" ? res : null;
 }
 
+/** Pick a single file with the given extensions (e.g. ["sql"]). */
+export async function pickFile(extensions: string[], title: string): Promise<string | null> {
+  const res = await open({
+    directory: false,
+    multiple: false,
+    title,
+    filters: [{ name: extensions.join("/").toUpperCase(), extensions }],
+  });
+  return typeof res === "string" ? res : null;
+}
+
 export function readTextFile(path: string): Promise<string> {
   return invoke<string>("read_text_file", { path });
 }
