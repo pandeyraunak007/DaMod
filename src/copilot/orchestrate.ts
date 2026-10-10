@@ -16,10 +16,18 @@ Return ONLY a JSON object with this shape:
   "actions": Action[]
 }
 
+A type is one of: string|text|integer|bigint|decimal|boolean|date|timestamp|uuid|json.
+
 Action is one of:
-- { "kind": "create_entity", "name": string, "description"?: string, "fields"?: [{ "name": string, "type"?: one of string|text|integer|bigint|decimal|boolean|date|timestamp|uuid|json, "primaryKey"?: boolean, "nullable"?: boolean }] }
+- { "kind": "create_entity", "name": string, "description"?: string, "fields"?: [{ "name": string, "type"?: type, "primaryKey"?: boolean, "nullable"?: boolean }] }
 - { "kind": "update_description", "entity": string, "field"?: string, "text": string }
 - { "kind": "create_relationship", "parent": string, "child": string, "cardinality": "one-to-one"|"one-to-many"|"many-to-many", "foreignKeyFieldName"?: string }
+- { "kind": "create_attribute", "entity": string, "name": string, "type"?: type, "primaryKey"?: boolean, "unique"?: boolean, "nullable"?: boolean }   // add a column/attribute to an EXISTING entity
+- { "kind": "update_attribute", "entity": string, "field": string, "newName"?: string, "type"?: type, "primaryKey"?: boolean, "unique"?: boolean, "nullable"?: boolean }   // change/rename a column
+- { "kind": "rename_entity", "entity": string, "newName": string }
+- { "kind": "delete_entity", "entity": string }
+- { "kind": "delete_attribute", "entity": string, "field": string }
+- { "kind": "delete_relationship", "parent": string, "child": string }
 
 Rules:
 - Reference existing objects by their exact name from the context.

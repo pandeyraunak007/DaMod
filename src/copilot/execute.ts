@@ -102,6 +102,77 @@ function applyAction(action: CopilotAction): ActionResult {
       });
       return ok(`Created ${action.cardinality} ${action.parent}→${action.child}`);
     }
+
+    case "create_attribute": {
+      const e = entityByName(model(), action.entity);
+      if (!e) return fail(`Entity “${action.entity}” not found`);
+      if (validateIdentifier(action.name)) return fail(`“${action.name}”: invalid name`);
+      if (fieldByName(e, action.name)) return skip(`${action.entity}.${action.name} already exists`);
+      const fid = store.addField(e.id);
+      if (!fid) return fail("could not add field");
+      store.updateField(e.id, fid, {
+        name: action.name,
+        ...(action.type ? { type: action.type as DataTypeKind } : {}),
+        primaryKey: action.primaryKey ?? false,
+        unique: action.unique ?? false,
+        nullable: action.nullable ?? !action.primaryKey,
+      });
+      return ok(`Added ${action.entity}.${action.name}`);
+    }
+
+    case "update_attribute": {
+      const e = entityByName(model(), action.entity);
+      if (!e) return fail(`Entity “${action.entity}” not found`);
+      const f = fieldByName(e, action.field);
+      if (!f) return fail(`Field “${action.entity}.${action.field}” not found`);
+      if (action.newName && validateIdentifier(action.newName)) return fail(`“${action.newName}”: invalid name`);
+      store.updateField(e.id, f.id, {
+        ...(action.newName ? { name: action.newName } : {}),
+        ...(action.type ? { type: action.type as DataTypeKind } : {}),
+        ...(action.primaryKey !== undefined ? { primaryKey: action.primaryKey } : {}),
+        ...(action.unique !== undefined ? { unique: action.unique } : {}),
+        ...(action.nullable !== undefined ? { nullable: action.nullable } : {}),
+      });
+      return ok(`Updated ${action.entity}.${action.field}`);
+    }
+
+    case "rename_entity": {
+      const e = entityByName(model(), action.entity);
+      if (!e) return fail(`Entity “${action.entity}” not found`);
+      const err = store.renameEntity(e.id, action.newName);
+      if (err) return fail(`rename to “${action.newName}”: ${err}`);
+      return ok(`Renamed ${action.entity} → ${action.newName}`);
+    }
+
+    case "delete_entity": {
+      const e = entityByName(model(), action.entity);
+      if (!e) return skip(`“${action.entity}” already gone`);
+      store.deleteEntity(e.id);
+      return ok(`Deleted ${action.entity} (and its relationships)`);
+    }
+
+    case "delete_attribute": {
+      const e = entityByName(model(), action.entity);
+      if (!e) return fail(`Entity “${action.entity}” not found`);
+      const f = fieldByName(e, action.field);
+      if (!f) return skip(`${action.entity}.${action.field} already gone`);
+      store.deleteField(e.id, f.id);
+      return ok(`Deleted ${action.entity}.${action.field}`);
+    }
+
+    case "delete_relationship": {
+      const parent = entityByName(model(), action.parent);
+      const child = entityByName(model(), action.child);
+      if (!parent || !child) return fail("relationship endpoints not found");
+      const rel = model().relationships.find(
+        (r) =>
+          (r.parentEntity === parent.id && r.childEntity === child.id) ||
+          (r.parentEntity === child.id && r.childEntity === parent.id),
+      );
+      if (!rel) return skip(`no relationship between ${action.parent} and ${action.child}`);
+      store.deleteRelationship(rel.id);
+      return ok(`Deleted relationship ${action.parent}↔${action.child}`);
+    }
   }
 }
 

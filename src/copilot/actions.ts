@@ -36,12 +36,62 @@ const zCreateRelationship = z.object({
   foreignKeyFieldName: z.string().optional(),
 });
 
+const zCreateAttribute = z.object({
+  kind: z.literal("create_attribute"),
+  entity: z.string(),
+  name: z.string(),
+  type: z.enum(DATA_TYPE_KINDS as unknown as [string, ...string[]]).optional(),
+  primaryKey: z.boolean().optional(),
+  unique: z.boolean().optional(),
+  nullable: z.boolean().optional(),
+});
+
+const zUpdateAttribute = z.object({
+  kind: z.literal("update_attribute"),
+  entity: z.string(),
+  field: z.string(),
+  newName: z.string().optional(),
+  type: z.enum(DATA_TYPE_KINDS as unknown as [string, ...string[]]).optional(),
+  primaryKey: z.boolean().optional(),
+  unique: z.boolean().optional(),
+  nullable: z.boolean().optional(),
+});
+
+const zRenameEntity = z.object({
+  kind: z.literal("rename_entity"),
+  entity: z.string(),
+  newName: z.string(),
+});
+
+const zDeleteEntity = z.object({ kind: z.literal("delete_entity"), entity: z.string() });
+const zDeleteAttribute = z.object({
+  kind: z.literal("delete_attribute"),
+  entity: z.string(),
+  field: z.string(),
+});
+const zDeleteRelationship = z.object({
+  kind: z.literal("delete_relationship"),
+  parent: z.string(),
+  child: z.string(),
+});
+
 export const zAction = z.discriminatedUnion("kind", [
   zCreateEntity,
   zUpdateDescription,
   zCreateRelationship,
+  zCreateAttribute,
+  zUpdateAttribute,
+  zRenameEntity,
+  zDeleteEntity,
+  zDeleteAttribute,
+  zDeleteRelationship,
 ]);
 export type CopilotAction = z.infer<typeof zAction>;
+
+const DESTRUCTIVE = new Set(["delete_entity", "delete_attribute", "delete_relationship"]);
+export function isDestructive(a: CopilotAction): boolean {
+  return DESTRUCTIVE.has(a.kind);
+}
 
 export const zPlan = z.object({
   /** One-line human summary of the whole plan. */
@@ -72,7 +122,12 @@ export function planMutates(plan: CopilotPlan): boolean {
 export function requiresApproval(plan: CopilotPlan): boolean {
   const mutating = plan.actions.length;
   const structural = plan.actions.some(
-    (a) => a.kind === "create_entity" || a.kind === "create_relationship",
+    (a) => a.kind === "create_entity" || a.kind === "create_relationship" || a.kind === "rename_entity",
   );
-  return structural || mutating > 5;
+  return structural || plan.actions.some(isDestructive) || mutating > 5;
+}
+
+/** Destructive plans (any delete) always need explicit approval (§14.9). */
+export function hasDestructive(plan: CopilotPlan): boolean {
+  return plan.actions.some(isDestructive);
 }

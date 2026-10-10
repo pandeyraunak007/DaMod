@@ -11,7 +11,7 @@ import { noTrainingLabel, sensitiveCategories } from "./privacy";
 import { OpenAiCompatProvider, type Provider } from "./provider";
 import { buildContext, type ContextScope } from "./context";
 import { requestPlan } from "./orchestrate";
-import { type CopilotPlan, requiresApproval } from "./actions";
+import { type CopilotPlan, requiresApproval, hasDestructive } from "./actions";
 import { executePlan, type PlanResult } from "./execute";
 
 // The optional AI Modeling Copilot drawer (§14.7). Proposes a structured plan the
@@ -136,6 +136,9 @@ export function CopilotPanel({ onClose }: { onClose: () => void }) {
           {plan && (
             <div className="copilot__plan">
               <p className="copilot__plan-summary">{plan.summary}</p>
+              {hasDestructive(plan) && (
+                <p className="field__hint field__hint--warn">⚠ This plan deletes objects — review carefully before approving.</p>
+              )}
               {plan.assumptions.length > 0 && (
                 <ul className="copilot__assumptions">
                   {plan.assumptions.map((a, i) => (
@@ -187,24 +190,71 @@ export function CopilotPanel({ onClose }: { onClose: () => void }) {
 function describeAction(a: CopilotPlan["actions"][number]): string {
   switch (a.kind) {
     case "create_entity":
-      return `+ ${a.name}${a.fields?.length ? ` (${a.fields.map((f) => f.name).join(", ")})` : ""}`;
+      return `+ table ${a.name}${a.fields?.length ? ` (${a.fields.map((f) => f.name).join(", ")})` : ""}`;
     case "update_description":
       return `✎ ${a.entity}${a.field ? `.${a.field}` : ""}: “${a.text.slice(0, 60)}${a.text.length > 60 ? "…" : ""}”`;
     case "create_relationship":
       return `→ ${a.parent} ${a.cardinality} ${a.child}`;
+    case "create_attribute":
+      return `+ column ${a.entity}.${a.name}${a.type ? ` (${a.type})` : ""}`;
+    case "update_attribute":
+      return `✎ column ${a.entity}.${a.field}${a.newName ? ` → ${a.newName}` : ""}${a.type ? ` (${a.type})` : ""}`;
+    case "rename_entity":
+      return `✎ rename ${a.entity} → ${a.newName}`;
+    case "delete_entity":
+      return `🗑 delete table ${a.entity}`;
+    case "delete_attribute":
+      return `🗑 delete column ${a.entity}.${a.field}`;
+    case "delete_relationship":
+      return `🗑 delete relationship ${a.parent}↔${a.child}`;
   }
 }
 
 function CopilotSettings({ config, onChange }: { config: CopilotConfig; onChange: (c: CopilotConfig) => void }) {
   const [apiKey, setApiKey] = useState("");
   const [saved, setSaved] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [models, setModels] = useState<string[]>([]);
   const set = (patch: Partial<CopilotConfig>) => onChange({ ...config, ...patch });
 
+  const provider = () =>
+    new OpenAiCompatProvider({ baseUrl: config.baseUrl, model: config.model, secretRef: config.secretRef });
+
+  const loadModels = async () => {
+    setBusy(true);
+    setSaved("Loading models…");
+    try {
+      const list = await provider().listModels();
+      setModels(list);
+      // If the current model isn't actually available, pick a real one so the
+      // user can't be stuck on a non-existent model id.
+      if (list.length && !list.includes(config.model)) {
+        set({ model: list[0] });
+        setSaved(`${list.length} models available — selected “${list[0]}”.`);
+      } else {
+        setSaved(`${list.length} models available.`);
+      }
+    } catch (e) {
+      setSaved(`✕ ${(e as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const saveKey = async () => {
-    if (!apiKey) return;
-    await secretStore(config.secretRef, apiKey);
+    const key = apiKey.trim(); // paste often brings trailing whitespace/newlines
+    if (!key) return;
+    await secretStore(config.secretRef, key);
     setApiKey("");
-    setSaved("API key saved to the OS keychain.");
+    setSaved(`API key saved to the OS keychain (${key.length} chars).`);
+  };
+
+  const testConnection = async () => {
+    setBusy(true);
+    setSaved("Testing…");
+    const res = await provider().testConnection();
+    setSaved(res.ok ? `✓ ${res.message}` : `✕ ${res.message}`);
+    setBusy(false);
   };
 
   return (
@@ -218,12 +268,25 @@ function CopilotSettings({ config, onChange }: { config: CopilotConfig; onChange
       </div>
       <div className="field">
         <label>Model</label>
-        <input value={config.model} onChange={(e) => set({ model: e.target.value })} />
+        {models.length > 0 ? (
+          <select value={config.model} onChange={(e) => set({ model: e.target.value })}>
+            {!models.includes(config.model) && <option value={config.model}>{config.model}</option>}
+            {models.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        ) : (
+          <input value={config.model} onChange={(e) => set({ model: e.target.value })} />
+        )}
+        <button className="btn btn--small" onClick={loadModels} disabled={busy}>Load available models</button>
       </div>
       <div className="field">
         <label>API key (stored in keychain)</label>
-        <input type="password" placeholder="sk-…" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
-        <button className="btn btn--small" onClick={saveKey} disabled={!apiKey}>Save key</button>
+        <input type="password" placeholder="sk-… / gsk_…" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
+        <div className="modal__actions">
+          <button className="btn btn--small" onClick={saveKey} disabled={!apiKey.trim()}>Save key</button>
+          <button className="btn btn--small" onClick={testConnection} disabled={busy}>Test connection</button>
+        </div>
       </div>
       <div className="field">
         <label>No-training status</label>

@@ -48,27 +48,73 @@ export class OpenAiCompatProvider implements Provider {
   readonly type = "openai-compatible";
   constructor(private cfg: OpenAiCompatConfig) {}
 
+  /** Lightweight auth/endpoint check against the models list (§14.3). */
+  async testConnection(signal?: AbortSignal): Promise<{ ok: boolean; message: string }> {
+    const bad = validateEndpoint(this.cfg.baseUrl);
+    if (bad) return { ok: false, message: bad };
+    const key = await secretGet(this.cfg.secretRef);
+    if (!key) return { ok: false, message: "No API key stored. Add one and Save key first." };
+    try {
+      const res = await fetch(`${this.cfg.baseUrl.replace(/\/$/, "")}/models`, {
+        headers: { Authorization: `Bearer ${key}` },
+        signal,
+      });
+      if (res.ok) return { ok: true, message: "Connected — API key accepted." };
+      const detail = await res.text().catch(() => "");
+      return { ok: false, message: `${res.status}: ${detail.slice(0, 160)}` };
+    } catch (e) {
+      return { ok: false, message: (e as Error).message };
+    }
+  }
+
+  /** List model ids available to the configured account (§14.3). */
+  async listModels(signal?: AbortSignal): Promise<string[]> {
+    const bad = validateEndpoint(this.cfg.baseUrl);
+    if (bad) throw new Error(bad);
+    const key = await secretGet(this.cfg.secretRef);
+    if (!key) throw new Error("No API key stored. Add one and Save key first.");
+    const res = await fetch(`${this.cfg.baseUrl.replace(/\/$/, "")}/models`, {
+      headers: { Authorization: `Bearer ${key}` },
+      signal,
+    });
+    if (!res.ok) throw new Error(`${res.status}: ${(await res.text().catch(() => "")).slice(0, 160)}`);
+    const data = (await res.json()) as { data?: { id: string }[] };
+    return (data.data ?? []).map((m) => m.id).sort();
+  }
+
   async complete(req: CompletionRequest): Promise<string> {
     const bad = validateEndpoint(this.cfg.baseUrl);
     if (bad) throw new Error(bad);
     const key = await secretGet(this.cfg.secretRef); // just-in-time; not persisted
     if (!key) throw new Error("No API key stored for this provider. Add one in Copilot settings.");
+    const url = `${this.cfg.baseUrl.replace(/\/$/, "")}/chat/completions`;
 
-    const res = await fetch(`${this.cfg.baseUrl.replace(/\/$/, "")}/chat/completions`, {
-      method: "POST",
-      signal: req.signal,
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-      body: JSON.stringify({
-        model: this.cfg.model,
-        messages: req.messages,
-        temperature: 0.2,
-        ...(req.json ? { response_format: { type: "json_object" } } : {}),
-      }),
-    });
+    const post = (useJson: boolean) =>
+      fetch(url, {
+        method: "POST",
+        signal: req.signal,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+        body: JSON.stringify({
+          model: this.cfg.model,
+          messages: req.messages,
+          temperature: 0.2,
+          ...(useJson ? { response_format: { type: "json_object" } } : {}),
+        }),
+      });
+
+    let res = await post(!!req.json);
+    // Some models reject JSON mode → retry once without it (parser handles prose).
+    if (!res.ok && req.json && res.status === 400) {
+      const peek = await res.clone().text().catch(() => "");
+      if (/response_format|json/i.test(peek)) res = await post(false);
+    }
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
-      if (res.status === 401 || res.status === 403) throw new Error("Authentication failed — check the API key.");
+      if (res.status === 401 || res.status === 403) {
+        throw new Error(`Authentication failed (${res.status}) — check the API key. ${detail.slice(0, 200)}`);
+      }
       if (res.status === 429) throw new Error("Rate limited by the provider — try again shortly.");
+      if (res.status === 404) throw new Error(`Not found (404) — check the Base URL and model name. ${detail.slice(0, 160)}`);
       throw new Error(`Provider error ${res.status}: ${detail.slice(0, 200)}`);
     }
     const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };

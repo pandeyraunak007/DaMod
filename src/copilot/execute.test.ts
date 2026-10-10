@@ -93,6 +93,49 @@ describe("executePlan (reuses existing ops, atomic, idempotent)", () => {
     expect(serializeModel(s().model)).toBe(before); // no change
   });
 
+  it("supports add column / update / rename / delete via existing ops", () => {
+    // Seed a Customer with an id.
+    const seed = parsePlan({
+      summary: "seed",
+      actions: [{ kind: "create_entity", name: "Customer", fields: [{ name: "id", type: "uuid", primaryKey: true }] }],
+    });
+    if (seed.ok) executePlan(seed.value);
+
+    // Add a column, rename it + change type, rename the entity.
+    const edit = parsePlan({
+      summary: "edit",
+      actions: [
+        { kind: "create_attribute", entity: "Customer", name: "email", type: "string" },
+        { kind: "update_attribute", entity: "Customer", field: "email", newName: "email_addr", nullable: false },
+        { kind: "rename_entity", entity: "Customer", newName: "Client" },
+      ],
+    });
+    if (!edit.ok) return;
+    const r = executePlan(edit.value);
+    expect(r.applied).toBe(3);
+    const e = s().model.entities.find((x) => x.name === "Client")!;
+    expect(e).toBeTruthy();
+    const col = e.fields.find((f) => f.name === "email_addr")!;
+    expect(col.type).toBe("string");
+    expect(col.nullable).toBe(false);
+
+    // Delete the column, then the entity.
+    const del = parsePlan({
+      summary: "del",
+      actions: [
+        { kind: "delete_attribute", entity: "Client", field: "email_addr" },
+        { kind: "delete_entity", entity: "Client" },
+      ],
+    });
+    if (!del.ok) return;
+    executePlan(del.value);
+    expect(s().model.entities.find((x) => x.name === "Client")).toBeUndefined();
+
+    // The whole delete batch undoes in one step.
+    s().undo();
+    expect(s().model.entities.find((x) => x.name === "Client")).toBeTruthy();
+  });
+
   it("rejecting a plan (never calling executePlan) leaves the model byte-identical", () => {
     const before = serializeModel(s().model);
     const plan = parsePlan({ summary: "x", actions: [{ kind: "create_entity", name: "Ghost" }] });
