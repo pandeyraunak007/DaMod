@@ -6,6 +6,7 @@
 import type { Model, Entity } from "../model/model";
 import { fieldTypeLabel } from "../model/fieldDisplay";
 import { levelTerms } from "../model/levels";
+import type { SemanticDoc } from "../semantic/semantic";
 
 export type ContextScope = "selection" | "model";
 
@@ -46,6 +47,7 @@ export function buildContext(
   model: Model,
   scope: ContextScope,
   selectedEntityId?: string | null,
+  semantic?: SemanticDoc,
 ): BuiltContext {
   const terms = levelTerms(model.level);
   const inScope: Entity[] =
@@ -77,6 +79,18 @@ export function buildContext(
     lines.push(
       `Domains (${model.domains.length}):`,
       ...model.domains.map((d) => `- ${d.name}: ${d.type}`),
+    );
+  }
+  if (model.subjectAreas?.length) {
+    lines.push(`Subject areas (${model.subjectAreas.length}): ${model.subjectAreas.map((a) => a.name).join(", ")}`);
+  }
+  // Semantic layer is workspace-wide (always available regardless of level) — list
+  // what exists so the AI references rather than duplicates it.
+  if (semantic && (semantic.terms.length || semantic.dimensions.length || semantic.metrics.length)) {
+    lines.push(
+      `Semantic layer — terms: ${semantic.terms.map((t) => t.name).join(", ") || "none"}; ` +
+        `dimensions: ${semantic.dimensions.map((d) => d.name).join(", ") || "none"}; ` +
+        `metrics: ${semantic.metrics.map((m) => m.name).join(", ") || "none"}`,
     );
   }
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Sparkles, ShieldCheck, ShieldAlert, Settings2, X, Send, Trash2 } from "lucide-react";
 import { useModelStore } from "../store/modelStore";
+import { useWorkspaceStore } from "../store/workspaceStore";
 import { secretStore } from "../lib/secrets";
 import { newId } from "../lib/ids";
 import {
@@ -77,7 +78,7 @@ export function CopilotPanel({ onClose }: { onClose: () => void }) {
     try {
       const model = useModelStore.getState().model;
       const selId = scope === "selection" && selection?.kind === "entity" ? selection.id : null;
-      const ctx = buildContext(model, scope, selId);
+      const ctx = buildContext(model, scope, selId, useWorkspaceStore.getState().semantic);
       const res = await requestPlan(provider(), text, ctx, {
         policy: config.privacyPolicy,
         status: config.noTraining,
@@ -320,6 +321,26 @@ function describeAction(a: CopilotPlan["actions"][number]): string {
       return `✎ rename ${a.entity} → ${a.newName}`;
     case "create_subject_area":
       return `▦ subject area ${a.name}${a.product ? ` (from ${a.product})` : a.tables?.length ? ` (${a.tables.length} tables)` : ""}`;
+    case "create_schema":
+      return `+ schema ${a.name}`;
+    case "create_view":
+      return `+ ${a.materialized ? "materialized view" : "view"} ${a.name}`;
+    case "create_index":
+      return `+ index on ${a.entity}${a.columns?.length ? ` (${a.columns.join(", ")})` : ""}`;
+    case "create_sequence":
+      return `+ sequence ${a.name}`;
+    case "create_domain":
+      return `+ domain ${a.name}${a.type ? ` (${a.type})` : ""}`;
+    case "create_check_constraint":
+      return `+ check on ${a.entity}: ${a.expression}`;
+    case "set_stereotype":
+      return `✎ ${a.entity} stereotype → ${a.stereotype}`;
+    case "create_term":
+      return `+ term ${a.name}`;
+    case "create_dimension":
+      return `+ dimension ${a.name}${a.entity ? ` (${a.entity})` : ""}`;
+    case "create_metric":
+      return `+ metric ${a.name}${a.aggregate ? ` (${a.aggregate}${a.field ? ` ${a.entity}.${a.field}` : ""})` : ""}`;
     case "delete_entity":
       return `🗑 delete table ${a.entity}`;
     case "delete_attribute":

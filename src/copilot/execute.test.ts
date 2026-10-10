@@ -181,3 +181,90 @@ describe("create_subject_area action (Req 21/22 §6)", () => {
     expect(executePlan(plan.value).failed).toBe(1);
   });
 });
+
+import { useWorkspaceStore } from "../store/workspaceStore";
+import { emptySemanticDoc } from "../semantic/semantic";
+
+describe("Copilot semantic-layer actions (FR-7)", () => {
+  beforeEach(() => {
+    useWorkspaceStore.setState({ semantic: emptySemanticDoc() });
+    // A model with an entity + a numeric field for metric binding.
+    s().loadModel(newModel("sales", "2026-01-01T00:00:00Z", "Physical"));
+    const e = s().createEntity();
+    s().renameEntity(e, "Order");
+    const f = s().addField(e)!;
+    s().updateField(e, f, { name: "total", type: "decimal" });
+  });
+
+  it("creates a business term", () => {
+    const plan = parsePlan({ summary: "x", actions: [{ kind: "create_term", name: "Gross Revenue", definition: "Total billed", synonyms: ["Revenue"] }] });
+    if (!plan.ok) return;
+    expect(executePlan(plan.value).applied).toBe(1);
+    const t = useWorkspaceStore.getState().semantic.terms[0];
+    expect(t.name).toBe("Gross Revenue");
+    expect(t.definition).toBe("Total billed");
+    expect(t.synonyms).toEqual(["Revenue"]);
+  });
+
+  it("creates a dimension bound to an entity", () => {
+    const plan = parsePlan({ summary: "x", actions: [{ kind: "create_dimension", name: "Order", entity: "Order" }] });
+    if (!plan.ok) return;
+    executePlan(plan.value);
+    const d = useWorkspaceStore.getState().semantic.dimensions[0];
+    expect(d.entity?.entity).toBe(s().model.entities[0].id);
+  });
+
+  it("creates a metric with aggregate + field binding", () => {
+    const plan = parsePlan({ summary: "x", actions: [{ kind: "create_metric", name: "Total Sales", aggregate: "sum", entity: "Order", field: "total" }] });
+    if (!plan.ok) return;
+    executePlan(plan.value);
+    const m = useWorkspaceStore.getState().semantic.metrics[0];
+    expect(m.aggregate).toBe("sum");
+    expect(m.field?.field).toBe(s().model.entities[0].fields[0].id);
+  });
+
+  it("is idempotent on term name", () => {
+    const plan = parsePlan({ summary: "x", actions: [{ kind: "create_term", name: "T" }] });
+    if (!plan.ok) return;
+    executePlan(plan.value);
+    expect(executePlan(plan.value).skipped).toBe(1);
+    expect(useWorkspaceStore.getState().semantic.terms).toHaveLength(1);
+  });
+});
+
+describe("Copilot model-object actions (Req 19)", () => {
+  beforeEach(() => {
+    s().loadModel(newModel("shop", "2026-01-01T00:00:00Z", "Physical"));
+    const e = s().createEntity();
+    s().renameEntity(e, "Invoice");
+    const f = s().addField(e)!;
+    s().updateField(e, f, { name: "amount", type: "decimal" });
+  });
+
+  it("creates schema, view, index, sequence, domain, check and sets stereotype", () => {
+    const plan = parsePlan({
+      summary: "objects",
+      actions: [
+        { kind: "create_schema", name: "sales", owner: "app" },
+        { kind: "create_view", name: "v_paid", definition: "SELECT 1", materialized: true },
+        { kind: "create_index", entity: "Invoice", columns: ["amount"], unique: false },
+        { kind: "create_sequence", name: "invoice_seq", start: 100 },
+        { kind: "create_domain", name: "Money", type: "decimal" },
+        { kind: "create_check_constraint", entity: "Invoice", expression: "amount >= 0" },
+        { kind: "set_stereotype", entity: "Invoice", stereotype: "fact" },
+      ],
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    const res = executePlan(plan.value);
+    expect(res.applied).toBe(7);
+    const m = s().model;
+    expect(m.schemas?.[0].name).toBe("sales");
+    expect(m.views?.find((v) => v.materialized)?.name).toBe("v_paid");
+    expect(m.indexes?.length).toBe(1);
+    expect(m.sequences?.[0].start).toBe(100);
+    expect(m.domains?.[0].name).toBe("Money");
+    expect(m.entities[0].checks?.[0].expression).toBe("amount >= 0");
+    expect(m.entities[0].stereotype).toBe("fact");
+  });
+});

@@ -5,6 +5,30 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Copilot action parity: semantic layer + all remaining object types
+
+Reported: the Copilot refused to create semantic-layer objects (terms/dimensions/metrics)
+— it only had table/column/relationship actions. Closed the gap comprehensively so the
+AI path matches what the manual UI can do.
+
+- **New actions** (`copilot/actions.ts`, documented in the SYSTEM_PROMPT, rendered in
+  `describeAction`, all structural → require approval): `create_term`,
+  `create_dimension`, `create_metric` (semantic layer, FR-7); plus the Req 19 objects —
+  `create_schema`, `create_view` (incl. materialized), `create_index`, `create_sequence`,
+  `create_domain`, `create_check_constraint`, and `set_stereotype` (fact/dimension).
+- **Executor** (`execute.ts`): semantic actions go through `useWorkspaceStore` ops
+  (`addTerm/addDimension/addMetric` with `newTerm/…` factories), resolving entity/field
+  names to refs; model-object actions through the existing `modelStore` ops. Idempotent
+  by name; names validated. (Semantic objects live in the workspace semantic doc, so
+  they're outside the model's single-undo group — expected.)
+- **Context** (`context.ts`): now includes a semantic-layer summary + subject areas, so
+  the AI references existing objects instead of duplicating (and no longer reasons that
+  "the context does not support semantic layer"). A prompt rule states semantic / subject
+  area / schema / view / … actions are available at ANY modeling level.
+- 344 TS tests (+5: semantic + model-object Copilot execute tests); tsc/build/cargo clean.
+- Still Copilot-only-create (no update/delete) for these new object types — the
+  high-value path; deeper edit/delete actions are a follow-up if needed.
+
 ## 2026-10-11 — Copilot can create subject areas (closing a reported gap)
 
 Reported: the Copilot refused "create a subject area" — the model/store/Explorer supported

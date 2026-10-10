@@ -20,6 +20,12 @@ See the top DECISIONS entries:
   convenience. Store op `addEntityToSubjectArea`. **Copilot** has a matching
   `create_subject_area` action (by table names or product/family code; reviewed/approved
   like other actions).
+- **Copilot action parity:** the Copilot can now also create **semantic-layer** objects
+  (`create_term`/`create_dimension`/`create_metric`) and all remaining model objects
+  (`create_schema`/`create_view`/`create_index`/`create_sequence`/`create_domain`/
+  `create_check_constraint`/`set_stereotype`) — all through the existing store/semantic
+  ops, reviewed + approved, one undo group for model actions. Context now summarizes the
+  semantic layer. Create-only for the new types (update/delete deferred).
 - **Req 22 (Fusion Cloud, offline/mock):** `oracle-fusion` mock connector (Financials),
   `mapFusionType`, `fusionSnapshotToModel`, `metadata.fusion` (REST resources + extract
   data stores), `source.apiVersion`, connector-generic Connections UI ("+ Oracle Fusion

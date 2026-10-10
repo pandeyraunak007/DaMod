@@ -6,11 +6,13 @@
 // is untouched.
 
 import { useModelStore } from "../store/modelStore";
+import { useWorkspaceStore } from "../store/workspaceStore";
 import { validateIdentifier } from "../model/identifiers";
 import { validateWorkspace } from "../validation/rules";
 import type { Entity, Field, Model } from "../model/model";
 import type { CopilotAction, CopilotPlan } from "./actions";
-import type { DataTypeKind } from "../model/dataTypes";
+import { type DataTypeKind, withTypeDefaults } from "../model/dataTypes";
+import { newTerm, newDimension, newMetric } from "../semantic/semantic";
 
 export interface ActionResult {
   action: CopilotAction;
@@ -166,6 +168,124 @@ function applyAction(action: CopilotAction): ActionResult {
       if (action.description) store.updateSubjectArea(id, { description: action.description });
       const note = unknown.length ? ` (${unknown.length} unknown table(s) skipped: ${unknown.join(", ")})` : "";
       return ok(`Created subject area “${action.name}” with ${ids.length} table(s)${note}`);
+    }
+
+    case "create_schema": {
+      if (validateIdentifier(action.name)) return fail(`“${action.name}”: invalid name`);
+      if ((model().schemas ?? []).some((s) => s.name.toLowerCase() === action.name.toLowerCase())) {
+        return skip(`schema “${action.name}” already exists`);
+      }
+      const id = store.createSchema();
+      store.updateSchema(id, { name: action.name, ...(action.owner ? { owner: action.owner } : {}), ...(action.comment ? { comment: action.comment } : {}) });
+      return ok(`Created schema “${action.name}”`);
+    }
+
+    case "create_view": {
+      if (validateIdentifier(action.name)) return fail(`“${action.name}”: invalid name`);
+      if ((model().views ?? []).some((v) => v.name.toLowerCase() === action.name.toLowerCase())) {
+        return skip(`view “${action.name}” already exists`);
+      }
+      const id = store.createView(undefined, action.materialized);
+      store.updateView(id, { name: action.name, ...(action.definition ? { definition: action.definition } : {}) });
+      return ok(`Created ${action.materialized ? "materialized view" : "view"} “${action.name}”`);
+    }
+
+    case "create_index": {
+      const e = entityByName(model(), action.entity);
+      if (!e) return fail(`Entity “${action.entity}” not found`);
+      const id = store.createIndex(e.id);
+      if (!id) return fail("could not create index");
+      const cols = (action.columns ?? [])
+        .map((c) => fieldByName(e, c)?.id)
+        .filter((x): x is string => !!x);
+      store.updateIndex(id, { ...(action.name ? { name: action.name } : {}), fields: cols, unique: action.unique ?? false });
+      return ok(`Created index on ${action.entity} (${cols.length} column(s))`);
+    }
+
+    case "create_sequence": {
+      if (validateIdentifier(action.name)) return fail(`“${action.name}”: invalid name`);
+      if ((model().sequences ?? []).some((s) => s.name.toLowerCase() === action.name.toLowerCase())) {
+        return skip(`sequence “${action.name}” already exists`);
+      }
+      const id = store.createSequence();
+      store.updateSequence(id, { name: action.name, ...(action.start !== undefined ? { start: action.start } : {}), ...(action.increment !== undefined ? { increment: action.increment } : {}) });
+      return ok(`Created sequence “${action.name}”`);
+    }
+
+    case "create_domain": {
+      if (validateIdentifier(action.name)) return fail(`“${action.name}”: invalid name`);
+      if ((model().domains ?? []).some((d) => d.name.toLowerCase() === action.name.toLowerCase())) {
+        return skip(`domain “${action.name}” already exists`);
+      }
+      const id = store.createDomain();
+      store.updateDomain(id, { name: action.name, ...(action.type ? withTypeDefaults(action.type as DataTypeKind) : {}) });
+      return ok(`Created domain “${action.name}”`);
+    }
+
+    case "create_check_constraint": {
+      const e = entityByName(model(), action.entity);
+      if (!e) return fail(`Entity “${action.entity}” not found`);
+      if (!action.expression.trim()) return fail("check constraint needs an expression");
+      const cid = store.addCheck(e.id);
+      if (!cid) return fail("could not add check constraint");
+      store.updateCheck(e.id, cid, { ...(action.name ? { name: action.name } : {}), expression: action.expression });
+      return ok(`Added check constraint on ${action.entity}`);
+    }
+
+    case "set_stereotype": {
+      const e = entityByName(model(), action.entity);
+      if (!e) return fail(`Entity “${action.entity}” not found`);
+      store.updateEntity(e.id, { stereotype: action.stereotype === "none" ? undefined : action.stereotype });
+      return ok(`Set ${action.entity} stereotype to ${action.stereotype}`);
+    }
+
+    case "create_term": {
+      const ws = useWorkspaceStore.getState();
+      if (ws.semantic.terms.some((t) => t.name.toLowerCase() === action.name.toLowerCase())) {
+        return skip(`term “${action.name}” already exists`);
+      }
+      const term = newTerm(action.name);
+      term.definition = action.definition ?? "";
+      if (action.synonyms?.length) term.synonyms = action.synonyms;
+      ws.addTerm(term);
+      return ok(`Created business term “${action.name}”`);
+    }
+
+    case "create_dimension": {
+      const ws = useWorkspaceStore.getState();
+      if (ws.semantic.dimensions.some((d) => d.name.toLowerCase() === action.name.toLowerCase())) {
+        return skip(`dimension “${action.name}” already exists`);
+      }
+      const dim = newDimension(action.name);
+      if (action.description) dim.description = action.description;
+      if (action.entity) {
+        const e = entityByName(model(), action.entity);
+        if (e) dim.entity = { model: model().id, entity: e.id };
+      }
+      ws.addDimension(dim);
+      return ok(`Created dimension “${action.name}”`);
+    }
+
+    case "create_metric": {
+      const ws = useWorkspaceStore.getState();
+      if (ws.semantic.metrics.some((m) => m.name.toLowerCase() === action.name.toLowerCase())) {
+        return skip(`metric “${action.name}” already exists`);
+      }
+      const metric = newMetric(action.name);
+      if (action.aggregate) metric.aggregate = action.aggregate;
+      if (action.description) metric.description = action.description;
+      if (action.entity) {
+        const e = entityByName(model(), action.entity);
+        if (e) {
+          metric.grain = { model: model().id, entity: e.id };
+          if (action.field) {
+            const f = fieldByName(e, action.field);
+            if (f) metric.field = { model: model().id, entity: e.id, field: f.id };
+          }
+        }
+      }
+      ws.addMetric(metric);
+      return ok(`Created metric “${action.name}”`);
     }
 
     case "delete_entity": {

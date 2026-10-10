@@ -26,6 +26,16 @@ Action is one of:
 - { "kind": "update_attribute", "entity": string, "field": string, "newName"?: string, "type"?: type, "primaryKey"?: boolean, "unique"?: boolean, "nullable"?: boolean }   // change/rename a column
 - { "kind": "rename_entity", "entity": string, "newName": string }
 - { "kind": "create_subject_area", "name": string, "description"?: string, "tables"?: string[], "product"?: string }   // group tables into a named subject area; "tables" are entity names, or give a "product"/family code (e.g. "AP", "Financials") to auto-include its tables. Level-agnostic.
+- { "kind": "create_schema", "name": string, "owner"?: string, "comment"?: string }   // a database schema (physical)
+- { "kind": "create_view", "name": string, "definition"?: string, "materialized"?: boolean }   // a (materialized) view; definition is raw SQL
+- { "kind": "create_index", "entity": string, "name"?: string, "columns"?: string[], "unique"?: boolean }   // index over an entity's columns
+- { "kind": "create_sequence", "name": string, "start"?: number, "increment"?: number }
+- { "kind": "create_domain", "name": string, "type"?: type }   // a reusable named type
+- { "kind": "create_check_constraint", "entity": string, "name"?: string, "expression": string }   // table CHECK, e.g. expression "total >= 0"
+- { "kind": "set_stereotype", "entity": string, "stereotype": "fact"|"dimension"|"none" }   // dimensional role
+- { "kind": "create_term", "name": string, "definition"?: string, "synonyms"?: string[] }   // SEMANTIC LAYER: a business term/glossary entry
+- { "kind": "create_dimension", "name": string, "description"?: string, "entity"?: string }   // SEMANTIC LAYER: an analysis dimension, optionally bound to an entity
+- { "kind": "create_metric", "name": string, "aggregate"?: "sum"|"count"|"count_distinct"|"avg"|"min"|"max", "entity"?: string, "field"?: string, "description"?: string }   // SEMANTIC LAYER: a measure, e.g. sum of Order.total
 - { "kind": "delete_entity", "entity": string }
 - { "kind": "delete_attribute", "entity": string, "field": string }
 - { "kind": "delete_relationship", "parent": string, "child": string }
@@ -34,7 +44,8 @@ Rules:
 - Reference existing objects by their exact name from the context.
 - Entity/field names must be valid identifiers (letters, digits, underscore; not starting with a digit).
 - Do NOT invent uniqueness/mandatory/business rules unless the user asked or it is an obvious key; put any guess in "assumptions".
-- Only use the modeling terminology shown in the context's level.
+- Only use the modeling terminology shown in the context's level for TABLE/COLUMN edits.
+- Semantic-layer actions (create_term/create_dimension/create_metric) and subject areas, schemas, views, indexes, sequences, domains and check constraints are available at ANY modeling level — use them when asked.
 - Keep the plan minimal and grounded in the given model; do not reference objects that are not in the context.`;
 
 export interface PlanRequestResult {

@@ -74,6 +74,71 @@ const zCreateSubjectArea = z.object({
   product: z.string().optional(),
 });
 
+// ---- other physical/logical model objects (Req 19/21/22) -------------------
+const zCreateSchema = z.object({
+  kind: z.literal("create_schema"),
+  name: z.string(),
+  owner: z.string().optional(),
+  comment: z.string().optional(),
+});
+const zCreateView = z.object({
+  kind: z.literal("create_view"),
+  name: z.string(),
+  definition: z.string().optional(),
+  materialized: z.boolean().optional(),
+});
+const zCreateIndex = z.object({
+  kind: z.literal("create_index"),
+  entity: z.string(),
+  name: z.string().optional(),
+  columns: z.array(z.string()).optional(), // column names on the entity
+  unique: z.boolean().optional(),
+});
+const zCreateSequence = z.object({
+  kind: z.literal("create_sequence"),
+  name: z.string(),
+  start: z.number().optional(),
+  increment: z.number().optional(),
+});
+const zCreateDomain = z.object({
+  kind: z.literal("create_domain"),
+  name: z.string(),
+  type: z.enum(DATA_TYPE_KINDS as unknown as [string, ...string[]]).optional(),
+});
+const zCreateCheckConstraint = z.object({
+  kind: z.literal("create_check_constraint"),
+  entity: z.string(),
+  name: z.string().optional(),
+  expression: z.string(),
+});
+const zSetStereotype = z.object({
+  kind: z.literal("set_stereotype"),
+  entity: z.string(),
+  stereotype: z.enum(["fact", "dimension", "none"]),
+});
+
+// ---- semantic layer (FR-7 / Req 19) -----------------------------------------
+const zCreateTerm = z.object({
+  kind: z.literal("create_term"),
+  name: z.string(),
+  definition: z.string().optional(),
+  synonyms: z.array(z.string()).optional(),
+});
+const zCreateDimension = z.object({
+  kind: z.literal("create_dimension"),
+  name: z.string(),
+  description: z.string().optional(),
+  entity: z.string().optional(), // bind to this entity when given
+});
+const zCreateMetric = z.object({
+  kind: z.literal("create_metric"),
+  name: z.string(),
+  aggregate: z.enum(["sum", "count", "count_distinct", "avg", "min", "max"]).optional(),
+  entity: z.string().optional(), // grain + field owner
+  field: z.string().optional(), // measured column (with entity)
+  description: z.string().optional(),
+});
+
 const zDeleteEntity = z.object({ kind: z.literal("delete_entity"), entity: z.string() });
 const zDeleteAttribute = z.object({
   kind: z.literal("delete_attribute"),
@@ -94,6 +159,16 @@ export const zAction = z.discriminatedUnion("kind", [
   zUpdateAttribute,
   zRenameEntity,
   zCreateSubjectArea,
+  zCreateSchema,
+  zCreateView,
+  zCreateIndex,
+  zCreateSequence,
+  zCreateDomain,
+  zCreateCheckConstraint,
+  zSetStereotype,
+  zCreateTerm,
+  zCreateDimension,
+  zCreateMetric,
   zDeleteEntity,
   zDeleteAttribute,
   zDeleteRelationship,
@@ -131,15 +206,25 @@ export function planMutates(plan: CopilotPlan): boolean {
 
 /** Whether a plan needs explicit approval vs review-and-apply (§14.9). Bulk or
  *  structural changes require approval; a few description edits are low-risk. */
+const STRUCTURAL = new Set([
+  "create_entity",
+  "create_relationship",
+  "rename_entity",
+  "create_subject_area",
+  "create_schema",
+  "create_view",
+  "create_index",
+  "create_sequence",
+  "create_domain",
+  "create_check_constraint",
+  "set_stereotype",
+  "create_term",
+  "create_dimension",
+  "create_metric",
+]);
 export function requiresApproval(plan: CopilotPlan): boolean {
   const mutating = plan.actions.length;
-  const structural = plan.actions.some(
-    (a) =>
-      a.kind === "create_entity" ||
-      a.kind === "create_relationship" ||
-      a.kind === "rename_entity" ||
-      a.kind === "create_subject_area",
-  );
+  const structural = plan.actions.some((a) => STRUCTURAL.has(a.kind));
   return structural || plan.actions.some(isDestructive) || mutating > 5;
 }
 
