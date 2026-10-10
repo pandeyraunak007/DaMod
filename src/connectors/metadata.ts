@@ -134,11 +134,57 @@ const zSourceIdentity = z.object({
   ebsInstance: z.string().optional(),
 });
 
+/** Kinds of Oracle program unit surfaced in EBS application metadata (Req 21 §3C). */
+export const PROGRAM_UNIT_KINDS = [
+  "package",
+  "package-body",
+  "procedure",
+  "function",
+  "trigger",
+  "synonym",
+  "type",
+] as const;
+export type ProgramUnitKind = (typeof PROGRAM_UNIT_KINDS)[number];
+
+const zConcurrentProgram = z.object({
+  shortName: z.string(),
+  name: z.string(),
+  product: z.string(),
+  description: z.string().optional(),
+});
+const zLookup = z.object({
+  type: z.string(),
+  product: z.string(),
+  description: z.string().optional(),
+});
+const zProgramUnit = z.object({
+  name: z.string(),
+  kind: z.enum(PROGRAM_UNIT_KINDS),
+  schema: z.string(),
+  product: z.string().optional(),
+  description: z.string().optional(),
+});
+
+/** EBS application-dictionary metadata (Req 21 §3C/§4) — discovered from the FND
+ *  dictionary / eTRM, NOT from standard Oracle catalog views. These are reference
+ *  facts (not editable model objects), stored on the snapshot and shown read-only. */
+export const zEbsApplication = z.object({
+  concurrentPrograms: z.array(zConcurrentProgram).default([]),
+  lookups: z.array(zLookup).default([]),
+  programUnits: z.array(zProgramUnit).default([]),
+});
+export type EbsApplication = z.infer<typeof zEbsApplication>;
+export type ConcurrentProgram = z.infer<typeof zConcurrentProgram>;
+export type EbsLookup = z.infer<typeof zLookup>;
+export type ProgramUnit = z.infer<typeof zProgramUnit>;
+
 export const zCanonicalMetadata = z.object({
   metadataVersion: z.literal(METADATA_VERSION),
   source: zSourceIdentity,
   capabilities: z.array(z.enum(CAPABILITIES as unknown as [string, ...string[]])).default([]),
   catalogs: z.array(zCatalog),
+  /** EBS application-dictionary metadata (optional; present for oracle-ebs sources). */
+  application: zEbsApplication.optional(),
 });
 export type CanonicalMetadata = z.infer<typeof zCanonicalMetadata>;
 

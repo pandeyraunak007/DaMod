@@ -5,6 +5,27 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-10 — Req 21 Phase 3 (offline): EBS application-dictionary metadata
+
+EBS application metadata (which product owns a table, concurrent programs, lookups,
+program units) is NOT in Oracle catalog views — it comes from the FND dictionary / eTRM.
+Modeled it as discovery facts on the snapshot, NOT as model tables (§11 separation).
+
+- **Contract:** optional `metadata.application` = { concurrentPrograms, lookups,
+  programUnits (package/package-body/procedure/function/trigger/synonym/type) }.
+  Backward-compatible; absent for non-EBS sources.
+- **Fixed a Phase-1 serialization bug:** `snapshot.metadataToPlain` had silently dropped
+  `source.ebsRelease`/`ebsInstance` and FK `provenance`/`confidence` when persisting a
+  snapshot (violating §11/§7). Now serialized deterministically alongside the new
+  `application` block; byte-identical round-trip test added.
+- **Mock** populates an eTRM-style AP+GL application dictionary; `ebsApplicationSummary`
+  counts it; the reverse-engineer preview shows the counts (read-only). Program units /
+  concurrent programs are **never turned into entities** (tested).
+- **Why not in the EBS Explorer:** the Explorer is model-scoped and §11 says keep source
+  metadata separate from the model. So app metadata is shown at discovery time + lives in
+  the snapshot; a snapshot browser for an imported model is deferred.
+- No new deps, no Rust. 307 TS tests (+4); tsc/build/cargo clean.
+
 ## 2026-10-10 — Req 21 Phase 2 (do-now 3): connector-generic Connections UI for EBS
 
 Made the whole EBS path reachable in the app (previously the `oracle-ebs` connector was

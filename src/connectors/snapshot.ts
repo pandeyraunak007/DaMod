@@ -74,7 +74,11 @@ function metadataToPlain(md: CanonicalMetadata): Record<string, unknown> {
     name: md.source.name,
   };
   if (md.source.productVersion) source.productVersion = md.source.productVersion;
-  return {
+  // EBS identity is part of the stable snapshot content (Req 21 §11) — kept
+  // separate from the DB version.
+  if (md.source.ebsRelease) source.ebsRelease = md.source.ebsRelease;
+  if (md.source.ebsInstance) source.ebsInstance = md.source.ebsInstance;
+  const out: Record<string, unknown> = {
     metadataVersion: md.metadataVersion,
     source,
     capabilities: [...md.capabilities].sort(),
@@ -98,6 +102,8 @@ function metadataToPlain(md: CanonicalMetadata): Record<string, unknown> {
               f.refColumns = [...fk.refColumns];
               if (fk.onDelete) f.onDelete = fk.onDelete;
               if (fk.onUpdate) f.onUpdate = fk.onUpdate;
+              if (fk.provenance) f.provenance = fk.provenance;
+              if (fk.confidence !== undefined) f.confidence = fk.confidence;
               return f;
             });
           o.indexes = [...obj.indexes]
@@ -111,6 +117,36 @@ function metadataToPlain(md: CanonicalMetadata): Record<string, unknown> {
       })),
     })),
   };
+
+  // EBS application-dictionary metadata (Req 21 §3C) — deterministic, omit-empty.
+  const app = md.application;
+  if (app && (app.concurrentPrograms.length || app.lookups.length || app.programUnits.length)) {
+    out.application = {
+      concurrentPrograms: [...app.concurrentPrograms]
+        .sort((a, b) => a.shortName.localeCompare(b.shortName))
+        .map((p) => {
+          const r: Record<string, unknown> = { shortName: p.shortName, name: p.name, product: p.product };
+          if (p.description) r.description = p.description;
+          return r;
+        }),
+      lookups: [...app.lookups]
+        .sort((a, b) => a.type.localeCompare(b.type))
+        .map((l) => {
+          const r: Record<string, unknown> = { type: l.type, product: l.product };
+          if (l.description) r.description = l.description;
+          return r;
+        }),
+      programUnits: [...app.programUnits]
+        .sort((a, b) => `${a.schema}.${a.name}`.localeCompare(`${b.schema}.${b.name}`))
+        .map((u) => {
+          const r: Record<string, unknown> = { name: u.name, kind: u.kind, schema: u.schema };
+          if (u.product) r.product = u.product;
+          if (u.description) r.description = u.description;
+          return r;
+        }),
+    };
+  }
+  return out;
 }
 
 /**

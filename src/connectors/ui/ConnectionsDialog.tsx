@@ -7,7 +7,7 @@ import type { ConnectionProfile } from "../connection";
 import { getConnector } from "../registry";
 import { pgTestConnection, secretStore } from "../postgres/postgresConnector";
 import { metadataToModel, type ToModelResult } from "../toModel";
-import { ebsSnapshotToModel } from "../oracle/ebs";
+import { ebsSnapshotToModel, ebsApplicationSummary } from "../oracle/ebs";
 import { computeDrift, applyDrift, type DriftChange } from "../drift";
 import type { ModelDiff } from "../../export/migrate";
 import type { Model } from "../../model/model";
@@ -27,6 +27,23 @@ function buildModel(p: ConnectionProfile, md: CanonicalMetadata, name: string, n
 
 function isEbs(p: ConnectionProfile): boolean {
   return p.systemType === "oracle-ebs";
+}
+
+// Read-only EBS application-dictionary counts in the reverse-engineer preview
+// (Req 21 §3C). These are discovery facts kept on the snapshot, not modeled objects.
+function EbsApplicationLine({ metadata }: { metadata: CanonicalMetadata }) {
+  const s = ebsApplicationSummary(metadata);
+  if (!s.concurrentPrograms && !s.lookups && !s.programUnits) return null;
+  const units = Object.entries(s.programUnitsByKind)
+    .map(([k, n]) => `${n} ${k}${n === 1 ? "" : "s"}`)
+    .join(", ");
+  return (
+    <p className="field__hint">
+      EBS application metadata: <strong>{s.concurrentPrograms}</strong> concurrent programs ·{" "}
+      <strong>{s.lookups}</strong> lookups · <strong>{s.programUnits}</strong> program units
+      {units ? ` (${units})` : ""}. Stored with the snapshot; not imported as model tables.
+    </p>
+  );
 }
 
 function buildSnapshot(connectionRef: string, d: DiscoveryResult): SourceSnapshot {
@@ -429,6 +446,7 @@ function ReversePanel({
                 </>
               )}
             </p>
+            {discovery && isEbs(profile) && <EbsApplicationLine metadata={discovery.metadata} />}
             {preview.warnings.length > 0 && (
               <details>
                 <summary className="field__hint">{preview.warnings.length} note(s)</summary>

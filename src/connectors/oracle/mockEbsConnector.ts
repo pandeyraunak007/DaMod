@@ -14,7 +14,7 @@ import type {
   DiscoveryResult,
 } from "../connector";
 import type { ConnectionProfile } from "../connection";
-import type { CanonicalColumn, CanonicalMetadata, CanonicalObject } from "../metadata";
+import type { CanonicalColumn, CanonicalMetadata, CanonicalObject, EbsApplication } from "../metadata";
 import { mapOracleType } from "./oracleTypes";
 import type { EbsAnnotation } from "./ebs";
 
@@ -158,6 +158,28 @@ function fixtureSchemas(): { name: string; objects: CanonicalObject[] }[] {
   ];
 }
 
+// EBS application-dictionary metadata (FND / eTRM), not visible in Oracle catalog
+// views — concurrent programs, lookups, and database program units per product.
+function fixtureApplication(): EbsApplication {
+  return {
+    concurrentPrograms: [
+      { shortName: "APXINWKB", name: "Invoice Workbench", product: "AP", description: "Enter and manage supplier invoices." },
+      { shortName: "APXPAWKB", name: "Payments Workbench", product: "AP" },
+      { shortName: "GLXJEENT", name: "Enter Journals", product: "GL", description: "Enter General Ledger journal entries." },
+    ],
+    lookups: [
+      { type: "INVOICE TYPE", product: "AP", description: "Standard, Credit Memo, Prepayment, …" },
+      { type: "JE SOURCE", product: "GL" },
+    ],
+    programUnits: [
+      { name: "AP_INVOICES_PKG", kind: "package", schema: "APPS", product: "AP", description: "Invoice validation and accounting." },
+      { name: "AP_WEB_OA_UTIL_PKG", kind: "package", schema: "APPS", product: "AP" },
+      { name: "GL_JOURNAL_IMPORT_PKG", kind: "package", schema: "APPS", product: "GL" },
+      { name: "AP_INVOICES", kind: "synonym", schema: "APPS", product: "AP", description: "Public synonym for AP.AP_INVOICES_ALL." },
+    ],
+  };
+}
+
 /** The fixture as a standalone canonical snapshot — also an importable offline
  *  metadata package (Req 21 §3C/§10: offline modeling from imported metadata). */
 export function ebsMockMetadata(database = "VIS"): CanonicalMetadata {
@@ -172,6 +194,7 @@ export function ebsMockMetadata(database = "VIS"): CanonicalMetadata {
     },
     capabilities: [...CAPS],
     catalogs: [{ name: database, schemas: fixtureSchemas() }],
+    application: fixtureApplication(),
   };
 }
 

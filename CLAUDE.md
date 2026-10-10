@@ -9,12 +9,11 @@
 
 ## NEXT SESSION — START HERE
 
-**Current status:** Branch `main`. Pushed: `fcfb760` (Req 21 Phase 2 do-now 2), `8c546b6`
-(do-now 1), `1769aaa` (Phase 1), Reqs 17–20 in `36adff3`. **Req 21 Phase 2 do-now item 3
-(connector-generic Connections UI for EBS) just landed — uncommitted in the working
-tree.** Author commits/pushes explicitly, do not commit or push unless asked. **303 TS
-tests pass · typecheck clean · `npm run build` clean · `cargo build` clean.** See the top
-DECISIONS entries:
+**Current status:** Branch `main`. Pushed: `a0f14c1` (Req 21 Phase 2 do-now 3) and the
+rest of Phase 1/2, Reqs 17–20. **Req 21 Phase 3 (offline EBS application-dictionary
+metadata) just landed — uncommitted in the working tree.** Author commits/pushes
+explicitly, do not commit or push unless asked. **307 TS tests pass · typecheck clean ·
+`npm run build` clean · `cargo build` clean.** See the top DECISIONS entries:
 - **Req 21 (Phase 1)** — Oracle **EBS offline/mock** foundation (no live driver, no Rust,
   no deps): mock `oracle-ebs` connector + eTRM-style fixture, `mapOracleType`,
   `ebsSnapshotToModel` (reuses `metadataToModel`), FK provenance/confidence + EBS release
@@ -50,7 +49,8 @@ driver trade-off + roadmap). Phase 2 has a **driver-gated track** and a **do-now
    EBS-specific editor, Test (EBS release + DB version), reverse-engineer (EBS-enriched),
    refresh & compare. The whole mock EBS path is now reachable end-to-end in the app.
 
-**The do-now track is complete.** Remaining Req 21 work is driver-gated or later-phase:
+**Do-now track + Phase 3 (offline app-dictionary metadata) are complete.** Remaining
+Req 21 work is driver-gated or later-phase:
 - **Live Oracle adapter (needs driver sign-off + an Oracle instance):** pick the driver
   (trade-off in `docs/ORACLE_EBS.md`), document in DECISIONS, then mirror `pg.rs` →
   Oracle catalog-view discovery; register it for `oracle`/`oracle-ebs`. A gated

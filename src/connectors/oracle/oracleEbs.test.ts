@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { mapOracleType } from "./oracleTypes";
 import { createMockEbsConnector, ebsMockMetadata } from "./mockEbsConnector";
-import { ebsSnapshotToModel, ebsAnnotation } from "./ebs";
+import { ebsSnapshotToModel, ebsAnnotation, ebsApplicationSummary } from "./ebs";
 import { parseMetadata, allObjects } from "../metadata";
+import { serializeMetadata } from "../snapshot";
 import { computeDrift } from "../drift";
 import { getConnector } from "../registry";
 import { serializeModel } from "../../persist/serialize";
@@ -118,5 +119,40 @@ describe("EBS reverse-engineering → model (Req 21 §6)", () => {
     const a = ebsAnnotation(obj)!;
     expect(a.product).toBe("AP");
     expect(a.verified).toBe(true);
+  });
+});
+
+describe("EBS application-dictionary metadata (Req 21 §3C / Phase 3)", () => {
+  it("discovers concurrent programs, lookups and program units", () => {
+    const sum = ebsApplicationSummary(ebsMockMetadata());
+    expect(sum.concurrentPrograms).toBe(3);
+    expect(sum.lookups).toBe(2);
+    expect(sum.programUnits).toBe(4);
+    expect(sum.programUnitsByKind).toEqual({ package: 3, synonym: 1 });
+  });
+
+  it("snapshot serialization now preserves EBS release, FK provenance and app metadata", () => {
+    const once = serializeMetadata(ebsMockMetadata());
+    // Previously dropped by metadataToPlain — now present (§11/§7 fix).
+    expect(once).toContain('"ebsRelease": "12.2.9"');
+    expect(once).toContain('"ebsInstance": "VIS"');
+    expect(once).toContain('"provenance": "ebs-metadata"');
+    expect(once).toContain('"confidence": 0.95');
+    expect(once).toContain('"concurrentPrograms"');
+    expect(once).toContain('"APXINWKB"');
+  });
+
+  it("round-trips the full snapshot metadata byte-identically", () => {
+    const once = serializeMetadata(ebsMockMetadata());
+    const parsed = parseMetadata(JSON.parse(once));
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) expect(serializeMetadata(parsed.value)).toBe(once);
+  });
+
+  it("application metadata is NOT turned into model tables (§11 separation)", () => {
+    const { model } = ebsSnapshotToModel(ebsMockMetadata(), "EBS", "2026-01-01T00:00:00Z");
+    // Program units / concurrent programs never become entities.
+    expect(model.entities.some((e) => e.name === "AP_INVOICES_PKG")).toBe(false);
+    expect(model.entities.some((e) => e.name === "APXINWKB")).toBe(false);
   });
 });

@@ -52,6 +52,27 @@ export function ebsProducts(md: CanonicalMetadata): EbsProduct[] {
   return [...byCode.values()].sort((x, y) => x.code.localeCompare(y.code));
 }
 
+export interface EbsApplicationSummary {
+  concurrentPrograms: number;
+  lookups: number;
+  programUnits: number;
+  /** Program-unit counts by kind (package/procedure/trigger/synonym/…). */
+  programUnitsByKind: Record<string, number>;
+}
+
+/** Counts of the EBS application-dictionary metadata in a discovery (Req 21 §3C). */
+export function ebsApplicationSummary(md: CanonicalMetadata): EbsApplicationSummary {
+  const app = md.application;
+  const byKind: Record<string, number> = {};
+  for (const u of app?.programUnits ?? []) byKind[u.kind] = (byKind[u.kind] ?? 0) + 1;
+  return {
+    concurrentPrograms: app?.concurrentPrograms.length ?? 0,
+    lookups: app?.lookups.length ?? 0,
+    programUnits: app?.programUnits.length ?? 0,
+    programUnitsByKind: byKind,
+  };
+}
+
 export interface EbsToModelResult extends ToModelResult {
   products: EbsProduct[];
 }

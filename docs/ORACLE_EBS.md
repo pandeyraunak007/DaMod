@@ -36,7 +36,8 @@ snapshot, awaits the live driver · **Live** = needs an accessible Oracle/EBS in
 | Live connection + permission checks | **Live / Deferred** | Needs the Rust Oracle driver + instance. Contract method `testConnection` exists (mock). |
 | DB object discovery (tables/cols/keys/indexes/views) | **Mock → Live** | Canonical shapes support all of these; live catalog-view queries (`ALL_TAB_COLUMNS`, `ALL_CONSTRAINTS`, `ALL_CONS_COLUMNS`, `ALL_INDEXES`, `ALL_VIEWS`) are deferred to the driver. |
 | Packages/procedures/functions/triggers/synonyms/types | **Deferred** | Needs the live driver + new canonical object kinds (Phase 2/3). |
-| EBS application dictionary (products, concurrent programs, lookups) | **Imported / Live** | Modeled via `native.ebs` today; full dictionary discovery (FND_* / eTRM) is Phase 3. |
+| EBS application dictionary (products, concurrent programs, lookups, program units) | **Done (mock)** | Products via `native.ebs`; concurrent programs / lookups / program units (packages/procedures/triggers/synonyms/types) carried on `metadata.application`, discovered by the mock, counted in the reverse preview (`ebsApplicationSummary`), persisted in the snapshot. Kept OUT of the model (they're not tables, §11). Live FND discovery awaits the Oracle adapter. |
+| Snapshot preserves EBS release + FK provenance + app metadata | **Done** | Fixed `metadataToPlain` (had silently dropped `ebsRelease`/`ebsInstance` and FK `provenance`/`confidence`); now serializes them + the `application` block deterministically, byte-identical round-trip. |
 | EBS-aware Model Explorer view | **Done** | `EbsExplorer` — Model/EBS toggle (shown when the active model has EBS provenance); groups discovered tables by **product** or **schema** with counts, search, expand/collapse, click-to-reveal; scoped to the active tab; read-only. |
 | EBS provenance in Properties Inspector | **Done** | Entity General tab shows a read-only discovery-source block (system/product/schema/nativeId/provenance/confidence), labelled verified-vs-inferred. Full EBS-specific property panels are Phase 3. |
 | Source-identifier provenance on model objects | **Done** | `Entity.source` ({system, schema, nativeId, product, provenance, confidence}); set by `metadataToModel` for all connectors, enriched for EBS; serialize + Zod optional, round-trips. |
@@ -76,9 +77,12 @@ Document the final choice here and in `DECISIONS.md` before adding any dependenc
   Connections UI** — create/test/reverse/refresh an `oracle-ebs` (mock) connection
   end-to-end. *Remaining (driver-gated):* live DB discovery via the Rust Oracle adapter
   and reverse-engineering selected tables from a live instance.
-- **Phase 3** — EBS application awareness: FND dictionary, product↔object association,
-  documented relationships, concurrent programs/lookups; new canonical object kinds
-  (packages/procedures/functions/triggers/synonyms/types).
+- **Phase 3** — EBS application awareness: *DONE (mock/offline):* `metadata.application`
+  (concurrent programs, lookups, program units) discovered by the mock, surfaced in the
+  reverse preview, persisted in the snapshot; snapshot serialization fixed to keep EBS
+  release + FK provenance. *Remaining:* live FND/eTRM discovery (driver-gated), and a
+  snapshot browser showing app metadata for an already-imported model (per §11 app
+  metadata is shown at discovery time, not grafted into the model).
 - **Phase 4** — logical/conceptual generation; snapshot compare/refresh UX that never
   overwrites manual edits (the diff engine already keys by name).
 - **Phase 5** — Copilot EBS context (scoped to instance/product/schema/objects; cites
