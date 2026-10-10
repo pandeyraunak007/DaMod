@@ -44,19 +44,20 @@ afterEach(() => {
 });
 
 describe("level-aware field editor", () => {
-  it("hides the physical type select and SQL default at Conceptual", () => {
+  it("hides the physical type/params/default columns at Conceptual", () => {
     mountAt("Conceptual");
-    expect(container.textContent).not.toContain("Default (SQL)");
-    // No physical data-type option like "decimal" is offered at Conceptual.
+    // The compact grid drops physical columns at Conceptual.
+    expect(container.textContent).not.toContain("Params");
     const options = [...container.querySelectorAll("option")].map((o) => o.textContent);
     expect(options).not.toContain("decimal");
   });
 
-  it("shows the full physical editor at Physical", () => {
+  it("shows the physical grid columns at Physical", () => {
     mountAt("Physical");
-    expect(container.textContent).toContain("Default (SQL)");
+    expect(container.textContent).toContain("Params");
+    expect(container.textContent).toContain("Default");
     const options = [...container.querySelectorAll("option")].map((o) => o.textContent);
-    expect(options).toContain("decimal"); // physical type dropdown present
+    expect(options).toContain("decimal"); // inline physical type dropdown present
   });
 
   it("preserves the hidden physical type in the model at Conceptual (not deleted)", () => {

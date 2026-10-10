@@ -2110,3 +2110,72 @@ body,
   min-height: 0;
 }
 .copilot { width: 100%; height: 100%; }
+
+/* ---- Req 16 Phase 2: compact column grid ---- */
+.colgrid-wrap { overflow-x: auto; }
+.colgrid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+.colgrid thead th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.25rem 0.3rem;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+}
+.colgrid__row td {
+  padding: 0.12rem 0.3rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.colgrid__row:hover td { background: #f8fafc; }
+.colgrid__row--open td { background: #eef4ff; }
+.colgrid__input {
+  width: 100%;
+  min-width: 70px;
+  padding: 0.18rem 0.3rem;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  font: inherit;
+}
+.colgrid__input:hover { border-color: var(--border-strong); }
+.colgrid__input:focus { border-color: var(--accent); outline: none; background: #fff; }
+.colgrid__name { min-width: 120px; }
+.colgrid__num { width: 46px; padding: 0.15rem 0.2rem; border: 1px solid var(--border-strong); border-radius: 5px; }
+.colgrid__ps { display: inline-flex; gap: 0.2rem; }
+.colgrid__chk { text-align: center; width: 28px; }
+.colgrid__actions { white-space: nowrap; text-align: right; }
+.colgrid__act {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 0.1rem 0.2rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+.colgrid__act:hover:not(:disabled) { background: #e2e8f0; color: var(--text); }
+.colgrid__act:disabled { opacity: 0.3; cursor: default; }
+.colgrid__act--del:hover { background: #fee2e2; color: var(--danger); }
+.colgrid__detail-row td { background: #f8fafc; padding: 0.5rem 0.6rem; }
+.colgrid__detail .field { margin-bottom: 0.5rem; }
+.colgrid__add { margin-top: 0.5rem; }
+
+/* sticky object header + tabs in the properties modal (§2.1) */
+.modal--props .props__head,
+.modal--props .tabs {
+  position: sticky;
+  background: var(--panel);
+  z-index: 2;
+}
+.modal--props .props__head { top: 0; }
+.modal--props .tabs { top: 2.6rem; }

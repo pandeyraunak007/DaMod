@@ -116,10 +116,20 @@ independently collapsible, resizable, and persisted, so the canvas can reclaim s
 - **Verified**: 5 new uiStore tests (independent copilot toggle, width clamping,
   layout presets, persist round-trip of widths+copilotOpen); **230 tests**;
   typecheck + build clean.
-- **Deferred (reported, not done)**: Phase 2 (structured Properties Inspector /
-  compact column grid), Phase 3 (Copilot panel visual redesign + suggested prompts),
-  Phase 4 (deeper inspector↔copilot integration). The level-aware inspector + Copilot
-  review flow already exist from earlier work; this phase was layout only.
+- **Phase 2 (done next):** the Properties modal's Columns/Attributes tab is now a
+  **compact, level-aware column grid** (§2.2) instead of one big expandable card per
+  field. Name/type/params/PK/NN/unique/default edit **inline** in a dense table;
+  type-aware params (length for string, precision+scale for decimal); a `⋯` expander
+  opens a `FieldDetail` row (logical name, domain, role, definition, note, UDP);
+  reorder (↑↓), delete (✕) and + Column via the existing ops. Columns shown adapt to
+  `inspectorCaps` (Conceptual → name + description only; Logical → logical type +
+  keys; Physical → full). Object header + tabs are sticky; the panel scrolls
+  internally. 4 grid interaction tests (inline edit, checkbox toggle, add/delete,
+  detail expand). **234 tests.**
+- **Deferred (reported, not done)**: Phase 3 (Copilot panel visual redesign +
+  suggested-prompt chips), Phase 4 (deeper inspector↔copilot integration). The
+  level-aware inspector, Copilot context scope, privacy status and review/approve/
+  reject flow already exist from earlier work.
 
 ## 2026-10-10 — AI Modeling Copilot (§14) — Stages 1–4 foundation
 

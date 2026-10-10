@@ -175,22 +175,167 @@ function EntityProperties({ entity, onClose }: { entity: Entity; onClose: () => 
   );
 }
 
+// Compact, level-aware column/attribute grid (§2.2). Common properties edit
+// inline in a dense table; clicking a row expands the detail editor for the rest.
+// Columns shown adapt to the active modeling level via inspectorCaps.
 function FieldsTab({ entity }: { entity: Entity }) {
-  const [openId, setOpenId] = useState<string | null>(entity.fields[0]?.id ?? null);
+  const level = useModelStore((s) => s.model.level);
+  const addField = useModelStore((s) => s.addField);
+  const caps = inspectorCaps(level);
+  const terms = levelTerms(level);
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  const cols =
+    1 +
+    (caps.physicalType ? 1 : 0) +
+    (caps.logicalType ? 1 : 0) +
+    (caps.physicalType ? 1 : 0) +
+    (caps.keys ? 3 : 0) +
+    (caps.physicalProps ? 1 : 0) +
+    1;
+
   return (
-    <div>
-      {entity.fields.map((f) => (
-        <div key={f.id} className="props__field">
-          <button className="props__field-head" onClick={() => setOpenId(openId === f.id ? null : f.id)}>
-            <span>{openId === f.id ? "▾" : "▸"}</span>
-            <strong>{f.name}</strong>
-            <span className="field__hint">{f.primaryKey ? "PK" : f.unique ? "unique" : ""}</span>
-          </button>
-          {openId === f.id && <FieldProps entityId={entity.id} field={f} />}
-        </div>
-      ))}
-      {entity.fields.length === 0 && <p className="side__hint">No fields.</p>}
+    <div className="colgrid-wrap">
+      <table className="colgrid">
+        <thead>
+          <tr>
+            <th className="colgrid__name">Name</th>
+            {caps.physicalType && <th>Type</th>}
+            {caps.logicalType && <th>Logical</th>}
+            {caps.physicalType && <th>Params</th>}
+            {caps.keys && <th title="Primary key">PK</th>}
+            {caps.keys && <th title="Not null">NN</th>}
+            {caps.keys && <th title="Unique">U</th>}
+            {caps.physicalProps && <th>Default</th>}
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {entity.fields.map((f, i) => (
+            <ColumnRow
+              key={f.id}
+              entityId={entity.id}
+              field={f}
+              index={i}
+              total={entity.fields.length}
+              caps={caps}
+              cols={cols}
+              open={openId === f.id}
+              onToggle={() => setOpenId(openId === f.id ? null : f.id)}
+            />
+          ))}
+        </tbody>
+      </table>
+      {entity.fields.length === 0 && (
+        <p className="side__hint">No {terms.fieldPlural.toLowerCase()} yet.</p>
+      )}
+      <button className="btn btn--small colgrid__add" onClick={() => addField(entity.id)}>
+        + {terms.field}
+      </button>
     </div>
+  );
+}
+
+function ColumnRow({
+  entityId,
+  field,
+  index,
+  total,
+  caps,
+  cols,
+  open,
+  onToggle,
+}: {
+  entityId: string;
+  field: Field;
+  index: number;
+  total: number;
+  caps: ReturnType<typeof inspectorCaps>;
+  cols: number;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const updateField = useModelStore((s) => s.updateField);
+  const deleteField = useModelStore((s) => s.deleteField);
+  const reorderField = useModelStore((s) => s.reorderField);
+  const patch = (p: Partial<Field>) => updateField(entityId, field.id, p);
+  const shape = field.type ? paramShape(field.type) : "none";
+
+  return (
+    <>
+      <tr className={`colgrid__row ${open ? "colgrid__row--open" : ""}`}>
+        <td className="colgrid__name">
+          <input
+            className="colgrid__input"
+            defaultValue={field.name}
+            onChange={(e) => !validateIdentifier(e.target.value) && patch({ name: e.target.value })}
+          />
+        </td>
+        {caps.physicalType && (
+          <td>
+            <select className="colgrid__input" value={field.type ?? "string"} onChange={(e) => patch({ type: e.target.value as DataTypeKind })}>
+              {DATA_TYPE_KINDS.map((k) => (
+                <option key={k} value={k}>{k}</option>
+              ))}
+            </select>
+          </td>
+        )}
+        {caps.logicalType && (
+          <td>
+            <select className="colgrid__input" value={field.logicalType ?? "Text"} onChange={(e) => patch({ logicalType: e.target.value as LogicalTypeKind })}>
+              {LOGICAL_TYPE_KINDS.map((k) => (
+                <option key={k} value={k}>{k}</option>
+              ))}
+            </select>
+          </td>
+        )}
+        {caps.physicalType && (
+          <td className="colgrid__params">
+            {shape === "length" ? (
+              <input type="number" min={1} className="colgrid__num" value={field.length ?? 255} onChange={(e) => patch({ length: Number(e.target.value) })} />
+            ) : shape === "decimal" ? (
+              <span className="colgrid__ps">
+                <input type="number" min={1} className="colgrid__num" title="precision" value={field.precision ?? 12} onChange={(e) => patch({ precision: Number(e.target.value) })} />
+                <input type="number" min={0} className="colgrid__num" title="scale" value={field.scale ?? 2} onChange={(e) => patch({ scale: Number(e.target.value) })} />
+              </span>
+            ) : (
+              <span className="field__hint">—</span>
+            )}
+          </td>
+        )}
+        {caps.keys && (
+          <>
+            <td className="colgrid__chk">
+              <input type="checkbox" checked={field.primaryKey} title="Primary key" onChange={(e) => patch({ primaryKey: e.target.checked, nullable: e.target.checked ? false : field.nullable })} />
+            </td>
+            <td className="colgrid__chk">
+              <input type="checkbox" checked={!field.nullable} title="Not null" onChange={(e) => patch({ nullable: !e.target.checked })} />
+            </td>
+            <td className="colgrid__chk">
+              <input type="checkbox" checked={field.unique} title="Unique" onChange={(e) => patch({ unique: e.target.checked })} />
+            </td>
+          </>
+        )}
+        {caps.physicalProps && (
+          <td>
+            <input className="colgrid__input" placeholder="—" defaultValue={field.default ?? ""} onChange={(e) => patch({ default: e.target.value || undefined })} />
+          </td>
+        )}
+        <td className="colgrid__actions">
+          <button className="colgrid__act" title="Move up" disabled={index === 0} onClick={() => reorderField(entityId, index, index - 1)}>↑</button>
+          <button className="colgrid__act" title="Move down" disabled={index === total - 1} onClick={() => reorderField(entityId, index, index + 1)}>↓</button>
+          <button className="colgrid__act" title="Details" onClick={onToggle}>{open ? "▾" : "⋯"}</button>
+          <button className="colgrid__act colgrid__act--del" title="Delete" onClick={() => deleteField(entityId, field.id)}>✕</button>
+        </td>
+      </tr>
+      {open && (
+        <tr className="colgrid__detail-row">
+          <td colSpan={cols}>
+            <FieldDetail entityId={entityId} field={field} caps={caps} />
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
@@ -220,71 +365,28 @@ function EntityDdl({ entityId }: { entityId: string }) {
   );
 }
 
-function FieldProps({ entityId, field }: { entityId: string; field: Field }) {
+// The expanded detail for one column — only the properties NOT shown inline in
+// the grid (name/type/params/keys/default are in the row). Level-aware via caps.
+function FieldDetail({ entityId, field, caps }: { entityId: string; field: Field; caps: ReturnType<typeof inspectorCaps> }) {
   const updateField = useModelStore((s) => s.updateField);
   const bindFieldDomain = useModelStore((s) => s.bindFieldDomain);
-  const level = useModelStore((s) => s.model.level);
-  // Default outside the selector (see DomainsDialog) to avoid an infinite loop.
   const domains = useModelStore((s) => s.model.domains) ?? [];
   const patch = (p: Partial<Field>) => updateField(entityId, field.id, p);
-  const shape = field.type ? paramShape(field.type) : "none";
-  const boundDomain = field.domainId ? domains.find((d) => d.id === field.domainId) : undefined;
-
-  // All level-driven visibility comes from the one shared capability object.
-  const caps = inspectorCaps(level);
-  const conceptual = !caps.keys;
-  const showPhysical = caps.physicalType;
-  const showLogical = caps.logicalType;
 
   return (
-    <div className="props__field-body">
-      <div className="attr-row">
-        <input
-          defaultValue={field.name}
-          onChange={(e) => !validateIdentifier(e.target.value) && patch({ name: e.target.value })}
-        />
-        {showPhysical && (
-          <select
-            value={field.type ?? "string"}
-            disabled={!!boundDomain}
-            title={boundDomain ? `Type governed by domain “${boundDomain.name}”` : "Physical type"}
-            onChange={(e) => patch({ type: e.target.value as DataTypeKind })}
-          >
-            {DATA_TYPE_KINDS.map((k) => (
-              <option key={k} value={k}>{k}</option>
-            ))}
-          </select>
-        )}
-        {showLogical && (
-          <select
-            value={field.logicalType ?? "Text"}
-            title="Logical type"
-            onChange={(e) => patch({ logicalType: e.target.value as LogicalTypeKind })}
-          >
-            {LOGICAL_TYPE_KINDS.map((k) => (
-              <option key={k} value={k}>{k}</option>
-            ))}
-          </select>
-        )}
-      </div>
-
+    <div className="colgrid__detail">
       <div className="field">
         <label>Logical / business name</label>
         <input
           defaultValue={field.logicalName ?? ""}
-          placeholder="e.g. Customer ID (shown at Logical/Conceptual levels)"
+          placeholder="e.g. Customer ID (shown at Logical/Conceptual)"
           onChange={(e) => patch({ logicalName: e.target.value || undefined })}
         />
       </div>
-
-      {/* Physical-only: domain binding, type parameters, SQL default, dimensional role. */}
-      {showPhysical && domains.length > 0 && (
+      {caps.physicalProps && domains.length > 0 && (
         <div className="field">
           <label>Domain</label>
-          <select
-            value={field.domainId ?? ""}
-            onChange={(e) => bindFieldDomain(entityId, field.id, e.target.value || null)}
-          >
+          <select value={field.domainId ?? ""} onChange={(e) => bindFieldDomain(entityId, field.id, e.target.value || null)}>
             <option value="">— none (free type) —</option>
             {domains.map((d) => (
               <option key={d.id} value={d.id}>{d.name}</option>
@@ -292,63 +394,16 @@ function FieldProps({ entityId, field }: { entityId: string; field: Field }) {
           </select>
         </div>
       )}
-      {showPhysical && shape === "length" && (
-        <label className="field-row__params">
-          length
-          <input type="number" value={field.length ?? 255} onChange={(e) => patch({ length: Number(e.target.value) })} />
-        </label>
-      )}
-      {showPhysical && shape === "decimal" && (
-        <div className="field-row__params">
-          <label>
-            precision
-            <input type="number" value={field.precision ?? 12} onChange={(e) => patch({ precision: Number(e.target.value) })} />
-          </label>
-          <label>
-            scale
-            <input type="number" value={field.scale ?? 2} onChange={(e) => patch({ scale: Number(e.target.value) })} />
-          </label>
+      {caps.physicalProps && (
+        <div className="field">
+          <label>Dimensional role (fact tables)</label>
+          <select value={field.role ?? ""} onChange={(e) => patch({ role: (e.target.value || undefined) as FieldRole | undefined })}>
+            <option value="">— none —</option>
+            <option value="measure">Measure (additive fact)</option>
+            <option value="degenerate">Degenerate dimension</option>
+          </select>
         </div>
       )}
-
-      {/* Keys/identifiers are hidden at Conceptual (§4.1). */}
-      {!conceptual && (
-        <div className="field-row__flags">
-          <label className="checkbox">
-            <input type="checkbox" checked={field.primaryKey} onChange={(e) => patch({ primaryKey: e.target.checked, nullable: e.target.checked ? false : field.nullable })} />
-            {showPhysical ? "PK" : "Primary identifier"}
-          </label>
-          <label className="checkbox">
-            <input type="checkbox" checked={!field.nullable} onChange={(e) => patch({ nullable: !e.target.checked })} />
-            {showPhysical ? "NOT NULL" : "Required"}
-          </label>
-          <label className="checkbox">
-            <input type="checkbox" checked={field.unique} onChange={(e) => patch({ unique: e.target.checked })} />
-            Unique
-          </label>
-        </div>
-      )}
-
-      {showPhysical && (
-        <>
-          <div className="field">
-            <label>Default (SQL)</label>
-            <input defaultValue={field.default ?? ""} onChange={(e) => patch({ default: e.target.value || undefined })} />
-          </div>
-          <div className="field">
-            <label>Dimensional role (fact tables)</label>
-            <select
-              value={field.role ?? ""}
-              onChange={(e) => patch({ role: (e.target.value || undefined) as FieldRole | undefined })}
-            >
-              <option value="">— none —</option>
-              <option value="measure">Measure (additive fact)</option>
-              <option value="degenerate">Degenerate dimension</option>
-            </select>
-          </div>
-        </>
-      )}
-
       <div className="field">
         <label>Definition</label>
         <textarea rows={2} defaultValue={field.description ?? ""} onChange={(e) => patch({ description: e.target.value || undefined })} />
