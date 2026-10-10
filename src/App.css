@@ -408,6 +408,11 @@ body,
 .entity__notnull {
   color: var(--warn);
 }
+.entity__name-logical {
+  font-weight: 400;
+  opacity: 0.65;
+  font-style: italic;
+}
 .entity__role {
   font-weight: 700;
 }

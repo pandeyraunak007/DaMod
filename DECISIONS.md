@@ -71,10 +71,28 @@ groups were unconditional. Not stale state, not caching.
     skip Conceptual; DDL export gated by `canExportDdl`) — confirmed, no change.
   - Tests: selection-hygiene matrix + jsdom render tests proving the field editor
     hides physical controls at Conceptual and preserves hidden data. 189 TS tests.
-- **Still open (future):** no separate physical-vs-logical *entity/attribute name*
-  fields in the model (the §6 Customer/dim_customer example needs an additive model
-  field — deferred, not invented); per-level validation *message wording*; a formal
-  shared command-capability registry (§8) beyond the current per-level gating.
+- **Extension 2 (2026-10-10, §6 dual logical/physical names):**
+  - Fields already had `logicalName` (physical `name` + logical `logicalName`) but it
+    was never displayed. Added the symmetric optional **`logicalName` on Entity**
+    (additive, backward-compatible: serialize + Zod + `updateEntity`; old files load
+    unchanged). `name` stays the physical identifier used for references and DDL.
+  - New **`model/presentation.ts`**: `displayName`/`displayNameParts` resolve which
+    name to show per level — business name at Conceptual/Logical (fallback to the
+    physical name), physical name at Physical, and physical **with the logical name
+    as a secondary** at Physical/Logical (shows the Customer↔dim_customer mapping).
+    If there is no logical mapping it falls back silently to the physical name (does
+    not invent one, §6).
+  - Wired into the **canvas** (node title shows the mapping at hybrid; field names
+    follow the level; inline rename edits `logicalName` at Conceptual/Logical and the
+    physical `name` at Physical levels), the **Explorer** (labels, search over both
+    names, level-aware rename), and the **Properties dialog** (entity + field now
+    have a "Logical / business name" input).
+  - **DDL export is unchanged — it uses the physical `name`, never the logical name**
+    (unit-tested: a `dim_customer`/`Customer` entity exports `CREATE TABLE
+    "dim_customer"`, never `"Customer"`). Serialization stays deterministic
+    (round-trip test). 196 TS tests.
+- **Still open (future):** per-level validation *message wording*; a formal shared
+  command-capability registry (§8) beyond the current per-level gating.
 
 ## 2026-10-10 — UI: View menu, bottom + floating toolbars (§13)
 

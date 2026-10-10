@@ -93,7 +93,7 @@ interface ModelStore {
   renameEntity: (id: string, name: string) => string | null;
   updateEntity: (
     id: string,
-    patch: Partial<Pick<Entity, "description" | "tags" | "stereotype" | "note" | "udps">>,
+    patch: Partial<Pick<Entity, "logicalName" | "description" | "tags" | "stereotype" | "note" | "udps">>,
   ) => void;
   deleteEntity: (id: string) => DeleteEntityResult;
 
@@ -317,6 +317,7 @@ export const useModelStore = create<ModelStore>((set, get) => {
       commit((m) => {
         const e = findEntity(m, id);
         if (!e) return;
+        if ("logicalName" in patch) e.logicalName = patch.logicalName || undefined;
         if ("description" in patch) e.description = patch.description || undefined;
         if ("tags" in patch) e.tags = patch.tags?.length ? patch.tags : undefined;
         if ("stereotype" in patch) e.stereotype = patch.stereotype || undefined;

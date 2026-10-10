@@ -38,6 +38,7 @@ const zField = z.object({
 const zEntity = z.object({
   id: z.string(),
   name: z.string(),
+  logicalName: z.string().optional(),
   description: z.string().optional(),
   tags: z.array(z.string()).optional(),
   stereotype: z.enum(["fact", "dimension"]).optional(),

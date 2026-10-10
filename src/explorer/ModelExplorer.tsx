@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useModelStore } from "../store/modelStore";
 import { useWorkspaceStore } from "../store/workspaceStore";
 import { fieldTypeLabel } from "../model/fieldDisplay";
+import { displayName } from "../model/presentation";
 import type { Model } from "../model/model";
 import {
   type LevelTerms,
@@ -9,6 +10,7 @@ import {
   levelTerms,
   showsKeys,
   showsPhysicalObjects,
+  usesPhysicalTypes,
 } from "../model/levels";
 import { linksTouching } from "../links/links";
 import { validateWorkspace, type Severity } from "../validation/rules";
@@ -393,7 +395,10 @@ function ModelBranch({
   const showPhysical = showsPhysicalObjects(model.level);
   const entityName = (id: string) => model.entities.find((e) => e.id === id)?.name ?? "?";
   const entityMatches = (e: Model["entities"][number]) =>
-    !filtering || matches(e.name, q) || e.fields.some((f) => matches(f.name, q));
+    !filtering ||
+    matches(e.name, q) ||
+    (e.logicalName ? matches(e.logicalName, q) : false) ||
+    e.fields.some((f) => matches(f.name, q) || (f.logicalName ? matches(f.logicalName, q) : false));
   const relText = (r: Model["relationships"][number]) =>
     `${entityName(r.parentEntity)} → ${entityName(r.childEntity)} (${r.cardinality})`;
   const relMatches = (r: Model["relationships"][number]) => !filtering || matches(relText(r), q);
@@ -622,8 +627,12 @@ function EntityBranch({
     if (tabId !== activeId) await switchTab(tabId);
     useModelStore.getState().revealEntity(entity.id);
   };
+  // At Conceptual/Logical the tree shows the business name, so rename edits
+  // logicalName; at Physical levels it renames the physical identifier.
+  const editsLogical = !usesPhysicalTypes(model.level);
   const commitRename = () => {
-    useModelStore.getState().renameEntity(entity.id, draft);
+    if (editsLogical) useModelStore.getState().updateEntity(entity.id, { logicalName: draft });
+    else useModelStore.getState().renameEntity(entity.id, draft);
     setRenaming(false);
   };
   const deleteEntity = async () => {
@@ -645,7 +654,7 @@ function EntityBranch({
       },
       { label: addFieldLabel, onClick: onAddField },
       { label: "Add relationship", onClick: onAddRelationship },
-      { label: "Rename", onClick: () => (setDraft(entity.name), setRenaming(true)) },
+      { label: "Rename", onClick: () => (setDraft(displayName(entity, model.level)), setRenaming(true)) },
       { label: "Delete entity", danger: true, onClick: deleteEntity },
     ]);
   };
@@ -683,11 +692,11 @@ function EntityBranch({
               className="tree__entity"
               onDoubleClick={(e) => {
                 e.stopPropagation();
-                setDraft(entity.name);
+                setDraft(displayName(entity, model.level));
                 setRenaming(true);
               }}
             >
-              {entity.name}
+              {displayName(entity, model.level)}
               {marks.entityHasLink(tabId, entity.id) && <span className="tree__link"> 🔗</span>}
               {sevDot(marks.entitySeverity(tabId, entity.id))}
             </span>
@@ -705,7 +714,7 @@ function EntityBranch({
                 <span className="tree__field-key">
                   {withKeys ? (f.primaryKey ? "🔑" : f.unique ? "◈" : "•") : "•"}
                 </span>
-                {f.name}
+                {displayName(f, model.level)}
                 <span className="tree__field-type">{fieldTypeLabel(f, model.level)}</span>
               </span>
             }

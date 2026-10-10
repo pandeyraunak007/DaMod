@@ -3,7 +3,8 @@ import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { useModelStore } from "../store/modelStore";
 import { useWorkspaceStore } from "../store/workspaceStore";
 import { fieldTypeLabel } from "../model/fieldDisplay";
-import { isConceptual } from "../model/levels";
+import { isConceptual, usesPhysicalTypes } from "../model/levels";
+import { displayName, displayNameParts } from "../model/presentation";
 import type { Field } from "../model/model";
 import { type Ref, linksTouching } from "../links/links";
 
@@ -18,6 +19,7 @@ function EntityNodeImpl({ data, selected }: NodeProps) {
   const notation = useModelStore((s) => s.model.notation ?? "IE");
   const relationships = useModelStore((s) => s.model.relationships);
   const renameEntity = useModelStore((s) => s.renameEntity);
+  const updateEntity = useModelStore((s) => s.updateEntity);
   const links = useWorkspaceStore((s) => s.links.links);
   const allModels = useWorkspaceStore((s) => s.allModels);
 
@@ -50,13 +52,23 @@ function EntityNodeImpl({ data, selected }: NodeProps) {
 
   if (!entity) return null;
 
+  // At Conceptual/Logical the title shows the business (logical) name, so inline
+  // rename edits `logicalName` (free text); at Physical levels it edits the
+  // physical identifier `name` (validated).
+  const editsLogical = !usesPhysicalTypes(level);
+
   const startEdit = () => {
-    setDraft(entity.name);
+    setDraft(displayName(entity, level));
     setError(null);
     setEditing(true);
   };
 
   const commit = () => {
+    if (editsLogical) {
+      updateEntity(entity.id, { logicalName: draft });
+      setEditing(false);
+      return;
+    }
     const err = renameEntity(entity.id, draft);
     if (err) {
       setError(err);
@@ -83,7 +95,7 @@ function EntityNodeImpl({ data, selected }: NodeProps) {
     <li key={f.id} className="entity__field">
       <span className="entity__key">{keyMark(f)}</span>
       <span className="entity__field-name">
-        {f.name}
+        {displayName(f, level)}
         {f.role === "measure" && (
           <span className="entity__role entity__role--measure" title="Measure (additive fact)"> ∑</span>
         )}
@@ -143,7 +155,12 @@ function EntityNodeImpl({ data, selected }: NodeProps) {
             {error && <div className="entity__rename-error">{error}</div>}
           </div>
         ) : (
-          <span className="entity__name">{entity.name}</span>
+          <span className="entity__name">
+            {displayNameParts(entity, level).primary}
+            {displayNameParts(entity, level).secondary && (
+              <span className="entity__name-logical"> · {displayNameParts(entity, level).secondary}</span>
+            )}
+          </span>
         )}
         {!editing && linksTouching(links, { model: modelId, entity: entity.id }).length > 0 && (
           <span

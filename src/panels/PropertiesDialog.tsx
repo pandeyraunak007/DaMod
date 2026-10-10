@@ -111,10 +111,18 @@ function EntityProperties({ entity, onClose }: { entity: Entity; onClose: () => 
         {tab === "General" && (
           <>
             <div className="field">
-              <label>Name</label>
+              <label>{terms.entity} name {terms.entity === "Table" ? "(physical)" : ""}</label>
               <input
                 defaultValue={entity.name}
                 onChange={(e) => !validateIdentifier(e.target.value) && renameEntity(entity.id, e.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label>Logical / business name</label>
+              <input
+                defaultValue={entity.logicalName ?? ""}
+                placeholder="e.g. Customer (shown at Logical/Conceptual levels)"
+                onChange={(e) => patch({ logicalName: e.target.value || undefined })}
               />
             </div>
             <div className="field">
@@ -228,6 +236,15 @@ function FieldProps({ entityId, field }: { entityId: string; field: Field }) {
             ))}
           </select>
         )}
+      </div>
+
+      <div className="field">
+        <label>Logical / business name</label>
+        <input
+          defaultValue={field.logicalName ?? ""}
+          placeholder="e.g. Customer ID (shown at Logical/Conceptual levels)"
+          onChange={(e) => patch({ logicalName: e.target.value || undefined })}
+        />
       </div>
 
       {/* Physical-only: domain binding, type parameters, SQL default, dimensional role. */}

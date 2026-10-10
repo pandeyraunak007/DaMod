@@ -70,6 +70,7 @@ function serializeDomain(d: Domain): Record<string, unknown> {
 
 function serializeEntity(e: Entity): Record<string, unknown> {
   const out: Record<string, unknown> = { id: e.id, name: e.name };
+  if (e.logicalName) out.logicalName = e.logicalName;
   if (e.description) out.description = e.description;
   if (e.tags && e.tags.length) out.tags = [...e.tags];
   if (e.stereotype) out.stereotype = e.stereotype;

@@ -78,7 +78,12 @@ export type Stereotype = "fact" | "dimension";
 
 export interface Entity {
   id: string;
+  /** Physical/identifier name (used for references and DDL). */
   name: string;
+  /** Optional logical/business name shown at Conceptual/Logical levels (e.g. a
+   *  "Customer" entity whose physical table is "dim_customer"). Mirrors a field's
+   *  `logicalName`. Free text; never used for DDL or references. */
+  logicalName?: string;
   description?: string;
   tags?: string[];
   position: Position;
