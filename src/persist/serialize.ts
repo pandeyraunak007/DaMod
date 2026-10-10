@@ -15,6 +15,7 @@ import type {
   Model,
   RawObject,
   Relationship,
+  SchemaObj,
   Sequence,
   Udp,
   View,
@@ -74,8 +75,12 @@ function serializeEntity(e: Entity): Record<string, unknown> {
   if (e.description) out.description = e.description;
   if (e.tags && e.tags.length) out.tags = [...e.tags];
   if (e.stereotype) out.stereotype = e.stereotype;
+  if (e.schema) out.schema = e.schema;
   out.position = { x: e.position.x, y: e.position.y };
   out.fields = e.fields.map(serializeField);
+  if (e.checks && e.checks.length) {
+    out.checks = e.checks.map((c) => ({ id: c.id, name: c.name, expression: c.expression }));
+  }
   udpsOut(out, e.note, e.udps);
   return out;
 }
@@ -103,6 +108,7 @@ function serializeRelationship(r: Relationship): Record<string, unknown> {
 function serializeView(v: View): Record<string, unknown> {
   const out: Record<string, unknown> = { id: v.id, name: v.name, definition: v.definition };
   if (v.materialized) out.materialized = true;
+  if (v.withNoData) out.withNoData = true;
   if (v.sources && v.sources.length) out.sources = [...v.sources];
   out.position = { x: v.position.x, y: v.position.y };
   return out;
@@ -122,6 +128,13 @@ function serializeSequence(s: Sequence): Record<string, unknown> {
   return out;
 }
 
+function serializeSchema(s: SchemaObj): Record<string, unknown> {
+  const out: Record<string, unknown> = { id: s.id, name: s.name };
+  if (s.owner) out.owner = s.owner;
+  if (s.comment) out.comment = s.comment;
+  return out;
+}
+
 function serializeRawObject(o: RawObject): Record<string, unknown> {
   const out: Record<string, unknown> = { id: o.id, name: o.name, dialect: o.dialect };
   if (o.kind) out.kind = o.kind;
@@ -138,12 +151,14 @@ export function modelToPlain(model: Model): Record<string, unknown> {
   };
   if (model.description) out.description = model.description;
   out.level = model.level;
+  if (model.dialect) out.dialect = model.dialect;
   if (model.notation && model.notation !== "IE") out.notation = model.notation;
   if (model.derivedFrom) out.derivedFrom = model.derivedFrom;
   out.createdAt = model.createdAt;
   out.updatedAt = model.updatedAt;
   out.entities = model.entities.map(serializeEntity);
   out.relationships = model.relationships.map(serializeRelationship);
+  if (model.schemas && model.schemas.length) out.schemas = model.schemas.map(serializeSchema);
   if (model.views && model.views.length) out.views = model.views.map(serializeView);
   if (model.indexes && model.indexes.length) out.indexes = model.indexes.map(serializeIndex);
   if (model.sequences && model.sequences.length) {

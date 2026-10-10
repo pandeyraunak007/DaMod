@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { KeyRound, PanelLeftClose } from "lucide-react";
+import { FilePlus2, KeyRound, PanelLeftClose } from "lucide-react";
 import { useModelStore } from "../store/modelStore";
 import { useWorkspaceStore } from "../store/workspaceStore";
 import { fieldTypeLabel } from "../model/fieldDisplay";
@@ -95,6 +95,22 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
       fileName: t.fileName,
       error: t.loadError,
     }));
+  // Req 18: the Explorer is scoped to the ACTIVE model tab only. Other open models
+  // stay open (their tabs remain the switcher) but are not shown as sibling roots.
+  const activeEntry = models.find((m) => m.tabId === activeId) ?? null;
+
+  // Auto-expand a model's node the first time it becomes active (so switching to a
+  // tab reveals its tree), unless the user has already toggled that model's nodes.
+  const autoExpanded = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!activeId) return;
+    if (autoExpanded.current.has(activeId)) return;
+    autoExpanded.current.add(activeId);
+    setExpanded((prev) => {
+      if ([...prev].some((k) => k === `m:${activeId}` || k.startsWith(`m:${activeId}:`))) return prev;
+      return new Set(prev).add(`m:${activeId}`).add(`m:${activeId}:ents`);
+    });
+  }, [activeId]);
 
   const marks: ExplorerMarks = useMemo(() => {
     const named = models
@@ -136,14 +152,17 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
   const expand = (key: string) => setExpanded((prev) => new Set(prev).add(key));
 
   const expandAll = () => {
-    const keys = new Set<string>(["ws"]);
-    for (const m of models) {
-      if (!m.model) continue;
-      keys.add(`m:${m.tabId}`);
-      keys.add(`m:${m.tabId}:ents`);
-      keys.add(`m:${m.tabId}:rels`);
-      keys.add(`m:${m.tabId}:sem`);
-      for (const e of m.model.entities) keys.add(`e:${m.tabId}:${e.id}`);
+    const keys = new Set<string>(["ws:sem"]);
+    if (activeEntry?.model) {
+      const { tabId, model } = activeEntry;
+      keys.add(`m:${tabId}`);
+      keys.add(`m:${tabId}:ents`);
+      keys.add(`m:${tabId}:rels`);
+      keys.add(`m:${tabId}:views`);
+      keys.add(`m:${tabId}:indexes`);
+      keys.add(`m:${tabId}:seqs`);
+      keys.add(`m:${tabId}:raw`);
+      for (const e of model.entities) keys.add(`e:${tabId}:${e.id}`);
     }
     setExpanded(keys);
   };
@@ -180,6 +199,18 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
     expand(`m:${tabId}`);
     expand(`m:${tabId}:views`);
   };
+  const addMatView = async (tabId: string) => {
+    await ensureActive(tabId);
+    useModelStore.getState().createView(undefined, true);
+    expand(`m:${tabId}`);
+    expand(`m:${tabId}:matviews`);
+  };
+  const addSchema = async (tabId: string) => {
+    await ensureActive(tabId);
+    useModelStore.getState().createSchema();
+    expand(`m:${tabId}`);
+    expand(`m:${tabId}:schemas`);
+  };
   const addIndex = async (tabId: string) => {
     await ensureActive(tabId);
     const first = useModelStore.getState().model.entities[0];
@@ -202,14 +233,14 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
   };
   const selectObject = async (
     tabId: string,
-    sel: { kind: "view" | "index" | "sequence" | "rawObject"; id: string },
+    sel: { kind: "view" | "index" | "sequence" | "rawObject" | "schema"; id: string },
   ) => {
     await ensureActive(tabId);
     useModelStore.getState().select(sel);
   };
   const deleteObject = async (
     tabId: string,
-    kind: "view" | "index" | "sequence" | "rawObject",
+    kind: "view" | "index" | "sequence" | "rawObject" | "schema",
     oid: string,
   ) => {
     await ensureActive(tabId);
@@ -217,6 +248,7 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
     if (kind === "view") st.deleteView(oid);
     else if (kind === "index") st.deleteIndex(oid);
     else if (kind === "sequence") st.deleteSequence(oid);
+    else if (kind === "schema") st.deleteSchema(oid);
     else st.deleteRawObject(oid);
   };
 
@@ -225,6 +257,9 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
       <div className="explorer__head">
         <span className="explorer__title">Explorer</span>
         <div className="explorer__head-actions">
+          <button className="icon-btn" title="New model" aria-label="New model" onClick={onNewModel}>
+            <FilePlus2 size={15} strokeWidth={1.8} aria-hidden />
+          </button>
           <button className="icon-btn" title="Expand all" onClick={expandAll}>
             ⊞
           </button>
@@ -244,71 +279,58 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
       />
 
       <div className="explorer__tree">
+        {/* Req 18: show ONLY the active model's tree. Tabs (TabBar) remain the
+            switcher between open models; inactive models stay open & untouched. */}
+        {activeEntry == null ? (
+          <p className="explorer__empty">{path ? "No model open — create one with +." : "Open a workspace to begin."}</p>
+        ) : activeEntry.error || !activeEntry.model ? (
+          <TreeRow
+            depth={0}
+            label={<span className="tree__error" title={activeEntry.error ?? ""}>⚠ {activeEntry.fileName}</span>}
+          />
+        ) : (
+          <ModelBranch
+            key={activeEntry.tabId}
+            tabId={activeEntry.tabId}
+            model={activeEntry.model}
+            active
+            q={q}
+            filtering={filtering}
+            isOpen={isOpen}
+            toggle={toggle}
+            openMenu={openMenu}
+            marks={marks}
+            onSwitch={switchTab}
+            onAddEntity={() => addEntity(activeEntry.tabId)}
+            onAddField={(eid) => addField(activeEntry.tabId, eid)}
+            onAddRelationship={() => addRelationship(activeEntry.tabId)}
+            onAddView={() => addView(activeEntry.tabId)}
+            onAddMatView={() => addMatView(activeEntry.tabId)}
+            onAddSchema={() => addSchema(activeEntry.tabId)}
+            onAddIndex={() => addIndex(activeEntry.tabId)}
+            onAddSequence={() => addSequence(activeEntry.tabId)}
+            onAddRaw={() => addRaw(activeEntry.tabId)}
+            onSelectObject={(sel) => selectObject(activeEntry.tabId, sel)}
+            onDeleteObject={(kind, oid) => deleteObject(activeEntry.tabId, kind, oid)}
+            onDuplicateModel={() => duplicateModel(activeEntry.tabId)}
+            onDeleteModel={() => onDeleteModel(activeEntry.tabId, activeEntry.model!.name)}
+          />
+        )}
+
+        {/* Semantic layer is a workspace-wide concern — shown as a sibling root. */}
         <TreeRow
           depth={0}
-          open={isOpen("ws")}
+          open={isOpen("ws:sem")}
           hasChildren
-          label={<span className="tree__ws">Workspace</span>}
-          onToggle={() => toggle("ws")}
-          actions={
-            <RowAction title="New model" onClick={onNewModel}>
-              +
-            </RowAction>
-          }
+          label={<span className="tree__group">Semantic layer</span>}
+          onToggle={() => toggle("ws:sem")}
+          onClick={onOpenSemantic}
         />
-        {isOpen("ws") &&
-          models.map((m) =>
-            m.error || !m.model ? (
-              <TreeRow
-                key={m.tabId}
-                depth={1}
-                label={<span className="tree__error" title={m.error ?? ""}>⚠ {m.fileName}</span>}
-                onClick={() => switchTab(m.tabId)}
-              />
-            ) : (
-              <ModelBranch
-                key={m.tabId}
-                tabId={m.tabId}
-                model={m.model}
-                active={m.tabId === activeId}
-                q={q}
-                filtering={filtering}
-                isOpen={isOpen}
-                toggle={toggle}
-                openMenu={openMenu}
-                marks={marks}
-                onSwitch={switchTab}
-                onAddEntity={() => addEntity(m.tabId)}
-                onAddField={(eid) => addField(m.tabId, eid)}
-                onAddRelationship={() => addRelationship(m.tabId)}
-                onAddView={() => addView(m.tabId)}
-                onAddIndex={() => addIndex(m.tabId)}
-                onAddSequence={() => addSequence(m.tabId)}
-                onAddRaw={() => addRaw(m.tabId)}
-                onSelectObject={(sel) => selectObject(m.tabId, sel)}
-                onDeleteObject={(kind, oid) => deleteObject(m.tabId, kind, oid)}
-                onDuplicateModel={() => duplicateModel(m.tabId)}
-                onDeleteModel={() => onDeleteModel(m.tabId, m.model!.name)}
-              />
-            ),
-          )}
-        {isOpen("ws") && (
+        {isOpen("ws:sem") && (
           <>
-            <TreeRow
-              depth={1}
-              open={isOpen("ws:sem")}
-              hasChildren
-              label={<span className="tree__group">Semantic layer</span>}
-              onToggle={() => toggle("ws:sem")}
-              onClick={onOpenSemantic}
-            />
-            {isOpen("ws:sem") && (
-              <>
-                <TreeRow depth={2} onClick={onOpenSemantic} label={<span className="tree__muted">Terms ({semantic.terms.length})</span>} />
-                <TreeRow depth={2} onClick={onOpenSemantic} label={<span className="tree__muted">Dimensions ({semantic.dimensions.length})</span>} />
-                <TreeRow depth={2} onClick={onOpenSemantic} label={<span className="tree__muted">Metrics ({semantic.metrics.length})</span>} />
-              </>
-            )}
+            <TreeRow depth={1} onClick={onOpenSemantic} label={<span className="tree__muted">Terms ({semantic.terms.length})</span>} />
+            <TreeRow depth={1} onClick={onOpenSemantic} label={<span className="tree__muted">Dimensions ({semantic.dimensions.length})</span>} />
+            <TreeRow depth={1} onClick={onOpenSemantic} label={<span className="tree__muted">Metrics ({semantic.metrics.length})</span>} />
           </>
         )}
       </div>
@@ -368,6 +390,8 @@ function ModelBranch({
   onAddField,
   onAddRelationship,
   onAddView,
+  onAddMatView,
+  onAddSchema,
   onAddIndex,
   onAddSequence,
   onAddRaw,
@@ -390,11 +414,13 @@ function ModelBranch({
   onAddField: (entityId: string) => void;
   onAddRelationship: () => void;
   onAddView: () => void;
+  onAddMatView: () => void;
+  onAddSchema: () => void;
   onAddIndex: () => void;
   onAddSequence: () => void;
   onAddRaw: () => void;
-  onSelectObject: (sel: { kind: "view" | "index" | "sequence" | "rawObject"; id: string }) => void;
-  onDeleteObject: (kind: "view" | "index" | "sequence" | "rawObject", id: string) => void;
+  onSelectObject: (sel: { kind: "view" | "index" | "sequence" | "rawObject" | "schema"; id: string }) => void;
+  onDeleteObject: (kind: "view" | "index" | "sequence" | "rawObject" | "schema", id: string) => void;
   onDuplicateModel: () => void;
   onDeleteModel: () => void;
 }) {
@@ -426,7 +452,7 @@ function ModelBranch({
   return (
     <>
       <TreeRow
-        depth={1}
+        depth={0}
         open={isOpen(`m:${tabId}`)}
         hasChildren
         active={active}
@@ -445,7 +471,7 @@ function ModelBranch({
         <>
           {/* Entities / Tables / Business Entities */}
           <TreeRow
-            depth={2}
+            depth={1}
             open={isOpen(`m:${tabId}:ents`)}
             hasChildren
             label={
@@ -481,7 +507,7 @@ function ModelBranch({
 
           {/* Relationships */}
           <TreeRow
-            depth={2}
+            depth={1}
             open={isOpen(`m:${tabId}:rels`)}
             hasChildren
             label={
@@ -514,12 +540,34 @@ function ModelBranch({
           {showPhysical && (
             <>
               <ObjectGroup
+                open={isOpen(`m:${tabId}:schemas`)}
+                onToggle={() => toggle(`m:${tabId}:schemas`)}
+                name="Schemas"
+                count={model.schemas?.length ?? 0}
+                onAdd={onAddSchema}
+                items={(model.schemas ?? []).filter((v) => !filtering || matches(v.name, q))}
+                onSelect={(id) => onSelectObject({ kind: "schema", id })}
+                onDelete={(id) => onDeleteObject("schema", id)}
+                openMenu={openMenu}
+              />
+              <ObjectGroup
                 open={isOpen(`m:${tabId}:views`)}
                 onToggle={() => toggle(`m:${tabId}:views`)}
                 name="Views"
-                count={model.views?.length ?? 0}
+                count={(model.views ?? []).filter((v) => !v.materialized).length}
                 onAdd={onAddView}
-                items={(model.views ?? []).filter((v) => !filtering || matches(v.name, q))}
+                items={(model.views ?? []).filter((v) => !v.materialized).filter((v) => !filtering || matches(v.name, q))}
+                onSelect={(id) => onSelectObject({ kind: "view", id })}
+                onDelete={(id) => onDeleteObject("view", id)}
+                openMenu={openMenu}
+              />
+              <ObjectGroup
+                open={isOpen(`m:${tabId}:matviews`)}
+                onToggle={() => toggle(`m:${tabId}:matviews`)}
+                name="Materialized views"
+                count={(model.views ?? []).filter((v) => v.materialized).length}
+                onAdd={onAddMatView}
+                items={(model.views ?? []).filter((v) => v.materialized).filter((v) => !filtering || matches(v.name, q))}
                 onSelect={(id) => onSelectObject({ kind: "view", id })}
                 onDelete={(id) => onDeleteObject("view", id)}
                 openMenu={openMenu}
@@ -589,7 +637,7 @@ function ObjectGroup({
   return (
     <>
       <TreeRow
-        depth={2}
+        depth={1}
         open={open}
         hasChildren
         label={
@@ -608,7 +656,7 @@ function ObjectGroup({
         items.map((it) => (
           <TreeRow
             key={it.id}
-            depth={3}
+            depth={2}
             label={<span className="tree__obj">{it.name}</span>}
             onClick={() => onSelect(it.id)}
             onContextMenu={(e) => {
@@ -666,6 +714,10 @@ function EntityBranch({
     if (tabId !== activeId) await switchTab(tabId);
     useModelStore.getState().revealEntity(entity.id);
   };
+  const openChecks = async () => {
+    await reveal();
+    useModelStore.getState().openProperties();
+  };
   // At Conceptual/Logical the tree shows the business name, so rename edits
   // logicalName; at Physical levels it renames the physical identifier.
   const editsLogical = !usesPhysicalTypes(model.level);
@@ -701,7 +753,7 @@ function EntityBranch({
   return (
     <>
       <TreeRow
-        depth={3}
+        depth={2}
         open={open}
         hasChildren={entity.fields.length > 0}
         onToggle={onToggle}
@@ -746,7 +798,7 @@ function EntityBranch({
         fields.map((f) => (
           <TreeRow
             key={f.id}
-            depth={4}
+            depth={3}
             onClick={reveal}
             label={
               <span className="tree__field">
@@ -755,6 +807,23 @@ function EntityBranch({
                 </span>
                 <span className="tree__field-name">{displayName(f, model.level)}</span>
                 <span className="tree__field-type">{fieldTypeLabel(f, model.level)}</span>
+              </span>
+            }
+          />
+        ))}
+      {/* CHECK constraints under the table (physical only) — click opens the
+          table's Checks tab (Req 19). */}
+      {open &&
+        withKeys &&
+        (entity.checks ?? []).map((c) => (
+          <TreeRow
+            key={c.id}
+            depth={3}
+            onClick={openChecks}
+            label={
+              <span className="tree__field">
+                <span className="tree__key-badge tree__key--chk">CK</span>
+                <span className="tree__field-name">{c.name}</span>
               </span>
             }
           />
@@ -809,7 +878,7 @@ function RelationshipRow({
   };
   return (
     <TreeRow
-      depth={3}
+      depth={2}
       onClick={reveal}
       onContextMenu={menu}
       label={

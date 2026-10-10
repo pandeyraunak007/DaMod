@@ -5,6 +5,7 @@
 import { newId } from "../lib/ids";
 import { type DataTypeKind, withTypeDefaults } from "./dataTypes";
 import type { LogicalTypeKind, ModelLevel } from "./levels";
+import { usesPhysicalTypes } from "./levels";
 
 export type { LogicalTypeKind } from "./levels";
 
@@ -94,6 +95,10 @@ export interface Entity {
   stereotype?: Stereotype;
   note?: string;
   udps?: Udp[];
+  /** Owning schema name (Req 19). Default/undefined means the public schema. */
+  schema?: string;
+  /** Table-level CHECK constraints (Req 19). */
+  checks?: CheckConstraint[];
 }
 
 export type Cardinality = "one-to-one" | "one-to-many" | "many-to-many";
@@ -136,16 +141,28 @@ export type Notation = "IE" | "IDEF1X";
 
 // ---- other physical/logical database objects --------------------------------
 
-/** A database view: a named SQL query. Rendered on the canvas and exported. */
+/** A database view: a named SQL query. Rendered on the canvas and exported.
+ *  A materialized view sets `materialized` (Req 19) — it is the same object with
+ *  different DDL (`CREATE MATERIALIZED VIEW`) and a storage/refresh option. */
 export interface View {
   id: string;
   name: string;
   /** The SQL SELECT body (raw, exported verbatim). */
   definition: string;
   materialized?: boolean;
+  /** Materialized-view only: create `WITH NO DATA` (populate later via REFRESH). */
+  withNoData?: boolean;
   /** Source entity ids, for drawing canvas lines (optional). */
   sources?: string[];
   position: Position;
+}
+
+/** A table-level CHECK constraint (Req 19). The expression is exported verbatim
+ *  inside `CHECK (...)`; it depends on the owning table's columns. */
+export interface CheckConstraint {
+  id: string;
+  name: string;
+  expression: string;
 }
 
 /** An index over one or more of an entity's columns. */
@@ -163,6 +180,16 @@ export interface Sequence {
   name: string;
   start?: number;
   increment?: number;
+}
+
+/** A database schema / namespace (Req 19). A cluster-level container that owns
+ *  tables, views, sequences, etc. Modeled as a first-class object with its own
+ *  DDL (`CREATE SCHEMA`); table→schema name-qualification is a later increment. */
+export interface SchemaObj {
+  id: string;
+  name: string;
+  owner?: string;
+  comment?: string;
 }
 
 export type DbDialect = "postgres" | "snowflake" | "databricks";
@@ -183,6 +210,11 @@ export interface Model {
   name: string;
   description?: string;
   level: ModelLevel;
+  /** Target database dialect for physical modeling (Req 17). Authoritative default
+   *  for physical types, DDL, validation and reverse-engineering. Only meaningful at
+   *  physical levels; absent for Conceptual/Logical (database-independent). Older
+   *  models written before Req 17 have none — `modelDialect` supplies the default. */
+  dialect?: DbDialect;
   /** Diagram notation (default IE crow's-foot). */
   notation?: Notation;
   /** Source model id when this model was derived from another (FR-11.7). */
@@ -191,6 +223,7 @@ export interface Model {
   updatedAt: string;
   entities: Entity[];
   relationships: Relationship[];
+  schemas?: SchemaObj[];
   views?: View[];
   indexes?: Index[];
   sequences?: Sequence[];
@@ -247,6 +280,14 @@ export function newSequence(name: string): Sequence {
   return { id: newId("sequence"), name, start: 1, increment: 1 };
 }
 
+export function newCheckConstraint(name: string, expression = ""): CheckConstraint {
+  return { id: newId("check"), name, expression };
+}
+
+export function newSchemaObject(name: string): SchemaObj {
+  return { id: newId("schema"), name };
+}
+
 export function newRawObject(name: string, dialect: DbDialect): RawObject {
   return { id: newId("rawObject"), name, dialect, sql: "" };
 }
@@ -255,17 +296,30 @@ export function newDomain(name: string, kind: DataTypeKind = "string"): Domain {
   return { id: newId("domain"), name, ...withTypeDefaults(kind) };
 }
 
-export function newModel(name: string, now: string, level: ModelLevel = "Physical"): Model {
+export function newModel(
+  name: string,
+  now: string,
+  level: ModelLevel = "Physical",
+  dialect?: DbDialect,
+): Model {
   return {
     formatVersion: 1,
     id: newId("model"),
     name,
     level,
+    // Database-independent levels carry no dialect (Req 17 §3).
+    ...(dialect && usesPhysicalTypes(level) ? { dialect } : {}),
     createdAt: now,
     updatedAt: now,
     entities: [],
     relationships: [],
   };
+}
+
+/** The authoritative dialect for a model's physical operations. Falls back to
+ *  Postgres for models written before Req 17 (compatibility default — see §4). */
+export function modelDialect(model: Model): DbDialect {
+  return model.dialect ?? "postgres";
 }
 
 // ---- lookups -----------------------------------------------------------------

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { useModelStore } from "./modelStore";
-import type { Model } from "../model/model";
+import type { DbDialect, Model } from "../model/model";
 import { newModel as createModel } from "../model/model";
 import type { ModelLevel } from "../model/levels";
 import { serializeModel } from "../persist/serialize";
@@ -103,7 +103,7 @@ interface WorkspaceState {
   openWorkspacePicker: () => Promise<void>;
   openWorkspace: (path: string) => Promise<void>;
   restoreLastWorkspace: () => Promise<void>;
-  newModel: (name: string, level?: ModelLevel) => Promise<string | null>;
+  newModel: (name: string, level?: ModelLevel, dialect?: DbDialect) => Promise<string | null>;
   importModel: (model: Model, name: string) => Promise<string | null>;
   duplicateModel: (id: string) => Promise<void>;
   deleteModel: (id: string) => Promise<void>;
@@ -372,7 +372,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       }
     },
 
-    newModel: async (name, level = "Physical") => {
+    newModel: async (name, level = "Physical", dialect) => {
       const { path, tabs } = get();
       if (!path) return "Open a workspace first";
       const err = validateIdentifier(name);
@@ -380,7 +380,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       if (tabs.some((t) => modelNameFromFile(t.fileName) === name)) {
         return `A model named ${name} already exists`;
       }
-      const model = createModel(name, nowIso(), level);
+      const model = createModel(name, nowIso(), level, dialect);
       const fileName = modelFileName(name);
       const text = serializeModel(model);
       const mt = await writeFile(joinPath(path, fileName), text, false);

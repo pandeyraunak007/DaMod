@@ -5,6 +5,112 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-10 — Req 19 (first batch) + Req 20: PG objects + context indicator
+
+**Req 20 — Model Context Indicator.** A compact `Model · Level · Database` badge in
+the always-visible top ribbon bar (`ModelContextIndicator.tsx`). Pure display: reads
+the active model's `name`/`level`/`dialect` via primitive selectors (no new state, no
+undo). `databaseLabel` is deliberately strict — it returns "Database-independent" for
+Conceptual/Logical, "Database not configured" when a physical model has no dialect, and
+NEVER falls back to Postgres (that fallback is `modelDialect`'s DDL concern, not a UI
+claim). Replaces the old plain `/ model` crumb. Tested.
+
+**Req 19 — the author chose "option 3": a first batch of real objects + the Phase 1
+registry, with the rest documented for later.** Scope was deliberately bounded — the
+spec itself mandates testable increments and forbids UI-only placeholder categories.
+
+- **Phase 1 — honest capability registry.** `src/model/objectRegistry.ts` catalogues the
+  whole erwin PostgreSQL inventory with per-object `support` (full/partial/none),
+  capability flags, valid parent scopes, visible levels and the model backing.
+  `objectRegistry.test.ts` ties every `"full"` row to a real backing + store op so the
+  registry can't claim unimplemented support. `docs/POSTGRES_OBJECTS.md` is the
+  human-readable matrix + the deferred-phase roadmap (so it can be built later).
+- **Three objects delivered end-to-end** (model type + factory → store ops with undo →
+  deterministic serialize + optional Zod field → validation rule → DDL → Explorer
+  category/context + Inspector editor → tests):
+  - **Check constraints** — `entities[].checks` (name + expression); inline
+    `CONSTRAINT … CHECK (…)`; Checks tab in the table Inspector; CK node under the table.
+  - **Schemas** — first-class `schemas` (`CREATE SCHEMA [AUTHORIZATION]` + `COMMENT ON
+    SCHEMA`); Explorer "Schemas" category; schema Inspector; a table's General tab sets
+    its schema; **delete detaches tables, never deletes them** (§6/§8). Table→schema
+    *name-qualification* in table DDL is explicitly deferred (documented).
+  - **Materialized views** — reused the existing `View.materialized` (DDL already
+    emitted it) + added `withNoData`; separate Explorer category + Inspector toggles.
+- **Reuse over duplication.** New objects flow through the SAME `commit`/undo, serialize,
+  Zod-optional-field (no silent migration of old models), `validateWorkspace`, and
+  `exportModelDDL` paths. Matviews were already half-built in `ddl.ts` — surfaced, not
+  reinvented.
+- **Deferred (documented in `docs/POSTGRES_OBJECTS.md`):** the §4 PostgreSQL type-system
+  expansion, and Phases 2–6 (programmable objects, roles/permissions, casts/collations/
+  extensions, servers/tablespaces/transforms, deeper reverse-eng + dependency prompts).
+  The registry marks all of these `none` with no capabilities — catalogued, not claimed.
+- 273 TS tests (+16: `toolbar/ModelContextIndicator`, `model/pgObjects`,
+  `model/objectRegistry`); tsc + build + cargo clean.
+
+## 2026-10-10 — Req 18: Model Explorer scoped to the active model tab
+
+The Explorer used to render a "Workspace" root listing **every** open model's full
+tree at once (e.g. `Orders` *and* `damod_test`), which was confusing while editing one
+model. It now shows **only the active model's** tree.
+
+- **Scoped render, no new state.** Derived `activeEntry = models.find(m => m.tabId ===
+  activeId)` and render a single `ModelBranch` for it instead of `models.map(...)`. The
+  Explorer keeps NO separate active-model state — it reads `activeId` + `activeModel`
+  from the existing stores (§4). Tree depths re-indexed by −1 so the active model is the
+  root (depth 0); `ModelBranch`/`EntityBranch`/`ObjectGroup`/`RelationshipRow` otherwise
+  unchanged (focused correction, not a rewrite).
+- **Tabs stay the switcher.** `TabBar` already switches open models; the Explorer no
+  longer doubles as a model list. Moved the "New model" `+` from the old Workspace root
+  to an Explorer-head icon button. Inactive models remain open (their tabs + parked
+  models untouched) — verified by test.
+- **Selection can't go stale across models.** No Explorer change needed: `switchTab →
+  activate → modelStore.loadModel` already resets `selection: null` (and parks the
+  outgoing model back into its tab). So a selection from the previous model is cleared
+  on every switch (§4) — covered by a test.
+- **Expansion per model.** Expansion keys are already tab-scoped (`m:<tabId>:…`) and
+  persisted per workspace, so each model's expand/collapse state is retained when you
+  switch away and back. A model's node auto-expands the first time it becomes active
+  (unless the user already toggled it). `expandAll` now scopes to the active model.
+- **Level-aware + validation preserved.** Still uses the active model's level via the
+  existing `levelTerms`/`showsPhysicalObjects`/`showsKeys` logic; `validateWorkspace`
+  still runs over all models so cross-model link marks stay correct. Semantic layer
+  stays a workspace-wide sibling root (it is not per-model in DaMod).
+- 257 TS tests (+5: `explorer/ModelExplorer.render.test.tsx` — isolation, tab-switch
+  swap, inactive-model preservation, selection clear, level badge); tsc + build + cargo
+  clean.
+
+## 2026-10-10 — Req 17: choose the target database when creating a physical model
+
+The New Model dialog now reveals a **required "Target database" selector** when the
+level is Physical or Physical/Logical, and hides it for Conceptual/Logical (those
+levels are database-independent). The chosen dialect is persisted on the model and is
+authoritative for its physical SQL.
+
+- **Reused the existing dialect identifiers** (`DbDialect = "postgres"|"snowflake"|
+  "databricks"`, already in `model.ts`, same strings as `export/dialects.DialectId`)
+  rather than inventing `postgresql`/… — the PRD said reuse existing ids. The selector
+  lists exactly `DIALECT_IDS` (the registry), so nothing shows as supported that the app
+  can't generate DDL for.
+- **Metadata, not a new type system.** DaMod has ONE fixed canonical physical type set
+  (`dataTypes.ts`); dialects differ only in *rendering* (`DIALECTS[id].type` → SQL
+  spelling). So `dialect` is stored as model metadata and made authoritative at the
+  render boundary: `ExportDialog` now defaults to `modelDialect(activeModel)`, and the
+  Inspector's **SQL (DDL) tab renders in the model's dialect** (was hardcoded Postgres).
+  Added `modelDialect(model)` = `model.dialect ?? "postgres"` as the single compatibility
+  default. We did NOT build per-dialect physical type vocabularies in the grid — that
+  would fork the one type engine; the dialect-specific surface is the generated SQL.
+- **Honest capability signalling.** Dialect hints in the dialog say Postgres is
+  full-support (types, DDL, live connection, reverse-engineering) while Snowflake/
+  Databricks are DDL+types only (no live connector yet) — per the PRD's "don't imply
+  parity" rule.
+- **No silent migration (§4).** `dialect` is an optional Zod field; models written
+  before Req 17 parse with no dialect and re-serialize byte-identically (test covers
+  this). `modelDialect` supplies Postgres only at point of use. The factory drops a
+  dialect passed for a non-physical level. Changing a model's DB later is deliberately
+  left as a separate explicit operation (not built here).
+- 252 TS tests (+14: `model/dialect.test.ts`, `workspace/NewModelDialog.render.test.tsx`,
+  `panels/DdlDialect.render.test.tsx`); typecheck + build + cargo clean.
+
 ## 2026-10-10 — Fix a class of Zustand selector infinite loops (blank screen)
 
 Two components crashed to a blank screen via "getSnapshot should be cached →

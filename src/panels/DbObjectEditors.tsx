@@ -34,6 +34,16 @@ export function ViewEditor({ id, onGone }: { id: string; onGone: () => void }) {
           />
           Materialized
         </label>
+        {view.materialized && (
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={!!view.withNoData}
+              onChange={(e) => update(id, { withNoData: e.target.checked })}
+            />
+            Create WITH NO DATA (populate later via REFRESH)
+          </label>
+        )}
       </div>
       <div className="editor__section">
         <label className="editor__label">SQL definition</label>
@@ -212,6 +222,57 @@ export function RawObjectEditor({ id, onGone }: { id: string; onGone: () => void
       </div>
       <button className="btn btn--danger btn--small" onClick={() => (del(id), onGone())}>
         Delete object
+      </button>
+    </div>
+  );
+}
+
+// Req 19 — schema (CREATE SCHEMA) properties: name, owner, comment.
+export function SchemaEditor({ id, onGone }: { id: string; onGone: () => void }) {
+  const schema = useModelStore((s) => s.model.schemas?.find((x) => x.id === id));
+  const update = useModelStore((s) => s.updateSchema);
+  const del = useModelStore((s) => s.deleteSchema);
+  const entities = useModelStore((s) => s.model.entities);
+  if (!schema) return null;
+  const dependents = entities.filter((e) => e.schema === schema.name);
+  return (
+    <div className="editor">
+      <div className="editor__section">
+        <label className="editor__label">Schema name</label>
+        <input
+          className="editor__input"
+          value={schema.name}
+          onChange={(e) => !validateIdentifier(e.target.value) && update(id, { name: e.target.value })}
+        />
+      </div>
+      <div className="editor__section">
+        <label className="editor__label">Owner (role)</label>
+        <input
+          className="editor__input"
+          value={schema.owner ?? ""}
+          placeholder="e.g. app_owner"
+          onChange={(e) => update(id, { owner: e.target.value })}
+        />
+      </div>
+      <div className="editor__section">
+        <label className="editor__label">Comment</label>
+        <textarea
+          className="editor__input"
+          rows={3}
+          value={schema.comment ?? ""}
+          onChange={(e) => update(id, { comment: e.target.value })}
+        />
+      </div>
+      <div className="editor__section">
+        <label className="editor__label">Tables in this schema ({dependents.length})</label>
+        {dependents.length === 0 ? (
+          <p className="field__hint">No tables assigned. Set a table's schema in its General tab.</p>
+        ) : (
+          <p className="field__hint">{dependents.map((e) => e.name).join(", ")}</p>
+        )}
+      </div>
+      <button className="btn btn--danger btn--small" onClick={() => (del(id), onGone())}>
+        Delete schema
       </button>
     </div>
   );

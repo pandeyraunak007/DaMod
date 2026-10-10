@@ -536,6 +536,80 @@ function domainIssues(ctx: ValidationContext): Issue[] {
   return issues;
 }
 
+function checkConstraintIssues(ctx: ValidationContext): Issue[] {
+  const issues: Issue[] = [];
+  for (const { id, model } of ctx.models) {
+    for (const e of model.entities) {
+      const counts = new Map<string, number>();
+      for (const c of e.checks ?? []) counts.set(c.name, (counts.get(c.name) ?? 0) + 1);
+      for (const c of e.checks ?? []) {
+        if (!c.expression.trim()) {
+          issues.push({
+            id: `checkEmpty:${id}:${e.id}:${c.id}`,
+            rule: "checkConstraintIssues",
+            severity: "error",
+            message: `Check constraint “${c.name}” on ${model.name}.${e.name} has no expression`,
+            target: { model: id, entity: e.id },
+          });
+        }
+        if ((counts.get(c.name) ?? 0) > 1) {
+          issues.push({
+            id: `checkDup:${id}:${e.id}:${c.id}`,
+            rule: "checkConstraintIssues",
+            severity: "error",
+            message: `Duplicate check-constraint name “${c.name}” on ${model.name}.${e.name}`,
+            target: { model: id, entity: e.id },
+          });
+        }
+      }
+    }
+  }
+  return issues;
+}
+
+function schemaIssues(ctx: ValidationContext): Issue[] {
+  const issues: Issue[] = [];
+  for (const { id, model } of ctx.models) {
+    const schemas = model.schemas ?? [];
+    const counts = new Map<string, number>();
+    for (const s of schemas) counts.set(s.name, (counts.get(s.name) ?? 0) + 1);
+    for (const s of schemas) {
+      if (validateIdentifier(s.name)) {
+        issues.push({
+          id: `badSchemaId:${id}:${s.id}`,
+          rule: "schemaIssues",
+          severity: "error",
+          message: `Invalid schema identifier “${s.name}” in ${model.name}`,
+          target: { model: id },
+        });
+      }
+      if ((counts.get(s.name) ?? 0) > 1) {
+        issues.push({
+          id: `dupSchema:${id}:${s.id}`,
+          rule: "schemaIssues",
+          severity: "error",
+          message: `Duplicate schema name “${s.name}” in ${model.name}`,
+          target: { model: id },
+        });
+      }
+    }
+    // A table that names a schema which no longer exists.
+    const names = new Set(schemas.map((s) => s.name));
+    for (const e of model.entities) {
+      if (e.schema && !names.has(e.schema)) {
+        issues.push({
+          id: `dangSchema:${id}:${e.id}`,
+          rule: "schemaIssues",
+          severity: "warning",
+          message: `${model.name}.${e.name} references schema “${e.schema}” which is not defined`,
+          target: { model: id, entity: e.id },
+        });
+      }
+    }
+  }
+  return issues;
+}
+
 const RULES: ((ctx: ValidationContext) => Issue[])[] = [
   duplicateEntityNames,
   duplicateFieldNames,
@@ -554,6 +628,8 @@ const RULES: ((ctx: ValidationContext) => Issue[])[] = [
   duplicateSemanticNames,
   domainIssues,
   measureRoleFit,
+  checkConstraintIssues,
+  schemaIssues,
 ];
 
 /** Run every rule over the workspace and return all issues (FR-10.1). */

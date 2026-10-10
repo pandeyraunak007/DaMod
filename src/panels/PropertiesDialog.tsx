@@ -13,8 +13,9 @@ import {
   levelTerms,
 } from "../model/levels";
 import { foreignKeys, tableDDL } from "../export/ddl";
-import { DIALECTS } from "../export/dialects";
+import { DIALECTS, type DialectId } from "../export/dialects";
 import type { Entity, Field, FieldRole, RiAction, Udp } from "../model/model";
+import { modelDialect } from "../model/model";
 
 const RI_ACTIONS: RiAction[] = ["no action", "cascade", "restrict", "set null", "set default"];
 
@@ -108,7 +109,7 @@ function EntityProperties({ entity, onClose }: { entity: Entity; onClose: () => 
         <button className="icon-btn" onClick={onClose}>✕</button>
       </div>
       <Tabs
-        tabs={["General", terms.fieldPlural, "Definition", "Note", "UDP", ...(caps.ddl ? ["SQL"] : [])]}
+        tabs={["General", terms.fieldPlural, ...(caps.ddl ? ["Checks"] : []), "Definition", "Note", "UDP", ...(caps.ddl ? ["SQL"] : [])]}
         active={tab}
         onChange={setTab}
       />
@@ -148,6 +149,7 @@ function EntityProperties({ entity, onClose }: { entity: Entity; onClose: () => 
                 onChange={(e) => patch({ tags: e.target.value.split(",").map((t) => t.trim()).filter(Boolean) })}
               />
             </div>
+            {caps.ddl && <EntitySchemaField entity={entity} onPatch={patch} />}
             <div className="field">
               <label>Dimensional modeling (Kimball)</label>
               <button className="btn btn--small" onClick={() => applyScd2(entity.id)}>
@@ -162,6 +164,7 @@ function EntityProperties({ entity, onClose }: { entity: Entity; onClose: () => 
           </>
         )}
         {tab === terms.fieldPlural && <FieldsTab entity={entity} />}
+        {tab === "Checks" && caps.ddl && <ChecksTab entity={entity} />}
         {tab === "Definition" && (
           <textarea className="editor__input" rows={8} defaultValue={entity.description ?? ""} onChange={(e) => patch({ description: e.target.value })} />
         )}
@@ -172,6 +175,75 @@ function EntityProperties({ entity, onClose }: { entity: Entity; onClose: () => 
         {tab === "SQL" && caps.ddl && <EntityDdl entityId={entity.id} />}
       </div>
     </>
+  );
+}
+
+// Owning-schema picker for a table (Req 19). A free-text name backed by a
+// datalist of the model's defined schemas; blank means the public schema.
+function EntitySchemaField({
+  entity,
+  onPatch,
+}: {
+  entity: Entity;
+  onPatch: (p: { schema?: string }) => void;
+}) {
+  const schemas = useModelStore((s) => s.model.schemas) ?? [];
+  return (
+    <div className="field">
+      <label>Schema</label>
+      <input
+        list="damod-schema-list"
+        defaultValue={entity.schema ?? ""}
+        placeholder="public"
+        onChange={(e) => onPatch({ schema: e.target.value.trim() || undefined })}
+      />
+      <datalist id="damod-schema-list">
+        {schemas.map((s) => (
+          <option key={s.id} value={s.name} />
+        ))}
+      </datalist>
+      <p className="field__hint">Blank = the public schema. Define schemas in the Explorer (Schemas).</p>
+    </div>
+  );
+}
+
+// Table CHECK constraints (Req 19) — name + SQL boolean expression, exported
+// verbatim inside CHECK (...). Edits go through the shared store ops (undo/redo).
+function ChecksTab({ entity }: { entity: Entity }) {
+  const addCheck = useModelStore((s) => s.addCheck);
+  const updateCheck = useModelStore((s) => s.updateCheck);
+  const deleteCheck = useModelStore((s) => s.deleteCheck);
+  const checks = entity.checks ?? [];
+  return (
+    <div>
+      {checks.length === 0 && <p className="field__hint">No check constraints yet.</p>}
+      {checks.map((c) => (
+        <div key={c.id} className="field">
+          <div className="attr-row">
+            <input
+              value={c.name}
+              placeholder="constraint name"
+              onChange={(e) => !validateIdentifier(e.target.value) && updateCheck(entity.id, c.id, { name: e.target.value })}
+            />
+            <button className="field-row__del" title="Delete constraint" onClick={() => deleteCheck(entity.id, c.id)}>
+              ✕
+            </button>
+          </div>
+          <textarea
+            className="editor__input"
+            rows={2}
+            style={{ fontFamily: "ui-monospace, monospace" }}
+            value={c.expression}
+            placeholder="e.g. total >= 0"
+            onChange={(e) => updateCheck(entity.id, c.id, { expression: e.target.value })}
+          />
+        </div>
+      ))}
+      <button className="btn btn--small" onClick={() => addCheck(entity.id)}>
+        + Check constraint
+      </button>
+      <p className="field__hint">Exported as <code>CONSTRAINT name CHECK (expression)</code> on the table.</p>
+    </div>
   );
 }
 
@@ -350,9 +422,10 @@ function EntityDdl({ entityId }: { entityId: string }) {
   const entity = model.entities.find((e) => e.id === entityId);
   if (!entity) return null;
   const fks = foreignKeys(model).filter((fk) => fk.child.id === entity.id);
+  const dialect = DIALECTS[modelDialect(model) as DialectId];
   let ddl: string;
   try {
-    ddl = tableDDL(DIALECTS.postgres, entity, fks, undefined);
+    ddl = tableDDL(dialect, entity, fks, undefined);
   } catch (e) {
     ddl = `-- error: ${(e as Error).message}`;
   }
@@ -360,7 +433,7 @@ function EntityDdl({ entityId }: { entityId: string }) {
     <div>
       <pre className="export-preview">{ddl}</pre>
       <button className="btn btn--small" onClick={() => navigator.clipboard?.writeText(ddl)}>Copy</button>
-      <p className="field__hint">Postgres CREATE TABLE for this table. Full export: Export (File tab).</p>
+      <p className="field__hint">{dialect.label} CREATE TABLE for this table. Full export: Export (File tab).</p>
     </div>
   );
 }

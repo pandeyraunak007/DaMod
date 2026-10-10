@@ -9,10 +9,22 @@
 
 ## NEXT SESSION — START HERE
 
-**Current status:** All work committed and green. Branch `main`, latest commit
-`dc2b8e9`. **2 commits unpushed** to `origin/main` (`57aac34`, `dc2b8e9`) — the
-author pushes explicitly; do not push unless asked. Working tree clean.
-**238 TS tests pass · typecheck clean · `npm run build` clean · `cargo build` clean.**
+**Current status:** Branch `main`, latest commit `2614c7c` (pushed). **Reqs 17–20 just
+landed — uncommitted in the working tree**; author commits/pushes explicitly, do not
+commit or push unless asked. **273 TS tests pass · typecheck clean · `npm run build`
+clean · `cargo build` clean.** See the top DECISIONS entries:
+- **Req 19 (first batch) + Req 20** — Model Context Indicator (`Model · Level · Database`
+  badge in the ribbon, pure display, never assumes Postgres). Req 19 was scoped by the
+  author to "option 3": a canonical **object registry** (`src/model/objectRegistry.ts`,
+  honest support flags, kept truthful by a test) + **capability matrix/roadmap**
+  (`docs/POSTGRES_OBJECTS.md`), plus three objects end-to-end — **check constraints,
+  first-class schemas, materialized views** (model→store→serialize→Zod→validation→DDL→
+  Explorer→Inspector→tests). The rest of the erwin inventory + the §4 type-system
+  expansion are catalogued as `none`/deferred in the matrix — build later from there.
+- **Req 18** — Model Explorer shows only the **active model tab's** tree; tabs (`TabBar`)
+  switch models; selection auto-clears on switch via `loadModel`; expansion per-model.
+- **Req 17** — New Model dialog's required Target database selector; `model.dialect`
+  persisted + authoritative (ExportDialog + Inspector SQL tab); optional Zod field.
 
 **Highest-priority next task (author's stated direction): Phase 7 — Oracle connector.**
 The user said "then we will move to another databases". Build an Oracle DB connector
@@ -178,7 +190,10 @@ Logical/Physical-Logical/Physical) governing fields/canvas/DDL eligibility; Mode
 **Beyond-spec modeling:** reusable **domains** (bind + propagate + detach-on-override);
 SQL **reverse-engineering** (`.sql` → model); **forward-engineering** (DROP/IF-NOT-EXISTS
 options + ALTER migration vs a baseline); **SCD-2 scaffolding** + **fact column roles**
-(measure/degenerate); **dual logical/physical names** (`Customer`/`dim_customer`).
+(measure/degenerate); **dual logical/physical names** (`Customer`/`dim_customer`);
+**per-model target database (Req 17)** — chosen at create time for physical levels,
+persisted as `model.dialect` (`postgres`/`snowflake`/`databricks`), authoritative for
+DDL export + the Inspector SQL tab; `modelDialect()` defaults legacy models to Postgres.
 
 **Connector framework + ETL (Phases 1–5, see `docs/CONNECTORS.md`):** canonical metadata
 contract, capability/typed-error contract, connection profiles (secret-ref only) + OS
@@ -201,6 +216,20 @@ deleted (round-trip tested).
 collapsible + drag-resizable** (shared `PanelChrome`), persisted to localStorage, with
 collapsed rails and layout presets (Full canvas / Modeling / AI-assisted / Review);
 canvas reclaims space (React Flow ResizeObserver, no `fitView` → positions preserved).
+**Model Explorer is scoped to the active model tab (Req 18)** — shows only the active
+model's tree (derived from `activeId`+`activeModel`, no separate Explorer state); `TabBar`
+switches models; expansion is per-model; selection auto-clears on switch via `loadModel`.
+A **Model Context Indicator** (Req 20) badge sits in the ribbon (`Model · Level ·
+Database`, pure display).
+
+**PostgreSQL object modeling (Req 19, in progress — erwin reference):** a canonical
+**object registry** (`src/model/objectRegistry.ts`) with honest per-object support flags
+drives the **capability matrix + roadmap** (`docs/POSTGRES_OBJECTS.md`). Real objects so
+far: tables/columns/PK/FK/unique + **check constraints**, indexes, views + **materialized
+views**, sequences, **first-class schemas**, domains, raw objects. The long tail
+(functions/procedures/triggers, roles/permissions, casts/collations/extensions, servers/
+tablespaces/transforms, UDTs, and the full PG **type-system expansion** §4) is catalogued
+as deferred in the matrix — NOT shown as empty placeholder categories.
 
 **AI Copilot (BYOLLM, §14 Stages 1–4):** a **ChatGPT-style** panel — flowing thread with
 user/assistant bubbles and a bottom composer (⌘↵). Propose → review (plan card with

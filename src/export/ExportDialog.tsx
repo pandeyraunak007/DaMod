@@ -8,7 +8,7 @@ import { exportModelDDL, exportWorkspaceDDL } from "./ddl";
 import { generateMigration } from "./migrate";
 import { exportSemanticYaml } from "./semanticExport";
 import { parseDdl } from "../import/reverse";
-import type { Model } from "../model/model";
+import { modelDialect, type Model } from "../model/model";
 import { joinPath, pickFile, readTextFile, writeFile } from "../persist/fs";
 
 type Scope = "model" | "workspace" | "semantic" | "migration";
@@ -24,7 +24,9 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   const semantic = useWorkspaceStore((s) => s.semantic);
   const activeModel = useModelStore((s) => s.model);
 
-  const [dialect, setDialect] = useState<DialectId>("postgres");
+  // Default to the model's own target database (Req 17) — it is authoritative for
+  // this model's DDL. The user can still override the dialect for a one-off export.
+  const [dialect, setDialect] = useState<DialectId>(modelDialect(activeModel) as DialectId);
   const [scope, setScope] = useState<Scope>("model");
   const [dropFirst, setDropFirst] = useState(false);
   const [ifNotExists, setIfNotExists] = useState(false);

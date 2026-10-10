@@ -160,6 +160,10 @@ export function tableDDL(
         .join(", ")})${riClause(d, fk)}`,
     );
   }
+  // Table-level CHECK constraints (Req 19). Expression is exported verbatim.
+  for (const c of entity.checks ?? []) {
+    if (c.expression.trim()) lines.push(`  CONSTRAINT ${q(c.name)} CHECK (${c.expression.trim()})`);
+  }
   let ddl = `${create} ${ref} (\n${lines.join(",\n")}\n)`;
   if (d.commentStyle === "inline" && entity.description) ddl += ` COMMENT ${sqlString(entity.description)}`;
   return ddl + ";";
@@ -238,9 +242,21 @@ function viewDDL(d: Dialect, v: NonNullable<Model["views"]>[number], schema?: st
     if (d.id === "databricks") {
       return `-- Databricks materialized views are limited; created as a regular view\nCREATE OR REPLACE VIEW ${ref} AS\n${body};`;
     }
-    return `CREATE MATERIALIZED VIEW ${ref} AS\n${body};`;
+    const withData = v.withNoData ? "\nWITH NO DATA" : "";
+    return `CREATE MATERIALIZED VIEW ${ref} AS\n${body}${withData};`;
   }
   return `CREATE OR REPLACE VIEW ${ref} AS\n${body};`;
+}
+
+function schemaDDL(d: Dialect, s: NonNullable<Model["schemas"]>[number]): string {
+  const ref = d.quote(s.name);
+  // AUTHORIZATION is Postgres-specific; other dialects don't accept it here.
+  const auth = d.id === "postgres" && s.owner ? ` AUTHORIZATION ${d.quote(s.owner)}` : "";
+  const create = `CREATE SCHEMA IF NOT EXISTS ${ref}${auth};`;
+  if (d.commentStyle === "commentOn" && s.comment) {
+    return `${create}\nCOMMENT ON SCHEMA ${ref} IS ${sqlString(s.comment)};`;
+  }
+  return create;
 }
 
 function rawObjectDDL(d: Dialect, o: NonNullable<Model["rawObjects"]>[number]): string | null {
@@ -248,10 +264,12 @@ function rawObjectDDL(d: Dialect, o: NonNullable<Model["rawObjects"]>[number]): 
   return `-- ${o.name}${o.kind ? ` (${o.kind})` : ""}\n${o.sql.trim()}`;
 }
 
-/** Sequences, indexes, views and raw objects for a model, as DDL blocks. */
+/** Schemas, sequences, indexes, views and raw objects for a model, as DDL blocks. */
 function objectBlocks(model: Model, d: Dialect, schema?: string): { pre: string[]; post: string[] } {
   const pre: string[] = [];
   const post: string[] = [];
+  const schemas = (model.schemas ?? []).map((s) => schemaDDL(d, s));
+  if (schemas.length) pre.push(schemas.join("\n")); // schemas must exist before their objects
   const seqs = (model.sequences ?? []).map((s) => sequenceDDL(d, s, schema));
   if (seqs.length) pre.push(seqs.join("\n"));
   const idxs = (model.indexes ?? [])

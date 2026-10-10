@@ -33,6 +33,7 @@ import { useWorkspaceStore } from "../store/workspaceStore";
 import { useUiStore } from "../store/uiStore";
 import { canvasControls } from "../canvas/canvasControls";
 import { MODEL_LEVELS, type ModelLevel, exportDisabledReason, levelTerms } from "../model/levels";
+import { ModelContextIndicator } from "./ModelContextIndicator";
 
 interface Props {
   onNewModel: () => void;
@@ -57,9 +58,9 @@ export function Toolbar(props: Props) {
   const { onToggleSemantic, semanticActive, onToggleCopilot, copilotActive } = props;
   const [tab, setTab] = useState<RibbonTab>("Home");
 
-  const modelName = useModelStore((s) => s.model.name);
   const wsName = useWorkspaceStore((s) => s.name);
   const wsPath = useWorkspaceStore((s) => s.path);
+  const activeId = useWorkspaceStore((s) => s.activeId);
   const openPicker = useWorkspaceStore((s) => s.openWorkspacePicker);
 
   return (
@@ -74,7 +75,7 @@ export function Toolbar(props: Props) {
           <FolderOpen size={14} strokeWidth={1.75} aria-hidden />
           {wsPath ? wsName : "Open workspace"}
         </button>
-        {wsPath && <span className="ribbon__crumb">/ {modelName}</span>}
+        {wsPath && activeId && <ModelContextIndicator />}
 
         <nav className="ribbon__tabs" role="tablist" aria-label="Ribbon tabs">
           {TABS.map((t) => (

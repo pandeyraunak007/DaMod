@@ -35,6 +35,12 @@ const zField = z.object({
   udps: z.array(zUdp).optional(),
 });
 
+const zCheck = z.object({
+  id: z.string(),
+  name: z.string(),
+  expression: z.string(),
+});
+
 const zEntity = z.object({
   id: z.string(),
   name: z.string(),
@@ -42,10 +48,12 @@ const zEntity = z.object({
   description: z.string().optional(),
   tags: z.array(z.string()).optional(),
   stereotype: z.enum(["fact", "dimension"]).optional(),
+  schema: z.string().optional(),
   note: z.string().optional(),
   udps: z.array(zUdp).optional(),
   position: z.object({ x: z.number(), y: z.number() }),
   fields: z.array(zField),
+  checks: z.array(zCheck).optional(),
 });
 
 const zRelationship = z.object({
@@ -73,8 +81,16 @@ const zView = z.object({
   name: z.string(),
   definition: z.string(),
   materialized: z.boolean().optional(),
+  withNoData: z.boolean().optional(),
   sources: z.array(z.string()).optional(),
   position: z.object({ x: z.number(), y: z.number() }),
+});
+
+const zSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  owner: z.string().optional(),
+  comment: z.string().optional(),
 });
 
 const zIndex = z.object({
@@ -119,12 +135,16 @@ const zModel = z.object({
   description: z.string().optional(),
   // Models written before levels existed default to Physical (FR-5.6 migration).
   level: z.enum(MODEL_LEVELS as unknown as [string, ...string[]]).optional().default("Physical"),
+  // Target database (Req 17). Optional: models written before Req 17 have none and
+  // keep current behaviour (Postgres default applied at use via modelDialect).
+  dialect: z.enum(["postgres", "snowflake", "databricks"]).optional(),
   notation: z.enum(["IE", "IDEF1X"]).optional(),
   derivedFrom: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
   entities: z.array(zEntity),
   relationships: z.array(zRelationship),
+  schemas: z.array(zSchema).optional(),
   views: z.array(zView).optional(),
   indexes: z.array(zIndex).optional(),
   sequences: z.array(zSequence).optional(),

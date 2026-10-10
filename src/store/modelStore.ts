@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import {
+  type CheckConstraint,
   type DbDialect,
   type Domain,
   type Entity,
@@ -8,18 +9,21 @@ import {
   type Model,
   type Notation,
   type Position,
+  type SchemaObj,
   type RawObject,
   type Relationship,
   type Sequence,
   type View,
   findEntity,
   findField,
+  newCheckConstraint,
   newDomain,
   newEntity,
   newField,
   newIndex,
   newModel,
   newRawObject,
+  newSchemaObject,
   newSequence,
   newView,
 } from "../model/model";
@@ -56,6 +60,7 @@ export type Selection =
   | { kind: "sequence"; id: string }
   | { kind: "rawObject"; id: string }
   | { kind: "domain"; id: string }
+  | { kind: "schema"; id: string }
   | null;
 
 export interface Notice {
@@ -93,7 +98,7 @@ interface ModelStore {
   renameEntity: (id: string, name: string) => string | null;
   updateEntity: (
     id: string,
-    patch: Partial<Pick<Entity, "logicalName" | "description" | "tags" | "stereotype" | "note" | "udps">>,
+    patch: Partial<Pick<Entity, "logicalName" | "description" | "tags" | "stereotype" | "note" | "udps" | "schema">>,
   ) => void;
   deleteEntity: (id: string) => DeleteEntityResult;
 
@@ -106,8 +111,18 @@ interface ModelStore {
   /** Add surrogate key + SCD-2 temporal columns to a dimension (Kimball). */
   applyScd2: (entityId: string) => void;
 
+  // table CHECK constraints (Req 19)
+  addCheck: (entityId: string) => string | null;
+  updateCheck: (entityId: string, checkId: string, patch: Partial<CheckConstraint>) => void;
+  deleteCheck: (entityId: string, checkId: string) => void;
+
+  // schemas (Req 19)
+  createSchema: () => string;
+  updateSchema: (id: string, patch: Partial<SchemaObj>) => void;
+  deleteSchema: (id: string) => void;
+
   // other database objects (views, indexes, sequences, raw objects)
-  createView: (position?: Position) => string;
+  createView: (position?: Position, materialized?: boolean) => string;
   updateView: (id: string, patch: Partial<View>) => void;
   deleteView: (id: string) => void;
   createIndex: (entityId: string) => string | null;
@@ -469,12 +484,13 @@ export const useModelStore = create<ModelStore>((set, get) => {
       });
     },
 
-    createView: (position) => {
+    createView: (position, materialized) => {
       const state = get();
       const taken = new Set((state.model.views ?? []).map((v) => v.name));
       const count = state.model.views?.length ?? 0;
       const pos = position ?? { x: 120 + (count % 4) * 260, y: 520 + Math.floor(count / 4) * 180 };
-      const view = newView(uniqueName("new_view", taken), pos);
+      const view = newView(uniqueName(materialized ? "new_matview" : "new_view", taken), pos);
+      if (materialized) view.materialized = true;
       commit((m) => {
         m.views = [...(m.views ?? []), view];
       });
@@ -537,6 +553,54 @@ export const useModelStore = create<ModelStore>((set, get) => {
       set((s) =>
         s.selection?.kind === "sequence" && s.selection.id === id ? { selection: null } : {},
       );
+    },
+
+    addCheck: (entityId) => {
+      const entity = findEntity(get().model, entityId);
+      if (!entity) return null;
+      const taken = new Set((entity.checks ?? []).map((c) => c.name));
+      const chk = newCheckConstraint(uniqueName(`chk_${entity.name.toLowerCase()}`, taken));
+      commit((m) => {
+        const e = findEntity(m, entityId);
+        if (e) e.checks = [...(e.checks ?? []), chk];
+      });
+      return chk.id;
+    },
+    updateCheck: (entityId, checkId, patch) => {
+      commit((m) => {
+        const e = findEntity(m, entityId);
+        if (e) e.checks = (e.checks ?? []).map((c) => (c.id === checkId ? { ...c, ...patch } : c));
+      });
+    },
+    deleteCheck: (entityId, checkId) => {
+      commit((m) => {
+        const e = findEntity(m, entityId);
+        if (e) e.checks = (e.checks ?? []).filter((c) => c.id !== checkId);
+      });
+    },
+
+    createSchema: () => {
+      const taken = new Set((get().model.schemas ?? []).map((s) => s.name));
+      const schema = newSchemaObject(uniqueName("new_schema", taken));
+      commit((m) => {
+        m.schemas = [...(m.schemas ?? []), schema];
+      });
+      set({ selection: { kind: "schema", id: schema.id } });
+      return schema.id;
+    },
+    updateSchema: (id, patch) => {
+      commit((m) => {
+        m.schemas = (m.schemas ?? []).map((s) => (s.id === id ? { ...s, ...patch } : s));
+      });
+    },
+    deleteSchema: (id) => {
+      commit((m) => {
+        m.schemas = (m.schemas ?? []).filter((s) => s.id !== id);
+        // Detach tables that named this schema (don't delete them — Req 19 §6/§8).
+        const removed = (get().model.schemas ?? []).find((s) => s.id === id)?.name;
+        if (removed) for (const e of m.entities) if (e.schema === removed) delete e.schema;
+      });
+      set((s) => (s.selection?.kind === "schema" && s.selection.id === id ? { selection: null } : {}));
     },
 
     createRawObject: (dialect) => {

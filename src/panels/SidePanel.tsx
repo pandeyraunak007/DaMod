@@ -20,7 +20,7 @@ import { validateIdentifier } from "../model/identifiers";
 import type { Entity, Field } from "../model/model";
 import { componentFor, entityKey, linksTouching } from "../links/links";
 import { newId } from "../lib/ids";
-import { ViewEditor, IndexEditor, SequenceEditor, RawObjectEditor } from "./DbObjectEditors";
+import { ViewEditor, IndexEditor, SequenceEditor, RawObjectEditor, SchemaEditor } from "./DbObjectEditors";
 
 // An input for identifier-valued names (entity/field). Keeps a local draft so the
 // field can be freely erased and retyped; commits to the store only when the value
@@ -96,7 +96,9 @@ export function SidePanel({ onCollapse }: { onCollapse: () => void }) {
             ? "Sequence"
             : selection?.kind === "rawObject"
               ? "Raw object"
-              : "Properties";
+              : selection?.kind === "schema"
+                ? "Schema"
+                : "Properties";
 
   return (
     <aside className="side">
@@ -119,6 +121,8 @@ export function SidePanel({ onCollapse }: { onCollapse: () => void }) {
         <SequenceEditor id={selection.id} onGone={clear} />
       ) : selection?.kind === "rawObject" ? (
         <RawObjectEditor id={selection.id} onGone={clear} />
+      ) : selection?.kind === "schema" ? (
+        <SchemaEditor id={selection.id} onGone={clear} />
       ) : (
         <div className="side__empty">
           <p>Nothing selected.</p>
