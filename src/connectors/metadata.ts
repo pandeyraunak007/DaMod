@@ -69,6 +69,7 @@ export type CanonicalColumn = z.infer<typeof zColumn>;
 export const RELATIONSHIP_PROVENANCE = [
   "declared-fk", // an actual database foreign key
   "ebs-metadata", // documented EBS/application dictionary relationship
+  "fusion-metadata", // documented Fusion Cloud business-object relationship / nested resource
   "etrm-import", // imported eTRM relationship/dependency metadata
   "user-mapping", // a mapping the user provided
   "ai-proposed", // inferred by the Copilot — must be reviewed before commit
@@ -132,6 +133,8 @@ const zSourceIdentity = z.object({
   ebsRelease: z.string().optional(),
   /** EBS instance / environment identifier, where known (non-sensitive). */
   ebsInstance: z.string().optional(),
+  /** Fusion Cloud REST API version (e.g. "11.13.18.05"), where applicable (Req 22). */
+  apiVersion: z.string().optional(),
 });
 
 /** Kinds of Oracle program unit surfaced in EBS application metadata (Req 21 §3C). */
@@ -178,6 +181,37 @@ export type ConcurrentProgram = z.infer<typeof zConcurrentProgram>;
 export type EbsLookup = z.infer<typeof zLookup>;
 export type ProgramUnit = z.infer<typeof zProgramUnit>;
 
+/** HTTP methods a Fusion REST resource supports. */
+export const HTTP_METHODS = ["GET", "POST", "PATCH", "PUT", "DELETE"] as const;
+
+const zApiResource = z.object({
+  name: z.string(),
+  path: z.string(),
+  methods: z.array(z.enum(HTTP_METHODS)).default([]),
+  version: z.string().optional(),
+  family: z.string().optional(),
+  description: z.string().optional(),
+});
+const zExtractDataStore = z.object({
+  name: z.string(),
+  offering: z.string(),
+  fields: z.array(z.string()).default([]),
+  incremental: z.boolean().optional(),
+  description: z.string().optional(),
+});
+
+/** Oracle Fusion Cloud API/extract metadata (Req 22 §2/§5) — API-oriented, NOT
+ *  relational tables. Business objects are modeled as canonical objects (kind
+ *  business-object); REST resources and extract data stores are reference facts
+ *  stored here, shown read-only (a Fusion object is not a DB table, §5). */
+export const zFusionMetadata = z.object({
+  apiResources: z.array(zApiResource).default([]),
+  extractDataStores: z.array(zExtractDataStore).default([]),
+});
+export type FusionMetadata = z.infer<typeof zFusionMetadata>;
+export type FusionApiResource = z.infer<typeof zApiResource>;
+export type FusionExtractDataStore = z.infer<typeof zExtractDataStore>;
+
 export const zCanonicalMetadata = z.object({
   metadataVersion: z.literal(METADATA_VERSION),
   source: zSourceIdentity,
@@ -185,6 +219,8 @@ export const zCanonicalMetadata = z.object({
   catalogs: z.array(zCatalog),
   /** EBS application-dictionary metadata (optional; present for oracle-ebs sources). */
   application: zEbsApplication.optional(),
+  /** Fusion Cloud API/extract metadata (optional; present for oracle-fusion sources). */
+  fusion: zFusionMetadata.optional(),
 });
 export type CanonicalMetadata = z.infer<typeof zCanonicalMetadata>;
 

@@ -7,6 +7,7 @@ import type { SourceSystemType } from "./metadata";
 import { createMockConnector } from "./mock/mockConnector";
 import { createPostgresConnector } from "./postgres/postgresConnector";
 import { createMockEbsConnector } from "./oracle/mockEbsConnector";
+import { createMockFusionConnector } from "./fusion/mockFusionConnector";
 
 const registry = new Map<SourceSystemType, ConnectorFactory>();
 
@@ -28,3 +29,6 @@ registerConnector("postgres", createPostgresConnector);
 // Oracle E-Business Suite — mock/offline connector (Req 21 Phase 1). The live
 // Rust Oracle adapter is deferred pending a driver-dependency sign-off.
 registerConnector("oracle-ebs", createMockEbsConnector);
+// Oracle Fusion Cloud — mock/offline connector (Req 22 Phase 1). The live REST
+// connector (tenant + OAuth + pagination/rate limits) is a later increment.
+registerConnector("oracle-fusion", createMockFusionConnector);

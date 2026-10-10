@@ -6,8 +6,10 @@ import { validateIdentifier } from "../../model/identifiers";
 import type { ConnectionProfile } from "../connection";
 import { getConnector } from "../registry";
 import { pgTestConnection, secretStore } from "../postgres/postgresConnector";
-import { metadataToModel, type ToModelResult } from "../toModel";
-import { ebsSnapshotToModel, ebsApplicationSummary, metadataToModelForSource } from "../oracle/ebs";
+import type { ToModelResult } from "../toModel";
+import { ebsApplicationSummary } from "../oracle/ebs";
+import { fusionApiSummary } from "../fusion/fusion";
+import { metadataToModelForSource } from "../buildModel";
 import { computeDrift, applyDrift, type DriftChange } from "../drift";
 import type { ModelDiff } from "../../export/migrate";
 import type { Model } from "../../model/model";
@@ -21,13 +23,22 @@ function connectorFor(p: ConnectionProfile): Connector | null {
   return getConnector(p.systemType as SourceSystemType) ?? null;
 }
 
-/** Build a model from discovered metadata, EBS-enriched for an oracle-ebs source. */
-function buildModel(p: ConnectionProfile, md: CanonicalMetadata, name: string, now: string): ToModelResult {
-  return p.systemType === "oracle-ebs" ? ebsSnapshotToModel(md, name, now) : metadataToModel(md, name, now);
+/** Build a model from discovered metadata, source-enriched (EBS/Fusion/plain). */
+function buildModel(_p: ConnectionProfile, md: CanonicalMetadata, name: string, now: string): ToModelResult {
+  return metadataToModelForSource(md, name, now);
 }
 
 function isEbs(p: ConnectionProfile): boolean {
   return p.systemType === "oracle-ebs";
+}
+
+function isFusion(p: ConnectionProfile): boolean {
+  return p.systemType === "oracle-fusion";
+}
+
+/** An application source modeled offline via a mock connector (no DB credentials). */
+function isAppMock(p: ConnectionProfile): boolean {
+  return isEbs(p) || isFusion(p);
 }
 
 // Read-only EBS application-dictionary counts in the reverse-engineer preview
@@ -43,6 +54,20 @@ function EbsApplicationLine({ metadata }: { metadata: CanonicalMetadata }) {
       EBS application metadata: <strong>{s.concurrentPrograms}</strong> concurrent programs ·{" "}
       <strong>{s.lookups}</strong> lookups · <strong>{s.programUnits}</strong> program units
       {units ? ` (${units})` : ""}. Stored with the snapshot; not imported as model tables.
+    </p>
+  );
+}
+
+// Read-only Fusion API/extract counts in the reverse-engineer preview (Req 22 §2/§5).
+function FusionApiLine({ metadata }: { metadata: CanonicalMetadata }) {
+  const s = fusionApiSummary(metadata);
+  if (!s.apiResources && !s.extractDataStores) return null;
+  return (
+    <p className="field__hint">
+      Fusion metadata: <strong>{s.apiResources}</strong> REST resources ·{" "}
+      <strong>{s.extractDataStores}</strong> extract data stores
+      {metadata.source.apiVersion ? ` · API ${metadata.source.apiVersion}` : ""}. Stored with
+      the snapshot; business objects import as entities.
     </p>
   );
 }
@@ -107,6 +132,11 @@ export function ConnectionsDialog({
     // Mock/offline Oracle EBS source — no host/credentials needed (Req 21 Phase 1/2).
     addConnection({ id, name: "oracle_ebs", systemType: "oracle-ebs", params: { database: "VIS" } });
   };
+  const newFusionConnection = () => {
+    const id = newId("connection");
+    // Mock/offline Oracle Fusion Cloud source — instance URL only (Req 22 Phase 1).
+    addConnection({ id, name: "oracle_fusion", systemType: "oracle-fusion", params: { baseUrl: "https://example.fa.ocs.oraclecloud.com" } });
+  };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -133,6 +163,7 @@ export function ConnectionsDialog({
             {connections.length === 0 && <p className="side__hint">No connections yet.</p>}
             <button className="btn btn--small" onClick={newPgConnection}>+ PostgreSQL connection</button>
             <button className="btn btn--small" onClick={newEbsConnection}>+ Oracle EBS (mock)</button>
+            <button className="btn btn--small" onClick={newFusionConnection}>+ Oracle Fusion (mock)</button>
             <button
               className={`conn__item ${importing ? "conn__item--active" : ""}`}
               onClick={() => {
@@ -197,21 +228,29 @@ function ConnectionEditor({
 
   // Discovery uses the SAVED profile + the keychain secret, so the connection
   // must be fully filled in AND saved (no unsaved edits) before reverse-engineer
-  // or refresh. Guard the buttons and explain why they are disabled. An EBS (mock)
-  // source needs only an instance name and carries no credentials.
+  // or refresh. Guard the buttons and explain why they are disabled. An app-mock
+  // source (EBS / Fusion) needs only an instance and carries no credentials.
   const ebs = isEbs(profile);
-  const configured = ebs ? !!params.database?.trim() : !!(params.host?.trim() && params.database?.trim() && params.user?.trim());
+  const fusion = isFusion(profile);
+  const appMock = isAppMock(profile);
+  // Fusion uses `baseUrl` (instance URL); EBS uses `database` (service name).
+  const instanceKey = fusion ? "baseUrl" : "database";
+  const configured = appMock
+    ? !!params[instanceKey]?.trim()
+    : !!(params.host?.trim() && params.database?.trim() && params.user?.trim());
   const dirty =
     password.length > 0 ||
     name !== profile.name ||
     JSON.stringify(params) !== JSON.stringify(profile.params);
   const ready = configured && !dirty;
   const readyReason = !configured
-    ? ebs
-      ? "Enter the EBS instance / service name."
-      : "Fill in host, database and user."
+    ? fusion
+      ? "Enter the Fusion instance URL."
+      : ebs
+        ? "Enter the EBS instance / service name."
+        : "Fill in host, database and user."
     : dirty
-      ? ebs
+      ? appMock
         ? "Save your changes first."
         : "Save your changes first (stores the password in the OS keychain)."
       : null;
@@ -235,7 +274,7 @@ function ConnectionEditor({
     setBusy(true);
     setStatus("Testing…");
     try {
-      if (ebs) {
+      if (appMock) {
         const c = connectorFor(profile);
         const res = c
           ? await c.testConnection({ ...profile, params })
@@ -260,16 +299,20 @@ function ConnectionEditor({
         <input className={nameError ? "is-error" : ""} value={name} onChange={(e) => setName(e.target.value)} />
         {nameError && <span className="toolbar__model-error">{nameError}</span>}
       </div>
-      {ebs ? (
+      {appMock ? (
         <>
           <div className="field">
-            <label>EBS instance / service name</label>
-            <input value={params.database ?? ""} placeholder="e.g. VIS" onChange={(e) => setParam("database", e.target.value)} />
+            <label>{fusion ? "Fusion instance URL" : "EBS instance / service name"}</label>
+            <input
+              value={params[instanceKey] ?? ""}
+              placeholder={fusion ? "https://<tenant>.fa.ocs.oraclecloud.com" : "e.g. VIS"}
+              onChange={(e) => setParam(instanceKey, e.target.value)}
+            />
           </div>
           <p className="field__hint">
-            Oracle E-Business Suite (mock/offline source). Read-only metadata discovery — no
-            credentials required; the live Oracle adapter is pending a driver sign-off
-            (see docs/ORACLE_EBS.md). EBS release &amp; DB version are reported on Test.
+            {fusion
+              ? "Oracle Fusion Cloud (mock/offline source). Read-only metadata discovery — no credentials; the live REST connector (tenant + OAuth) is a later increment (see docs/ORACLE_FUSION.md). API version is reported on Test."
+              : "Oracle E-Business Suite (mock/offline source). Read-only metadata discovery — no credentials required; the live Oracle adapter is pending a driver sign-off (see docs/ORACLE_EBS.md). EBS release & DB version are reported on Test."}
           </p>
         </>
       ) : (
@@ -463,6 +506,7 @@ function ReversePanel({
               )}
             </p>
             {discovery && isEbs(profile) && <EbsApplicationLine metadata={discovery.metadata} />}
+            {discovery && isFusion(profile) && <FusionApiLine metadata={discovery.metadata} />}
             {preview.warnings.length > 0 && (
               <details>
                 <summary className="field__hint">{preview.warnings.length} note(s)</summary>

@@ -9,12 +9,15 @@
 
 ## NEXT SESSION — START HERE
 
-**Current status:** Branch `main`. Pushed: `cf8c8e2` (EBS sample fixture) and the rest of
-Reqs 17–21 Phases 1–3 + the driver decision + file import. **Req 21 Phase 4 (part) —
-subject areas by EBS product — just landed, uncommitted in the working tree.** Author
-commits/pushes explicitly, do not commit or push unless asked. **320 TS tests pass ·
-typecheck clean · `npm run build` clean · `cargo build` clean.** See the top DECISIONS
-entries:
+**Current status:** Branch `main`. Pushed: `0d2aa9c` (Req 21 Phase 4 subject areas) and
+all prior Reqs 17–21. **Req 22 (Oracle Fusion Cloud, Phase 1 + reverse-engineering,
+offline/mock) just landed, uncommitted in the working tree.** Author commits/pushes
+explicitly, do not commit or push unless asked. **334 TS tests pass · typecheck clean ·
+`npm run build` clean · `cargo build` clean.** See the top DECISIONS entries:
+- **Req 22 (Fusion Cloud, offline/mock):** `oracle-fusion` mock connector (Financials),
+  `mapFusionType`, `fusionSnapshotToModel`, `metadata.fusion` (REST resources + extract
+  data stores), `source.apiVersion`, connector-generic Connections UI ("+ Oracle Fusion
+  (mock)"). Live REST connector + Fusion Explorer/mapping deferred (`docs/ORACLE_FUSION.md`).
 - **Req 21 Phase 4 (part):** `SubjectArea` model concept + `createSubjectAreaFromProduct`
   + EBS Explorer "+ area" / Subject Areas list. A lens, not a container (delete never
   deletes entities).

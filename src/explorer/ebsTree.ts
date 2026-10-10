@@ -26,10 +26,16 @@ export function ebsEntitySchema(e: Entity): string | undefined {
   return e.source?.schema ?? e.schema ?? undefined;
 }
 
-/** True when the active model carries EBS/Oracle discovery provenance. */
+/** True when the active model carries EBS discovery provenance. Deliberately
+ *  EBS-specific (system / `ebs:` tag) — NOT a generic `source.product` check — so a
+ *  Fusion model (which also sets `source.product` to its family) does not light up
+ *  the EBS-labelled view. */
 export function hasEbsContent(model: Model): boolean {
   return model.entities.some(
-    (e) => !!ebsEntityProduct(e) || e.source?.system === "oracle-ebs" || e.source?.system === "oracle",
+    (e) =>
+      e.source?.system === "oracle-ebs" ||
+      e.source?.system === "oracle" ||
+      (e.tags ?? []).some((t) => t.startsWith("ebs:")),
   );
 }
 

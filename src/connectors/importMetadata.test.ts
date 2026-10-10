@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { parseMetadataFile, serializeMetadata } from "./snapshot";
 import { ebsMockMetadata } from "./oracle/mockEbsConnector";
-import { metadataToModelForSource } from "./oracle/ebs";
+import { metadataToModelForSource } from "./buildModel";
 
 // Req 21 — the "imported-only" driver path: load an eTRM-derived / exported metadata
 // package from a file, offline, with no Oracle driver or live connection.

@@ -79,6 +79,7 @@ function metadataToPlain(md: CanonicalMetadata): Record<string, unknown> {
   // separate from the DB version.
   if (md.source.ebsRelease) source.ebsRelease = md.source.ebsRelease;
   if (md.source.ebsInstance) source.ebsInstance = md.source.ebsInstance;
+  if (md.source.apiVersion) source.apiVersion = md.source.apiVersion;
   const out: Record<string, unknown> = {
     metadataVersion: md.metadataVersion,
     source,
@@ -144,6 +145,30 @@ function metadataToPlain(md: CanonicalMetadata): Record<string, unknown> {
           if (u.product) r.product = u.product;
           if (u.description) r.description = u.description;
           return r;
+        }),
+    };
+  }
+
+  // Fusion Cloud API/extract metadata (Req 22 §5) — deterministic, omit-empty.
+  const fus = md.fusion;
+  if (fus && (fus.apiResources.length || fus.extractDataStores.length)) {
+    out.fusion = {
+      apiResources: [...fus.apiResources]
+        .sort((a, b) => a.path.localeCompare(b.path))
+        .map((r) => {
+          const o: Record<string, unknown> = { name: r.name, path: r.path, methods: [...r.methods] };
+          if (r.version) o.version = r.version;
+          if (r.family) o.family = r.family;
+          if (r.description) o.description = r.description;
+          return o;
+        }),
+      extractDataStores: [...fus.extractDataStores]
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((d) => {
+          const o: Record<string, unknown> = { name: d.name, offering: d.offering, fields: [...d.fields] };
+          if (d.incremental !== undefined) o.incremental = d.incremental;
+          if (d.description) o.description = d.description;
+          return o;
         }),
     };
   }

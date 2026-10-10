@@ -5,6 +5,34 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Req 22 (Phase 1 + reverse): Oracle Fusion Cloud offline/mock foundation
+
+Fusion Cloud is an API/extract source, not a DB. Built the offline/mock foundation on the
+existing connector framework (no tenant / OAuth / network — untestable here), mirroring
+the EBS approach and reusing everything downstream.
+
+- **Contract (backward-compatible):** `source.apiVersion` (Fusion REST version, separate
+  from any DB version); `fusion-metadata` added to `RELATIONSHIP_PROVENANCE` (documented
+  Fusion relationships / nested resources are not DB FKs); optional `metadata.fusion`
+  = { apiResources (path/methods/version/family), extractDataStores (offering/fields/
+  incremental) }. API/extract metadata are reference facts on the snapshot, NOT model
+  tables (§5). `snapshot.metadataToPlain` serializes all of it deterministically.
+- **`mapFusionType`** (JSON-ish REST spellings → canonical set; unmappable → native).
+- **Mock Fusion connector** (Financials: Supplier, InvoiceHeader, InvoiceLine nested
+  child) + `native.fusion` annotations (family/module/apiPath/apiVersion/verified).
+- **`fusionSnapshotToModel`** reuses `metadataToModel`: family tags (`fusion:<FAMILY>`),
+  family/module onto `entity.source`, parent-child relationships, composite keys.
+- **Neutral dispatcher:** moved `metadataToModelForSource` out of `ebs.ts` into
+  `connectors/buildModel.ts` (EBS/Fusion/plain) to avoid EBS↔Fusion coupling.
+- **UI:** generalized the Connections editor from EBS-only to any **app-mock** source;
+  "+ Oracle Fusion (mock)" (instance URL only, no credentials); Test reports the API
+  version; Reverse-engineer imports a Fusion model; the reverse preview shows REST /
+  extract counts. Tightened `hasEbsContent` so Fusion models don't trigger the
+  EBS-labelled Explorer view (Fusion view deferred).
+- No new deps, no Rust. 334 TS tests (+14: `fusion/fusion.test.ts` + Fusion dialog render
+  test); tsc/build/cargo clean. Live REST connector + Fusion Explorer/Inspector/mapping/
+  extraction are deferred (`docs/ORACLE_FUSION.md`).
+
 ## 2026-10-11 — Req 21 Phase 4 (part): subject areas by EBS product
 
 Subject areas (§6) — named entity groupings for focus/navigation. Generally useful, but
