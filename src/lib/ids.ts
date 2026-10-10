@@ -22,6 +22,9 @@ export const ID_PREFIXES = {
   sequence: "q_",
   rawObject: "o_",
   domain: "n_",
+  connection: "g_",
+  snapshot: "s_",
+  pipeline: "p_",
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;
@@ -46,7 +49,7 @@ export function newId(kind: IdKind): string {
   return ID_PREFIXES[kind] + randomSuffix();
 }
 
-const ID_PATTERN = new RegExp(`^(m|e|f|r|l|c|t|d|k|b|v|x|q|o|n)_[0-9a-z]{${RANDOM_LENGTH}}$`);
+const ID_PATTERN = new RegExp(`^(m|e|f|r|l|c|t|d|k|b|v|x|q|o|n|g|s|p)_[0-9a-z]{${RANDOM_LENGTH}}$`);
 
 /** True when a string is a well-formed DaMod ID of any kind. */
 export function isId(value: string): boolean {

@@ -5,6 +5,54 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-10 — Connector framework & ETL platform (Phase 1 foundation)
+
+New direction: extend the app into a local-first data-modeling **and ETL design**
+platform with a reusable connector framework (discover → model → compare → plan
+pipelines). This is an **extension, not a rewrite** — all existing modeling,
+persistence, DDL export, semantic layer and validation are preserved. Full
+contract reference lives in `docs/CONNECTORS.md`; roadmap phases 0–9.
+
+**Phase 0 audit (verified, not assumed):** git clean at `b73e123`, 121 tests
+pass, typecheck + build clean, ~12.4k lines (incl. tests). Confirmed reusable
+pieces: model factories + fixed type set, `mapSqlType`, `diffModels`/
+`generateMigration`, the deterministic serialize pattern, and the Zod+version
+persistence pattern.
+
+**Phase 1 implemented — connector foundation (`src/connectors/`), no DB driver:**
+- `connector.ts` — one `Connector` contract (test/listSchemas/discover), driver-
+  independent; **metadata discovery kept separate from data extraction** (reverse
+  engineering never reads rows).
+- `capabilities.ts` + `errors.ts` — declared capabilities; **unsupported ops throw
+  a typed `ConnectorError("unsupported")`**, never a silent empty success.
+- `metadata.ts` — versioned, Zod-validated **canonical metadata**. Object-centric
+  (`kind`: table/view/business-object/api-resource/…) so it extends to app sources
+  like Fusion without a table abstraction. `normalizedType` **reuses the existing
+  fixed modeling type set** (the bridge to `.model.json`); native type/id/metadata
+  preserved for round-trip fidelity.
+- `connection.ts` — `ConnectionProfile` holds a **`secretRef` only**; `findSecretLeaks`
+  guard. No plaintext credential may enter JSON/logs/Git.
+- `snapshot.ts` — `SourceSnapshot` + provenance, **stable metadata separated from
+  operational timestamps**; deterministic serialization (byte-identical across
+  serialize→parse→serialize); `parseSnapshot` rejects credential-bearing files.
+- `registry.ts` + `mock/mockConnector.ts` — registry-resolved connectors; an
+  in-memory mock (composite keys, self-ref, view, quoted identifier, unmappable
+  native type) to build/test the pipeline before the Rust Postgres adapter.
+- 13 new tests; **134 total pass**; build clean; no existing file's behavior changed.
+
+**Decisions made here:** (1) connector contract lives in TS, with live drivers to
+run in Rust/Tauri behind `invoke` (Postgres can't be opened from React, and creds
+must stay out of the renderer). (2) Reuse the one model format + `mapSqlType` for
+normalization — no second modeling engine. (3) New artifacts (snapshots, later
+connections/pipelines) follow the existing versioned-JSON + deterministic-serialize
++ Zod conventions.
+**Needs author approval before Phase 2:** adding a PostgreSQL driver crate to the
+Rust shell (packaging/security/macOS), and acknowledging the 15k LOC budget will
+need a documented raise as the platform grows.
+
+**Next task:** Phase 2 — PostgreSQL connector (driver eval → Rust discovery via
+catalog queries → TS client over the contract → integration tests on a docker PG).
+
 ## 2026-10-10 — Domains, reverse-engineering and forward-engineering (beyond-spec, ERwin)
 
 Author asked to continue development with three ERwin-style features: reusable

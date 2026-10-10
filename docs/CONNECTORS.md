@@ -1,0 +1,158 @@
+# Connector Framework & ETL Planning — Architecture
+
+Status: **Phase 1 (connector foundation) implemented.** Phases 2+ (live
+PostgreSQL, reverse-engineering integration, refresh/drift, pipeline planning)
+are specified here but not yet built. This document is the contract reference;
+`DECISIONS.md` carries the dated decision log.
+
+Guiding principle: **discover once, normalize once, reuse** across modeling,
+comparison, pipeline planning, and semantic modeling. There is exactly one
+discovery/metadata path — no separate implementations for reverse engineering
+and ETL.
+
+All code lives under `src/connectors/`. It is pure TypeScript with Zod; no DB
+driver is bundled yet. The live PostgreSQL adapter (Phase 2) will run its driver
+in the Rust/Tauri layer and expose the same contract to TypeScript over `invoke`.
+
+---
+
+## 1. Connector interface (`connector.ts`)
+
+One `Connector` interface every adapter implements, independent of its driver or
+language:
+
+```
+interface Connector {
+  id; version; systemType
+  capabilities(): Capability[]
+  testConnection(profile): Promise<ConnectionTestResult>   // no user data read
+  listSchemas(profile): Promise<string[]>
+  discover(profile, options?): Promise<DiscoveryResult>    // METADATA ONLY
+}
+```
+
+- **Metadata discovery is separate from data extraction.** Reverse engineering
+  must never read whole tables; `discover` returns structure, not rows.
+- Extraction (`fullExtract` / `incrementalExtract`) is a later, capability-gated,
+  explicitly-authorized concern — not part of the discovery path.
+- Connectors are resolved through `registry.ts` (`getConnector(systemType)`), so
+  adding a source never touches the canvas or the pipeline planner.
+
+## 2. Capability model (`capabilities.ts`)
+
+A connector declares the subset of operations it supports (`capabilities()`).
+**Unsupported operations are explicit**: calling one throws a typed
+`ConnectorError("unsupported")` — never a silent empty result or false success
+(`errors.ts`). Not every source supports every capability (e.g. an app/API
+source has no `discoverIndexes`).
+
+## 3. Canonical metadata contract (`metadata.ts`)
+
+Versioned (`metadataVersion`), Zod-validated. Object-centric, not table-centric:
+
+```
+CanonicalMetadata
+  source: { systemType, name, productVersion? }   // name is non-secret
+  capabilities: Capability[]
+  catalogs: [{ name, schemas: [{ name, objects: SourceObject[] }] }]
+
+SourceObject { name, kind, columns[], primaryKey?, foreignKeys[], indexes[],
+               comment?, nativeId?, native? }      // kind ∈ table|view|
+                                                   // business-object|api-resource|…
+Column { name, ordinal, nativeType, normalizedType?, nullable, default?,
+         generated?, comment?, nativeId? }
+```
+
+- **`normalizedType` reuses the application's fixed modeling type set**
+  (`model/dataTypes.ts`) — the bridge into `.model.json`. When a native type has
+  no clean mapping, `normalizedType` is omitted and `nativeType` is preserved.
+- **Native fidelity is preserved** (`nativeType`, `nativeId`, `native`) so
+  round-trips and schema comparison stay possible.
+- **Extensible to non-DB sources:** `kind` lets Oracle Fusion business objects /
+  API resources be represented without forcing them into a table abstraction.
+  Fusion/EBS are *not* assumed to be reachable as database tables.
+
+## 4. Source snapshot & provenance (`snapshot.ts`)
+
+A `SourceSnapshot` records what a source contained at one discovery point.
+
+```
+SourceSnapshot { snapshotVersion, id, connectionRef, metadata, provenance }
+Provenance { connectorId, connectorVersion, discoveredAt,
+             schemasDiscovered[], capabilitiesUsed[] }
+```
+
+- **Stable vs operational split:** `metadata` is the stable, diffable content;
+  `provenance` holds operational data (timestamps). `serializeMetadata` is
+  deterministic and **excludes** timestamps, so an unchanged schema is
+  byte-identical across refreshes (no meaningless Git diffs).
+- Deterministic serialization uses fixed key order + sorted collections (mirrors
+  `persist/serialize.ts`), verified byte-identical through serialize→parse→
+  serialize.
+- **`connectionRef` is an id, never credentials.** `parseSnapshot` *rejects* any
+  snapshot that contains credential-like fields (`findSecretLeaks`).
+
+## 5. Credential storage (`connection.ts`)
+
+- A `ConnectionProfile` holds only non-secret params plus a `secretRef` — an
+  opaque key into the OS secure store (keychain), resolved in the Rust layer at
+  connection time.
+- **No plaintext secret ever lands in workspace JSON, model JSON, snapshots,
+  pipeline artifacts, logs, exports, or Git.** `findSecretLeaks` is a reusable
+  guard (used by `parseSnapshot` and asserted in tests).
+- Keychain integration itself is a Rust/Tauri concern (Phase 2).
+
+## 6. Schema refresh & drift (planned — Phase 4)
+
+Refresh never blindly overwrites a model:
+
+1. discover → new snapshot → 2. compare against previous snapshot + saved model →
+3. classify added/removed/changed (and *possible* renames, flagged for review,
+not auto-applied when evidence is insufficient) → 4. user reviews/approves →
+5. apply accepted changes while preserving unrelated manual edits → 6. save
+atomically.
+
+Will reuse `export/migrate.ts` (`diffModels` / `generateMigration`) but
+distinguish **physical source drift** from **user-authored model changes**.
+
+## 7. Pipeline specification & planner (planned — Phase 5)
+
+A separate, versioned, Zod-validated `PipelineSpec`: source connector +
+connection ref, source model/snapshot version, selected objects/columns, target
+platform/objects, source→target mappings, type conversions, explicit
+transformations, dependencies/order, load strategy, validation results. The
+planner **consumes canonical metadata already discovered** — it never re-runs
+discovery. Target DDL reuses the existing `export/` generators. Generating target
+DDL is *not* executing a pipeline; discovery, mapping, spec, DDL generation, and
+execution are kept separate. Execution (Phase 6) is explicitly authorized,
+validated, bounded, and never runs unvalidated/AI-generated SQL.
+
+## 8. MCP / AI (future — Phase 9)
+
+Once the contracts are stable, expose narrowly-scoped authorized operations
+(`list_connections`, `discover_schema`, `get_model`, `compare_model`,
+`generate_pipeline_plan`, `validate_pipeline_plan`). AI output is validated
+against these canonical contracts and existing rules; it never bypasses
+permissions or executes destructive operations.
+
+---
+
+## Reused existing components (no duplication)
+
+| Existing | Reused for |
+|---|---|
+| `model/dataTypes.ts` fixed type set | `normalizedType` — the model bridge |
+| `import/reverse.ts` `mapSqlType` | native-type → fixed-type normalization |
+| `export/migrate.ts` diff/migration | schema-drift comparison (Phase 4) |
+| `export/*` DDL generators | pipeline target DDL (Phase 5) |
+| `persist/serialize.ts` pattern | deterministic snapshot/spec serialization |
+| `persist/schema.ts` Zod + versioning | metadata/snapshot validation + migration |
+
+## Test coverage (Phase 1)
+
+`src/connectors/connectors.test.ts` — 13 tests: registry resolution, capability
+declaration, connection test, discovery of composite keys / foreign keys /
+self-reference, native-type preservation, schema filtering + `includeViews`,
+explicit unsupported-capability error, metadata validation (reject bad shape /
+unknown normalized type), snapshot determinism, snapshot round-trip, credential
+rejection in snapshots, and credential-leak detection.

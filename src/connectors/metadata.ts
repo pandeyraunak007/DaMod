@@ -1,0 +1,150 @@
+// Canonical metadata contract (§3.4). A versioned, Zod-validated representation
+// of what a connector discovered in a source, normalized once so modeling,
+// comparison, and pipeline planning all reuse it ("discover once, normalize
+// once, reuse"). Native types/identifiers are preserved alongside the normalized
+// view so round-trips and future schema comparison stay possible.
+//
+// The shape is deliberately object-centric rather than table-centric: a
+// SourceObject has a `kind` (table/view/businessObject/apiResource/…), so the
+// contract extends to application sources (e.g. Oracle Fusion) that are not
+// directly-accessible database tables. Relational discovery uses table/view.
+
+import { z } from "zod";
+import { DATA_TYPE_KINDS } from "../model/dataTypes";
+import { CAPABILITIES } from "./capabilities";
+
+export const METADATA_VERSION = 1;
+
+/** The kind of source system a metadata set came from. Extensible. */
+export const SOURCE_SYSTEM_TYPES = [
+  "postgres",
+  "oracle",
+  "oracle-ebs",
+  "oracle-fusion",
+  "snowflake",
+  "databricks",
+  "sql-file",
+  "mock",
+] as const;
+export type SourceSystemType = (typeof SOURCE_SYSTEM_TYPES)[number];
+
+/** The kind of a discovered object. Tables/views for DBs; the rest for apps. */
+export const OBJECT_KINDS = [
+  "table",
+  "view",
+  "materialized-view",
+  "business-object",
+  "api-resource",
+  "other",
+] as const;
+export type ObjectKind = (typeof OBJECT_KINDS)[number];
+
+const zNormalizedType = z.object({
+  // Reuses the application's fixed modeling type set — the bridge to the model.
+  type: z.enum(DATA_TYPE_KINDS as unknown as [string, ...string[]]),
+  length: z.number().int().positive().optional(),
+  precision: z.number().int().positive().optional(),
+  scale: z.number().int().nonnegative().optional(),
+});
+export type NormalizedType = z.infer<typeof zNormalizedType>;
+
+const zColumn = z.object({
+  name: z.string(),
+  ordinal: z.number().int().nonnegative(),
+  /** The source's own type spelling, preserved verbatim (e.g. "timestamptz"). */
+  nativeType: z.string(),
+  /** The type mapped into the fixed modeling set; omitted if unmappable. */
+  normalizedType: zNormalizedType.optional(),
+  nullable: z.boolean(),
+  default: z.string().optional(),
+  generated: z.boolean().optional(),
+  comment: z.string().optional(),
+  nativeId: z.string().optional(),
+});
+export type CanonicalColumn = z.infer<typeof zColumn>;
+
+const zForeignKey = z.object({
+  name: z.string().optional(),
+  columns: z.array(z.string()).min(1),
+  refSchema: z.string().optional(),
+  refObject: z.string(),
+  refColumns: z.array(z.string()).min(1),
+  onDelete: z.string().optional(),
+  onUpdate: z.string().optional(),
+});
+export type CanonicalForeignKey = z.infer<typeof zForeignKey>;
+
+const zIndex = z.object({
+  name: z.string(),
+  columns: z.array(z.string()).min(1),
+  unique: z.boolean(),
+});
+
+const zObject = z.object({
+  name: z.string(),
+  kind: z.enum(OBJECT_KINDS),
+  columns: z.array(zColumn),
+  primaryKey: z.array(z.string()).optional(), // column names, in key order
+  foreignKeys: z.array(zForeignKey).default([]),
+  indexes: z.array(zIndex).default([]),
+  comment: z.string().optional(),
+  nativeId: z.string().optional(),
+  /** Preserved source-native metadata that has no normalized representation. */
+  native: z.record(z.string(), z.unknown()).optional(),
+});
+export type CanonicalObject = z.infer<typeof zObject>;
+
+const zSchema = z.object({
+  name: z.string(),
+  objects: z.array(zObject),
+});
+export type CanonicalSchema = z.infer<typeof zSchema>;
+
+const zCatalog = z.object({
+  name: z.string(),
+  schemas: z.array(zSchema),
+});
+
+const zSourceIdentity = z.object({
+  systemType: z.enum(SOURCE_SYSTEM_TYPES),
+  /** A stable, non-sensitive label for the source (e.g. host/db, never creds). */
+  name: z.string(),
+  productVersion: z.string().optional(),
+});
+
+export const zCanonicalMetadata = z.object({
+  metadataVersion: z.literal(METADATA_VERSION),
+  source: zSourceIdentity,
+  capabilities: z.array(z.enum(CAPABILITIES as unknown as [string, ...string[]])).default([]),
+  catalogs: z.array(zCatalog),
+});
+export type CanonicalMetadata = z.infer<typeof zCanonicalMetadata>;
+
+export type ParseResult<T> = { ok: true; value: T } | { ok: false; error: string };
+
+function firstIssue(err: z.ZodError): string {
+  const issue = err.issues[0];
+  const path = issue.path.join(".");
+  return path ? `${path}: ${issue.message}` : issue.message;
+}
+
+/** Validate an untrusted metadata object (e.g. from a connector or disk). */
+export function parseMetadata(raw: unknown): ParseResult<CanonicalMetadata> {
+  const parsed = zCanonicalMetadata.safeParse(raw);
+  return parsed.success
+    ? { ok: true, value: parsed.data }
+    : { ok: false, error: firstIssue(parsed.error) };
+}
+
+/** Every object across all catalogs/schemas, with its schema name. */
+export function allObjects(
+  md: CanonicalMetadata,
+): { schema: string; object: CanonicalObject }[] {
+  const out: { schema: string; object: CanonicalObject }[] = [];
+  for (const cat of md.catalogs) {
+    for (const sch of cat.schemas) {
+      for (const obj of sch.objects) out.push({ schema: sch.name, object: obj });
+    }
+  }
+  return out;
+}
