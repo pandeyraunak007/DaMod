@@ -30,7 +30,7 @@ import { useModelStore } from "../store/modelStore";
 import { useWorkspaceStore } from "../store/workspaceStore";
 import { useUiStore } from "../store/uiStore";
 import { canvasControls } from "../canvas/canvasControls";
-import { MODEL_LEVELS, type ModelLevel, exportDisabledReason } from "../model/levels";
+import { MODEL_LEVELS, type ModelLevel, exportDisabledReason, levelTerms } from "../model/levels";
 
 interface Props {
   onNewModel: () => void;
@@ -184,6 +184,7 @@ function HomeTab({ onOpenDomains }: { onOpenDomains: () => void }) {
   const arrange = useModelStore((s) => s.arrange);
   const arrangeStar = useModelStore((s) => s.arrangeStar);
   const hasStereotypes = useModelStore((s) => s.model.entities.some((e) => e.stereotype));
+  const terms = useModelStore((s) => levelTerms(s.model.level));
   const undo = useModelStore((s) => s.undo);
   const redo = useModelStore((s) => s.redo);
   const canUndo = useModelStore((s) => s.past.length > 0);
@@ -229,7 +230,7 @@ function HomeTab({ onOpenDomains }: { onOpenDomains: () => void }) {
         <div className="rgroup__title">Model</div>
       </div>
       <RGroup title="Add">
-        <RibbonButton Icon={Table} label="Entity" onClick={() => createEntity()} />
+        <RibbonButton Icon={Table} label={terms.entity} title={`Add ${terms.entity.toLowerCase()}`} onClick={() => createEntity()} />
         <RibbonButton Icon={Shapes} label="Domains" title="Reusable named types" onClick={onOpenDomains} />
       </RGroup>
       <RGroup title="Layout">

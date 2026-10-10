@@ -5,6 +5,42 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-10 — Level-aware presentation (erwin terminology per modeling level)
+
+Reported bug: switching a model between Logical and Physical did not change the
+Model Explorer (still "Entities"/"fields", physical-only objects always shown).
+**Root cause (diagnosed, not assumed):** the Explorer already re-renders on level
+change (it reads the active model reactively) — the problem was a **missing
+level-aware presentation layer**; all labels were hardcoded and physical-only
+groups were unconditional. Not stale state, not caching.
+
+- **One source of truth** (`model/levels.ts`): `levelTerms(level)` →
+  Conceptual = Business Entity/Attribute, Logical = Entity/Attribute,
+  Physical & Physical/Logical = Table/Column; `showsPhysicalObjects(level)` (true
+  only where there's a physical implementation — Physical & Physical/Logical);
+  `showsKeys(level)` (false at Conceptual). Pure functions, presentation-only.
+- **Model Explorer** derives every label from the **per-model** level (so two open
+  models at different levels each read correctly): group headers (Entities↔Tables),
+  `+`/context-menu add actions (Add entity↔Add table↔Add column), field key markers
+  hidden at Conceptual, and **Views/Indexes/Sequences/Raw objects hidden at
+  Conceptual/Logical**. Field type labels already used the level-aware
+  `fieldTypeLabel`.
+- **Extended the same terms** to the Properties dialog (entity title + Fields tab →
+  Columns/Attributes), the ribbon **Add Entity/Table** button, and the canvas
+  add-entity action — so tree, properties, toolbar and canvas never disagree.
+- **No model mutation for labels:** terminology is pure presentation. The `level`
+  value itself remains legitimate model state (the existing `relevelModel`
+  hide/raise behavior for types is unchanged, FR-11.6). A regression test cycles a
+  model through all four levels repeatedly and asserts entity/field/relationship
+  **IDs and counts are unchanged** (no duplication, no regenerated FKs).
+- **Verified:** 8 new tests (terminology matrix incl. the Logical↔Physical flip,
+  visibility gating, level-cycle identity integrity); **181 TS tests**; typecheck +
+  build clean.
+- **Not done this pass (follow-ups):** canvas node titles still show the raw name
+  (no separate physical-vs-logical name field exists in the model yet, so there's
+  nothing to switch); validation messages are not yet reworded per level; a shared
+  command-capability registry (§8) beyond the current per-level gating.
+
 ## 2026-10-10 — UI: View menu, bottom + floating toolbars (§13)
 
 Professional IDE-style workspace controls, added as an extension (canvas, model

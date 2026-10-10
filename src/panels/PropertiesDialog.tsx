@@ -6,6 +6,7 @@ import {
   type DataTypeKind,
 } from "../model/dataTypes";
 import { validateIdentifier } from "../model/identifiers";
+import { levelTerms } from "../model/levels";
 import type { Entity, Field, FieldRole, RiAction, Udp } from "../model/model";
 
 const RI_ACTIONS: RiAction[] = ["no action", "cascade", "restrict", "set null", "set default"];
@@ -86,6 +87,7 @@ function EntityProperties({ entity, onClose }: { entity: Entity; onClose: () => 
   const renameEntity = useModelStore((s) => s.renameEntity);
   const updateEntity = useModelStore((s) => s.updateEntity);
   const applyScd2 = useModelStore((s) => s.applyScd2);
+  const terms = useModelStore((s) => levelTerms(s.model.level));
   const [tab, setTab] = useState("General");
   const patch = (p: Parameters<typeof updateEntity>[1]) => updateEntity(entity.id, p);
   const hasSurrogate = entity.fields.some((f) => f.name.toLowerCase() === `${entity.name.toLowerCase()}_key`);
@@ -93,10 +95,10 @@ function EntityProperties({ entity, onClose }: { entity: Entity; onClose: () => 
   return (
     <>
       <div className="props__head">
-        <h2 className="modal__title">Entity: {entity.name}</h2>
+        <h2 className="modal__title">{terms.entity}: {entity.name}</h2>
         <button className="icon-btn" onClick={onClose}>✕</button>
       </div>
-      <Tabs tabs={["General", "Fields", "Definition", "Note", "UDP"]} active={tab} onChange={setTab} />
+      <Tabs tabs={["General", terms.fieldPlural, "Definition", "Note", "UDP"]} active={tab} onChange={setTab} />
       <div className="props__body">
         {tab === "General" && (
           <>
@@ -138,7 +140,7 @@ function EntityProperties({ entity, onClose }: { entity: Entity; onClose: () => 
             </div>
           </>
         )}
-        {tab === "Fields" && <FieldsTab entity={entity} />}
+        {tab === terms.fieldPlural && <FieldsTab entity={entity} />}
         {tab === "Definition" && (
           <textarea className="editor__input" rows={8} defaultValue={entity.description ?? ""} onChange={(e) => patch({ description: e.target.value })} />
         )}

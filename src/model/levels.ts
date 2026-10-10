@@ -58,6 +58,42 @@ export function exportDisabledReason(level: ModelLevel): string | null {
   return `${level} models have no physical types to export. Raise the level to Physical first.`;
 }
 
+// ---- level-aware presentation terminology & visibility (one source of truth) --
+//
+// erwin-style: the SAME underlying objects are labelled differently per level
+// (Entity/Attribute at Logical, Table/Column at Physical, Business Entity at
+// Conceptual). This is presentation only — it never changes the model.
+
+export interface LevelTerms {
+  entity: string;
+  entityPlural: string;
+  field: string;
+  fieldPlural: string;
+}
+
+export function levelTerms(level: ModelLevel): LevelTerms {
+  switch (level) {
+    case "Conceptual":
+      return { entity: "Business Entity", entityPlural: "Business Entities", field: "Attribute", fieldPlural: "Attributes" };
+    case "Logical":
+      return { entity: "Entity", entityPlural: "Entities", field: "Attribute", fieldPlural: "Attributes" };
+    case "Physical/Logical":
+    case "Physical":
+      return { entity: "Table", entityPlural: "Tables", field: "Column", fieldPlural: "Columns" };
+  }
+}
+
+/** Physical-only objects (indexes, sequences, views, raw DDL) appear only where
+ *  the level has a physical implementation. Hidden at Conceptual/Logical. */
+export function showsPhysicalObjects(level: ModelLevel): boolean {
+  return usesPhysicalTypes(level);
+}
+
+/** Key markers (PK/FK/unique) are implementation detail — hidden at Conceptual. */
+export function showsKeys(level: ModelLevel): boolean {
+  return !isConceptual(level);
+}
+
 export interface PhysicalMapping {
   type: DataTypeKind;
   length?: number;

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useModelStore } from "../store/modelStore";
 import { useUiStore } from "../store/uiStore";
+import { levelTerms } from "../model/levels";
 
 export interface ToolbarAction {
   id: string;
@@ -41,6 +42,7 @@ export function useCanvasActions(): ToolbarGroups {
   const { fitView, zoomIn, zoomOut } = useReactFlow();
   const mode = useModelStore((s) => s.canvasMode);
   const setMode = useModelStore((s) => s.setCanvasMode);
+  const entityNoun = useModelStore((s) => levelTerms(s.model.level).entity.toLowerCase());
   const undo = useModelStore((s) => s.undo);
   const redo = useModelStore((s) => s.redo);
   const canUndo = useModelStore((s) => s.past.length > 0);
@@ -58,7 +60,7 @@ export function useCanvasActions(): ToolbarGroups {
   return {
     tools: [
       { id: "select", label: "Select", Icon: MousePointer2, active: mode === "select", onClick: () => setMode("select") },
-      { id: "add-entity", label: "Add entity — then click the canvas", Icon: Table, active: mode === "add-entity", onClick: () => toggleMode("add-entity") },
+      { id: "add-entity", label: `Add ${entityNoun} — then click the canvas`, Icon: Table, active: mode === "add-entity", onClick: () => toggleMode("add-entity") },
       { id: "add-relationship", label: "Add relationship — click two entities", Icon: Spline, active: mode === "add-relationship", onClick: () => toggleMode("add-relationship") },
     ],
     canvas: [

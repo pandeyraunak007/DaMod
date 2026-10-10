@@ -3,7 +3,13 @@ import { useModelStore } from "../store/modelStore";
 import { useWorkspaceStore } from "../store/workspaceStore";
 import { fieldTypeLabel } from "../model/fieldDisplay";
 import type { Model } from "../model/model";
-import type { ModelLevel } from "../model/levels";
+import {
+  type LevelTerms,
+  type ModelLevel,
+  levelTerms,
+  showsKeys,
+  showsPhysicalObjects,
+} from "../model/levels";
 import { linksTouching } from "../links/links";
 import { validateWorkspace, type Severity } from "../validation/rules";
 
@@ -383,6 +389,8 @@ function ModelBranch({
   onDuplicateModel: () => void;
   onDeleteModel: () => void;
 }) {
+  const terms = levelTerms(model.level);
+  const showPhysical = showsPhysicalObjects(model.level);
   const entityName = (id: string) => model.entities.find((e) => e.id === id)?.name ?? "?";
   const entityMatches = (e: Model["entities"][number]) =>
     !filtering || matches(e.name, q) || e.fields.some((f) => matches(f.name, q));
@@ -397,7 +405,7 @@ function ModelBranch({
   const modelMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     openMenu(e.clientX, e.clientY, [
-      { label: "Add entity", onClick: onAddEntity },
+      { label: `Add ${terms.entity.toLowerCase()}`, onClick: onAddEntity },
       { label: "Duplicate model", onClick: onDuplicateModel },
       { label: "Delete model", danger: true, onClick: onDeleteModel },
     ]);
@@ -423,15 +431,15 @@ function ModelBranch({
       />
       {isOpen(`m:${tabId}`) && (
         <>
-          {/* Entities */}
+          {/* Entities / Tables / Business Entities */}
           <TreeRow
             depth={2}
             open={isOpen(`m:${tabId}:ents`)}
             hasChildren
-            label={<span className="tree__group">Entities ({model.entities.length})</span>}
+            label={<span className="tree__group">{terms.entityPlural} ({model.entities.length})</span>}
             onToggle={() => toggle(`m:${tabId}:ents`)}
             actions={
-              <RowAction title="Add entity" onClick={onAddEntity}>
+              <RowAction title={`Add ${terms.entity.toLowerCase()}`} onClick={onAddEntity}>
                 +
               </RowAction>
             }
@@ -443,6 +451,7 @@ function ModelBranch({
                 tabId={tabId}
                 model={model}
                 entity={e}
+                terms={terms}
                 q={q}
                 filtering={filtering}
                 open={isOpen(`e:${tabId}:${e.id}`)}
@@ -472,46 +481,51 @@ function ModelBranch({
               <RelationshipRow key={r.id} tabId={tabId} relId={r.id} text={relText(r)} openMenu={openMenu} />
             ))}
 
-          <ObjectGroup
-            open={isOpen(`m:${tabId}:views`)}
-            onToggle={() => toggle(`m:${tabId}:views`)}
-            label={`Views (${model.views?.length ?? 0})`}
-            onAdd={onAddView}
-            items={(model.views ?? []).filter((v) => !filtering || matches(v.name, q))}
-            onSelect={(id) => onSelectObject({ kind: "view", id })}
-            onDelete={(id) => onDeleteObject("view", id)}
-            openMenu={openMenu}
-          />
-          <ObjectGroup
-            open={isOpen(`m:${tabId}:indexes`)}
-            onToggle={() => toggle(`m:${tabId}:indexes`)}
-            label={`Indexes (${model.indexes?.length ?? 0})`}
-            onAdd={onAddIndex}
-            items={(model.indexes ?? []).filter((v) => !filtering || matches(v.name, q))}
-            onSelect={(id) => onSelectObject({ kind: "index", id })}
-            onDelete={(id) => onDeleteObject("index", id)}
-            openMenu={openMenu}
-          />
-          <ObjectGroup
-            open={isOpen(`m:${tabId}:seqs`)}
-            onToggle={() => toggle(`m:${tabId}:seqs`)}
-            label={`Sequences (${model.sequences?.length ?? 0})`}
-            onAdd={onAddSequence}
-            items={(model.sequences ?? []).filter((v) => !filtering || matches(v.name, q))}
-            onSelect={(id) => onSelectObject({ kind: "sequence", id })}
-            onDelete={(id) => onDeleteObject("sequence", id)}
-            openMenu={openMenu}
-          />
-          <ObjectGroup
-            open={isOpen(`m:${tabId}:raw`)}
-            onToggle={() => toggle(`m:${tabId}:raw`)}
-            label={`Raw objects (${model.rawObjects?.length ?? 0})`}
-            onAdd={onAddRaw}
-            items={(model.rawObjects ?? []).filter((v) => !filtering || matches(v.name, q))}
-            onSelect={(id) => onSelectObject({ kind: "rawObject", id })}
-            onDelete={(id) => onDeleteObject("rawObject", id)}
-            openMenu={openMenu}
-          />
+          {/* Physical-only objects — hidden at Conceptual/Logical (§4.1/§4.2). */}
+          {showPhysical && (
+            <>
+              <ObjectGroup
+                open={isOpen(`m:${tabId}:views`)}
+                onToggle={() => toggle(`m:${tabId}:views`)}
+                label={`Views (${model.views?.length ?? 0})`}
+                onAdd={onAddView}
+                items={(model.views ?? []).filter((v) => !filtering || matches(v.name, q))}
+                onSelect={(id) => onSelectObject({ kind: "view", id })}
+                onDelete={(id) => onDeleteObject("view", id)}
+                openMenu={openMenu}
+              />
+              <ObjectGroup
+                open={isOpen(`m:${tabId}:indexes`)}
+                onToggle={() => toggle(`m:${tabId}:indexes`)}
+                label={`Indexes (${model.indexes?.length ?? 0})`}
+                onAdd={onAddIndex}
+                items={(model.indexes ?? []).filter((v) => !filtering || matches(v.name, q))}
+                onSelect={(id) => onSelectObject({ kind: "index", id })}
+                onDelete={(id) => onDeleteObject("index", id)}
+                openMenu={openMenu}
+              />
+              <ObjectGroup
+                open={isOpen(`m:${tabId}:seqs`)}
+                onToggle={() => toggle(`m:${tabId}:seqs`)}
+                label={`Sequences (${model.sequences?.length ?? 0})`}
+                onAdd={onAddSequence}
+                items={(model.sequences ?? []).filter((v) => !filtering || matches(v.name, q))}
+                onSelect={(id) => onSelectObject({ kind: "sequence", id })}
+                onDelete={(id) => onDeleteObject("sequence", id)}
+                openMenu={openMenu}
+              />
+              <ObjectGroup
+                open={isOpen(`m:${tabId}:raw`)}
+                onToggle={() => toggle(`m:${tabId}:raw`)}
+                label={`Raw objects (${model.rawObjects?.length ?? 0})`}
+                onAdd={onAddRaw}
+                items={(model.rawObjects ?? []).filter((v) => !filtering || matches(v.name, q))}
+                onSelect={(id) => onSelectObject({ kind: "rawObject", id })}
+                onDelete={(id) => onDeleteObject("rawObject", id)}
+                openMenu={openMenu}
+              />
+            </>
+          )}
         </>
       )}
     </>
@@ -574,6 +588,7 @@ function EntityBranch({
   tabId,
   model,
   entity,
+  terms,
   q,
   filtering,
   open,
@@ -586,6 +601,7 @@ function EntityBranch({
   tabId: string;
   model: Model;
   entity: Model["entities"][number];
+  terms: LevelTerms;
   q: string;
   filtering: boolean;
   open: boolean;
@@ -595,6 +611,8 @@ function EntityBranch({
   onAddField: () => void;
   onAddRelationship: () => void;
 }) {
+  const addFieldLabel = `Add ${terms.field.toLowerCase()}`;
+  const withKeys = showsKeys(model.level);
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState(entity.name);
   const switchTab = useWorkspaceStore((s) => s.switchTab);
@@ -625,7 +643,7 @@ function EntityBranch({
           useModelStore.getState().openProperties();
         },
       },
-      { label: "Add field", onClick: onAddField },
+      { label: addFieldLabel, onClick: onAddField },
       { label: "Add relationship", onClick: onAddRelationship },
       { label: "Rename", onClick: () => (setDraft(entity.name), setRenaming(true)) },
       { label: "Delete entity", danger: true, onClick: deleteEntity },
@@ -642,7 +660,7 @@ function EntityBranch({
         onClick={reveal}
         onContextMenu={entityMenu}
         actions={
-          <RowAction title="Add field" onClick={onAddField}>
+          <RowAction title={addFieldLabel} onClick={onAddField}>
             +
           </RowAction>
         }
@@ -684,7 +702,9 @@ function EntityBranch({
             onClick={reveal}
             label={
               <span className="tree__field">
-                <span className="tree__field-key">{f.primaryKey ? "🔑" : f.unique ? "◈" : "•"}</span>
+                <span className="tree__field-key">
+                  {withKeys ? (f.primaryKey ? "🔑" : f.unique ? "◈" : "•") : "•"}
+                </span>
                 {f.name}
                 <span className="tree__field-type">{fieldTypeLabel(f, model.level)}</span>
               </span>
