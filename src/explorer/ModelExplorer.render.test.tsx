@@ -95,4 +95,15 @@ describe("ModelExplorer active-model scoping (Req 18)", () => {
     // Physical model → "P" badge present at the model root.
     expect(container.querySelector(".tree__badge")?.textContent).toBe("P");
   });
+
+  it("offers subject areas for a plain (non-EBS) model and creates one", () => {
+    // ORDERS is a plain Postgres model — the Subject areas section must still appear.
+    expect(container.textContent).toContain("Subject areas");
+    const add = [...container.querySelectorAll(".tree-row")]
+      .find((r) => /Subject areas/.test(r.textContent ?? ""))
+      ?.querySelector(".tree-row__add") as HTMLButtonElement;
+    expect(add).toBeTruthy();
+    act(() => add.click());
+    expect(useModelStore.getState().model.subjectAreas?.length).toBe(1);
+  });
 });

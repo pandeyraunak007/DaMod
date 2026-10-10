@@ -123,11 +123,13 @@ interface ModelStore {
   updateSchema: (id: string, patch: Partial<SchemaObj>) => void;
   deleteSchema: (id: string) => void;
 
-  // subject areas (Req 21 §6)
+  // subject areas (Req 21 §6) — database-agnostic: any model can group its entities.
   createSubjectArea: (name: string, entities?: string[], product?: string) => string;
   updateSubjectArea: (id: string, patch: Partial<Pick<SubjectArea, "name" | "description" | "entities">>) => void;
   deleteSubjectArea: (id: string) => void;
-  /** Create (or refresh) a subject area from an EBS product's tables. */
+  /** Add an entity to a subject area (idempotent). */
+  addEntityToSubjectArea: (areaId: string, entityId: string) => void;
+  /** Create (or refresh) a subject area from an EBS product's / Fusion family's tables. */
   createSubjectAreaFromProduct: (product: string, name?: string) => string | null;
 
   // other database objects (views, indexes, sequences, raw objects)
@@ -628,6 +630,15 @@ export const useModelStore = create<ModelStore>((set, get) => {
     deleteSubjectArea: (id) => {
       commit((m) => {
         m.subjectAreas = (m.subjectAreas ?? []).filter((a) => a.id !== id);
+      });
+    },
+    addEntityToSubjectArea: (areaId, entityId) => {
+      commit((m) => {
+        m.subjectAreas = (m.subjectAreas ?? []).map((a) =>
+          a.id === areaId && !a.entities.includes(entityId)
+            ? { ...a, entities: [...a.entities, entityId] }
+            : a,
+        );
       });
     },
     createSubjectAreaFromProduct: (product, name) => {

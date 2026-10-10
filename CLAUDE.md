@@ -9,11 +9,15 @@
 
 ## NEXT SESSION — START HERE
 
-**Current status:** Branch `main`. Pushed: `0d2aa9c` (Req 21 Phase 4 subject areas) and
-all prior Reqs 17–21. **Req 22 (Oracle Fusion Cloud, Phase 1 + reverse-engineering,
-offline/mock) just landed, uncommitted in the working tree.** Author commits/pushes
-explicitly, do not commit or push unless asked. **334 TS tests pass · typecheck clean ·
-`npm run build` clean · `cargo build` clean.** See the top DECISIONS entries:
+**Current status:** Branch `main`. Pushed: `44c0082` (Req 22 Fusion) and all prior Reqs
+17–21. **Fusion + "subject areas for all databases" just landed, uncommitted in the
+working tree.** Author commits/pushes explicitly, do not commit or push unless asked.
+**336 TS tests pass · typecheck clean · `npm run build` clean · `cargo build` clean.**
+See the top DECISIONS entries:
+- **Subject areas for ALL databases:** the standard Model Explorer now has a Subject
+  areas section (create/rename/delete, add selected table, entity-context "New subject
+  area from this") for any source — the EBS/Fusion "from product/family" stays as a
+  convenience. Store op `addEntityToSubjectArea`.
 - **Req 22 (Fusion Cloud, offline/mock):** `oracle-fusion` mock connector (Financials),
   `mapFusionType`, `fusionSnapshotToModel`, `metadata.fusion` (REST resources + extract
   data stores), `source.apiVersion`, connector-generic Connections UI ("+ Oracle Fusion

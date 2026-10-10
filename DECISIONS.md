@@ -5,6 +5,22 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Subject areas available for ALL databases (not just EBS)
+
+The `SubjectArea` model concept was already database-agnostic, but the only UI to
+create/manage areas lived in the EBS Explorer view — so a plain Postgres/Snowflake/
+Databricks/Fusion/blank model couldn't use them. Added a generic entry point.
+
+- **Standard Model Explorer** now has a **Subject areas** section (sibling of Semantic
+  layer), rendered for the active model of ANY source: `+` creates an empty area; each
+  area expands to its member tables (reveal/remove), renames (double-click), deletes, and
+  a `+`/context action adds the currently-selected table. Entity right-click gains "New
+  subject area from this".
+- **Store:** added `addEntityToSubjectArea(areaId, entityId)` (idempotent). Everything
+  flows through `commit` (undo/redo). The EBS/Fusion "from product/family" convenience
+  stays; this is the universal path.
+- No new deps, no Rust. 336 TS tests (+2); tsc/build/cargo clean.
+
 ## 2026-10-11 — Req 22 (Phase 1 + reverse): Oracle Fusion Cloud offline/mock foundation
 
 Fusion Cloud is an API/extract source, not a DB. Built the offline/mock foundation on the

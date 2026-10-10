@@ -352,6 +352,12 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
           />
         )}
 
+        {/* Subject areas (Req 21/22 §6) — database-agnostic entity groupings for the
+            active model; available for every source, not just EBS/Fusion. */}
+        {activeEntry?.model && (
+          <SubjectAreasSection model={activeEntry.model} isOpen={isOpen} toggle={toggle} openMenu={openMenu} />
+        )}
+
         {/* Semantic layer is a workspace-wide concern — shown as a sibling root. */}
         <TreeRow
           depth={0}
@@ -650,6 +656,146 @@ function ModelBranch({
   );
 }
 
+// Database-agnostic subject areas for the active model (Req 21/22 §6). Create an
+// empty area (+), add the selected entity to an area, expand to see/reveal/remove
+// members, rename (double-click) and delete. Works for any source.
+function SubjectAreasSection({
+  model,
+  isOpen,
+  toggle,
+  openMenu,
+}: {
+  model: Model;
+  isOpen: (k: string) => boolean;
+  toggle: (k: string) => void;
+  openMenu: OpenMenu;
+}) {
+  const areas = model.subjectAreas ?? [];
+  const create = () => useModelStore.getState().createSubjectArea("new_area");
+  return (
+    <>
+      <TreeRow
+        depth={0}
+        open={isOpen("ws:areas")}
+        hasChildren
+        label={
+          <span className="tree__group">
+            Subject areas <span className="tree__count">{areas.length}</span>
+          </span>
+        }
+        onToggle={() => toggle("ws:areas")}
+        actions={
+          <RowAction title="New subject area" onClick={create}>
+            +
+          </RowAction>
+        }
+      />
+      {isOpen("ws:areas") &&
+        areas.map((a) => (
+          <SubjectAreaRow key={a.id} area={a} model={model} open={isOpen(`a:${a.id}`)} onToggle={() => toggle(`a:${a.id}`)} openMenu={openMenu} />
+        ))}
+    </>
+  );
+}
+
+function SubjectAreaRow({
+  area,
+  model,
+  open,
+  onToggle,
+  openMenu,
+}: {
+  area: NonNullable<Model["subjectAreas"]>[number];
+  model: Model;
+  open: boolean;
+  onToggle: () => void;
+  openMenu: OpenMenu;
+}) {
+  const [renaming, setRenaming] = useState(false);
+  const [draft, setDraft] = useState(area.name);
+  const entityName = (id: string) => model.entities.find((e) => e.id === id)?.name ?? "?";
+  const revealFirst = () => area.entities[0] && useModelStore.getState().revealEntity(area.entities[0]);
+  const addSelected = () => {
+    const sel = useModelStore.getState().selection;
+    if (sel?.kind === "entity") useModelStore.getState().addEntityToSubjectArea(area.id, sel.id);
+    else useModelStore.getState().pushNotice("Select a table first, then add it to the subject area.");
+  };
+  const commitRename = () => {
+    useModelStore.getState().updateSubjectArea(area.id, { name: draft });
+    setRenaming(false);
+  };
+  const menu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    openMenu(e.clientX, e.clientY, [
+      { label: "Add selected table", onClick: addSelected },
+      { label: "Rename", onClick: () => (setDraft(area.name), setRenaming(true)) },
+      { label: "Delete subject area", danger: true, onClick: () => useModelStore.getState().deleteSubjectArea(area.id) },
+    ]);
+  };
+  return (
+    <>
+      <TreeRow
+        depth={1}
+        open={open}
+        hasChildren={area.entities.length > 0}
+        onToggle={onToggle}
+        onClick={revealFirst}
+        onContextMenu={menu}
+        actions={
+          <>
+            <RowAction title="Add selected table" onClick={addSelected}>+</RowAction>
+            <RowAction title="Delete subject area" onClick={() => useModelStore.getState().deleteSubjectArea(area.id)}>✕</RowAction>
+          </>
+        }
+        label={
+          renaming ? (
+            <input
+              autoFocus
+              className="tree__rename"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={commitRename}
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitRename();
+                if (e.key === "Escape") setRenaming(false);
+              }}
+            />
+          ) : (
+            <span
+              className="tree__entity"
+              title={area.description ?? area.name}
+              onDoubleClick={(e) => (e.stopPropagation(), setDraft(area.name), setRenaming(true))}
+            >
+              {area.name} <span className="tree__count">{area.entities.length}</span>
+              {area.product && <span className="tree__badge"> {area.product}</span>}
+            </span>
+          )
+        }
+      />
+      {open &&
+        area.entities.map((eid) => (
+          <TreeRow
+            key={eid}
+            depth={2}
+            onClick={() => useModelStore.getState().revealEntity(eid)}
+            actions={
+              <RowAction
+                title="Remove from subject area"
+                onClick={() =>
+                  useModelStore.getState().updateSubjectArea(area.id, { entities: area.entities.filter((x) => x !== eid) })
+                }
+              >
+                –
+              </RowAction>
+            }
+            label={<span className="tree__entity">{entityName(eid)}</span>}
+          />
+        ))}
+    </>
+  );
+}
+
 function ObjectGroup({
   open,
   onToggle,
@@ -782,6 +928,14 @@ function EntityBranch({
       },
       { label: addFieldLabel, onClick: onAddField },
       { label: "Add relationship", onClick: onAddRelationship },
+      {
+        label: "New subject area from this",
+        onClick: () => {
+          const st = useModelStore.getState();
+          const id = st.createSubjectArea(`${entity.name}_area`);
+          st.addEntityToSubjectArea(id, entity.id);
+        },
+      },
       { label: "Rename", onClick: () => (setDraft(displayName(entity, model.level)), setRenaming(true)) },
       { label: "Delete entity", danger: true, onClick: deleteEntity },
     ]);

@@ -52,6 +52,14 @@ describe("subject areas (Req 21 §6)", () => {
     if (parsed.ok) expect(serializeModel(parsed.value)).toBe(once);
   });
 
+  it("adds an entity to an area idempotently (works for any model)", () => {
+    const e0 = s().model.entities[0].id;
+    const id = s().createSubjectArea("Area");
+    s().addEntityToSubjectArea(id, e0);
+    s().addEntityToSubjectArea(id, e0); // no-op second time
+    expect(s().model.subjectAreas![0].entities).toEqual([e0]);
+  });
+
   it("deleting an area never deletes its entities", () => {
     const before = s().model.entities.length;
     const id = s().createSubjectAreaFromProduct("AP")!;
