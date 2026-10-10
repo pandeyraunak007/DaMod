@@ -3,7 +3,7 @@ import { useCopilotSession } from "./session";
 
 const s = () => useCopilotSession.getState();
 
-beforeEach(() => useCopilotSession.setState({ draft: "", history: [] }));
+beforeEach(() => useCopilotSession.setState({ draft: "", messages: [] }));
 
 describe("copilot session (survives panel collapse)", () => {
   it("keeps a draft prompt", () => {
@@ -11,19 +11,24 @@ describe("copilot session (survives panel collapse)", () => {
     expect(s().draft).toBe("describe all tables");
   });
 
-  it("records conversation entries newest-first and caps the history", () => {
-    for (let i = 0; i < 30; i++) {
-      s().addEntry({ id: `e${i}`, prompt: `p${i}`, summary: `s${i}`, applied: i, skipped: 0, failed: 0 });
-    }
-    expect(s().history).toHaveLength(25); // capped
-    expect(s().history[0].prompt).toBe("p29"); // newest first
+  it("appends chat messages in order", () => {
+    s().push({ id: "u1", role: "user", text: "hi" });
+    s().push({ id: "a1", role: "assistant", kind: "answer", text: "hello" });
+    expect(s().messages.map((m) => m.id)).toEqual(["u1", "a1"]);
   });
 
-  it("clears the history without touching the draft", () => {
+  it("updates a pending plan message to applied", () => {
+    s().push({ id: "p1", role: "assistant", kind: "plan", summary: "x", assumptions: [], actions: [], planBase: "t", status: "pending" });
+    s().update("p1", { status: "applied" });
+    const m = s().messages[0];
+    expect(m.role === "assistant" && m.kind === "plan" && m.status).toBe("applied");
+  });
+
+  it("clears the thread without touching the draft", () => {
     s().setDraft("keep me");
-    s().addEntry({ id: "a", prompt: "x", summary: "y", applied: 1, skipped: 0, failed: 0 });
+    s().push({ id: "u1", role: "user", text: "x" });
     s().clear();
-    expect(s().history).toEqual([]);
+    expect(s().messages).toEqual([]);
     expect(s().draft).toBe("keep me");
   });
 });
