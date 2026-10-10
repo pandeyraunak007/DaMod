@@ -63,6 +63,18 @@ const zColumn = z.object({
 });
 export type CanonicalColumn = z.infer<typeof zColumn>;
 
+/** Evidence hierarchy for a discovered relationship (Req 21 §7), strongest first.
+ *  Application databases carry logical relationships not declared as DB FKs, so a
+ *  relationship records WHERE it came from and (for weaker evidence) a confidence. */
+export const RELATIONSHIP_PROVENANCE = [
+  "declared-fk", // an actual database foreign key
+  "ebs-metadata", // documented EBS/application dictionary relationship
+  "etrm-import", // imported eTRM relationship/dependency metadata
+  "user-mapping", // a mapping the user provided
+  "ai-proposed", // inferred by the Copilot — must be reviewed before commit
+] as const;
+export type RelationshipProvenance = (typeof RELATIONSHIP_PROVENANCE)[number];
+
 const zForeignKey = z.object({
   name: z.string().optional(),
   columns: z.array(z.string()).min(1),
@@ -71,6 +83,10 @@ const zForeignKey = z.object({
   refColumns: z.array(z.string()).min(1),
   onDelete: z.string().optional(),
   onUpdate: z.string().optional(),
+  /** Where this relationship came from (Req 21 §7). Defaults to a declared FK. */
+  provenance: z.enum(RELATIONSHIP_PROVENANCE).optional(),
+  /** 0..1 confidence for inferred (non-declared) relationships. */
+  confidence: z.number().min(0).max(1).optional(),
 });
 export type CanonicalForeignKey = z.infer<typeof zForeignKey>;
 
@@ -109,7 +125,13 @@ const zSourceIdentity = z.object({
   systemType: z.enum(SOURCE_SYSTEM_TYPES),
   /** A stable, non-sensitive label for the source (e.g. host/db, never creds). */
   name: z.string(),
+  /** The underlying database product version (e.g. the Oracle Database version). */
   productVersion: z.string().optional(),
+  /** EBS application release (e.g. "12.2.9"), kept SEPARATE from the DB version
+   *  (Req 21 §2/§11). Only present for an Oracle E-Business Suite source. */
+  ebsRelease: z.string().optional(),
+  /** EBS instance / environment identifier, where known (non-sensitive). */
+  ebsInstance: z.string().optional(),
 });
 
 export const zCanonicalMetadata = z.object({

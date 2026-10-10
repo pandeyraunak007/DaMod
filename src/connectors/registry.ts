@@ -6,6 +6,7 @@ import type { Connector, ConnectorFactory } from "./connector";
 import type { SourceSystemType } from "./metadata";
 import { createMockConnector } from "./mock/mockConnector";
 import { createPostgresConnector } from "./postgres/postgresConnector";
+import { createMockEbsConnector } from "./oracle/mockEbsConnector";
 
 const registry = new Map<SourceSystemType, ConnectorFactory>();
 
@@ -24,3 +25,6 @@ export function registeredSystemTypes(): SourceSystemType[] {
 // Built-in connectors.
 registerConnector("mock", createMockConnector);
 registerConnector("postgres", createPostgresConnector);
+// Oracle E-Business Suite — mock/offline connector (Req 21 Phase 1). The live
+// Rust Oracle adapter is deferred pending a driver-dependency sign-off.
+registerConnector("oracle-ebs", createMockEbsConnector);

@@ -5,6 +5,39 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-10 — Req 21 (Phase 1): Oracle EBS offline/mock foundation
+
+The author chose the **offline/mock** scope (no live driver this session). Rationale:
+a live Oracle/EBS connector needs a Rust Oracle driver (Instant Client — a real
+licensing/packaging/Apple-Silicon concern) that per NFR-8 requires author sign-off, and
+it's untestable here (no Oracle instance; Claude can't self-drive live DBs). So Phase 1
+builds everything that does NOT need the driver, fully unit-tested.
+
+- **Reused the connector framework wholesale.** `metadata.ts` already anticipated
+  `oracle`/`oracle-ebs`/`oracle-fusion` source kinds and is object-centric with a
+  per-object `native` bag — so EBS application metadata (which module owns a table, its
+  business purpose) rides in `native.ebs` with ZERO changes to the shared contract
+  except two backward-compatible optional additions: `source.ebsRelease`/`ebsInstance`
+  (kept SEPARATE from the Oracle DB `productVersion`, §2/§11) and FK
+  `provenance`/`confidence` (§7 evidence hierarchy: declared-fk → ebs-metadata →
+  etrm-import → user-mapping → ai-proposed). Existing snapshots still validate.
+- **Delivered (tested):** `oracleTypes.mapOracleType` (NUMBER/VARCHAR2/CLOB/DATE/
+  TIMESTAMP/…; unmappable BLOB/RAW/spatial preserved as native); a mock EBS connector
+  with an eTRM-style AP+GL fixture (composite keys, documented-vs-declared FKs, business
+  descriptions); `ebsSnapshotToModel` reusing the EXISTING `metadataToModel` (product
+  tags `ebs:<CODE>`, verified business descriptions, byte-identical round-trip);
+  `ebsProducts` (catalog derived from real annotations, not an assumed list); idempotent
+  re-discovery via the existing `computeDrift` (no duplicates); offline import path.
+- **Honesty guards (§5/§7):** `EbsAnnotation.verified` distinguishes documented metadata
+  from inferred meaning, and inferred descriptions are NOT promoted into model text; a
+  real DB comment is never overwritten by an eTRM description; AI-proposed relationships
+  carry `provenance: "ai-proposed"` + confidence and are never emitted as declared FKs.
+- **Capability matrix + driver trade-off + phased roadmap:** `docs/ORACLE_EBS.md`
+  (Done/Mock/Live/Imported/Deferred per capability). The live Rust adapter + EBS
+  Explorer/Inspector/Copilot/pipeline UI are documented as deferred phases.
+- **No new dependencies, no Rust, no model-schema change.** 285 TS tests (+12); tsc +
+  build + cargo clean.
+
 ## 2026-10-10 — Req 19 (first batch) + Req 20: PG objects + context indicator
 
 **Req 20 — Model Context Indicator.** A compact `Model · Level · Database` badge in

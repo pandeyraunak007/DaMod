@@ -9,10 +9,16 @@
 
 ## NEXT SESSION — START HERE
 
-**Current status:** Branch `main`, latest commit `2614c7c` (pushed). **Reqs 17–20 just
-landed — uncommitted in the working tree**; author commits/pushes explicitly, do not
-commit or push unless asked. **273 TS tests pass · typecheck clean · `npm run build`
-clean · `cargo build` clean.** See the top DECISIONS entries:
+**Current status:** Branch `main`. Reqs 17–20 are committed + pushed (`36adff3`).
+**Req 21 Phase 1 (Oracle EBS offline/mock foundation) just landed — uncommitted in the
+working tree**; author commits/pushes explicitly, do not commit or push unless asked.
+**285 TS tests pass · typecheck clean · `npm run build` clean · `cargo build` clean.**
+See the top DECISIONS entries:
+- **Req 21 (Phase 1)** — Oracle **EBS offline/mock** foundation (no live driver, no Rust,
+  no deps): mock `oracle-ebs` connector + eTRM-style fixture, `mapOracleType`,
+  `ebsSnapshotToModel` (reuses `metadataToModel`), FK provenance/confidence + EBS release
+  (separate from DB version), capability matrix + driver trade-off in `docs/ORACLE_EBS.md`.
+  Live Rust Oracle adapter still gated on a driver sign-off (documented there).
 - **Req 19 (first batch) + Req 20** — Model Context Indicator (`Model · Level · Database`
   badge in the ribbon, pure display, never assumes Postgres). Req 19 was scoped by the
   author to "option 3": a canonical **object registry** (`src/model/objectRegistry.ts`,
