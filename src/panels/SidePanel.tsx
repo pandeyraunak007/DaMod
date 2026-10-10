@@ -15,6 +15,7 @@ import {
   usesLogicalTypes,
   usesPhysicalTypes,
 } from "../model/levels";
+import { PanelRightClose } from "lucide-react";
 import { validateIdentifier } from "../model/identifiers";
 import type { Entity, Field } from "../model/model";
 import { componentFor, entityKey, linksTouching } from "../links/links";
@@ -70,7 +71,7 @@ function IdentifierInput({
   );
 }
 
-export function SidePanel() {
+export function SidePanel({ onCollapse }: { onCollapse: () => void }) {
   const selection = useModelStore((s) => s.selection);
   const select = useModelStore((s) => s.select);
   const entity = useModelStore((s) =>
@@ -78,11 +79,34 @@ export function SidePanel() {
       ? s.model.entities.find((e) => e.id === selection.id)
       : undefined,
   );
+  const level = useModelStore((s) => s.model.level);
   const relId = selection?.kind === "relationship" ? selection.id : null;
   const clear = () => select(null);
 
+  // Header title reflects what's selected at the active level (§2.4).
+  const objectLabel = entity
+    ? levelTerms(level).entity
+    : relId
+      ? "Relationship"
+      : selection?.kind === "view"
+        ? "View"
+        : selection?.kind === "index"
+          ? "Index"
+          : selection?.kind === "sequence"
+            ? "Sequence"
+            : selection?.kind === "rawObject"
+              ? "Raw object"
+              : "Properties";
+
   return (
     <aside className="side">
+      <div className="panel-head">
+        <span className="panel-head__title">{objectLabel}</span>
+        <button className="icon-btn" title="Hide properties" aria-label="Hide properties" onClick={onCollapse}>
+          <PanelRightClose size={15} strokeWidth={1.8} aria-hidden />
+        </button>
+      </div>
+      <div className="side__scroll">
       {entity ? (
         <EntityEditor entity={entity} />
       ) : relId ? (
@@ -103,6 +127,7 @@ export function SidePanel() {
           </p>
         </div>
       )}
+      </div>
     </aside>
   );
 }

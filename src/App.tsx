@@ -21,6 +21,7 @@ import { ImportDialog } from "./import/ImportDialog";
 import { ConnectionsDialog } from "./connectors/ui/ConnectionsDialog";
 import { PipelineDialog } from "./connectors/pipeline/PipelineDialog";
 import { CopilotPanel } from "./copilot/CopilotPanel";
+import { ResizeHandle, PanelRail } from "./workspace/PanelChrome";
 import { LinkDialog } from "./links/LinkDialog";
 import { useModelStore } from "./store/modelStore";
 import { useWorkspaceStore } from "./store/workspaceStore";
@@ -45,7 +46,6 @@ export default function App() {
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [connectionsReverse, setConnectionsReverse] = useState(false);
   const [pipelinesOpen, setPipelinesOpen] = useState(false);
-  const [copilotOpen, setCopilotOpen] = useState(false);
   const [semanticOpen, setSemanticOpen] = useState(false);
   const [deleteModel, setDeleteModel] = useState<{ id: string; name: string } | null>(null);
 
@@ -67,6 +67,13 @@ export default function App() {
   const showExplorer = useUiStore((s) => s.showExplorer);
   const showProperties = useUiStore((s) => s.showProperties);
   const showValidation = useUiStore((s) => s.showValidation);
+  const copilotOpen = useUiStore((s) => s.copilotOpen);
+  const explorerWidth = useUiStore((s) => s.explorerWidth);
+  const propertiesWidth = useUiStore((s) => s.propertiesWidth);
+  const copilotWidth = useUiStore((s) => s.copilotWidth);
+  const setPanel = useUiStore((s) => s.setPanel);
+  const setCopilotOpen = useUiStore((s) => s.setCopilotOpen);
+  const setPanelWidth = useUiStore((s) => s.setPanelWidth);
 
   // Restore the last workspace on startup (FR-1.1).
   useEffect(() => {
@@ -124,6 +131,45 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [undo, redo]);
 
+  // Reusable, independently collapsible + resizable workspace panels (Req 16 §1).
+  const explorerPanel = showExplorer ? (
+    <div className="panel panel--left" style={{ width: explorerWidth }}>
+      <ModelExplorer
+        onNewModel={() => setNewModelOpen(true)}
+        onDeleteModel={(id, name) => setDeleteModel({ id, name })}
+        onOpenSemantic={() => setSemanticOpen(true)}
+        onCollapse={() => setPanel("showExplorer", false)}
+      />
+      <ResizeHandle edge="right" width={explorerWidth} onResize={(w) => setPanelWidth("explorerWidth", w)} />
+    </div>
+  ) : (
+    <PanelRail side="left" title="Explorer" onExpand={() => setPanel("showExplorer", true)} />
+  );
+
+  const propertiesPanel = showProperties ? (
+    <div className="panel panel--right" style={{ width: propertiesWidth }}>
+      <ResizeHandle edge="left" width={propertiesWidth} onResize={(w) => setPanelWidth("propertiesWidth", w)} />
+      <SidePanel onCollapse={() => setPanel("showProperties", false)} />
+    </div>
+  ) : (
+    <PanelRail side="right" title="Properties" onExpand={() => setPanel("showProperties", true)} />
+  );
+
+  // Copilot stays mounted (hidden) when closed so its draft/plan are preserved
+  // (§3.4); a rail restores it.
+  const copilotPanel = (
+    <>
+      <div
+        className="panel panel--right"
+        style={{ width: copilotWidth, display: copilotOpen ? undefined : "none" }}
+      >
+        <ResizeHandle edge="left" width={copilotWidth} onResize={(w) => setPanelWidth("copilotWidth", w)} />
+        <CopilotPanel onClose={() => setCopilotOpen(false)} />
+      </div>
+      {!copilotOpen && <PanelRail side="right" title="Copilot" onExpand={() => setCopilotOpen(true)} />}
+    </>
+  );
+
   return (
     <div className="app">
       <Toolbar
@@ -143,7 +189,7 @@ export default function App() {
         onOpenExport={() => setExportOpen(true)}
         onOpenDomains={() => setDomainsOpen(true)}
         onToggleSemantic={() => setSemanticOpen((v) => !v)}
-        onToggleCopilot={() => setCopilotOpen((v) => !v)}
+        onToggleCopilot={() => setCopilotOpen(!copilotOpen)}
         copilotActive={copilotOpen}
         semanticActive={semanticOpen}
       />
@@ -155,25 +201,13 @@ export default function App() {
         </div>
       ) : semanticOpen ? (
         <div className="app__body">
-          {showExplorer && (
-            <ModelExplorer
-              onNewModel={() => setNewModelOpen(true)}
-              onDeleteModel={(id, name) => setDeleteModel({ id, name })}
-              onOpenSemantic={() => setSemanticOpen(true)}
-            />
-          )}
+          {explorerPanel}
           <SemanticView />
-          {copilotOpen && <CopilotPanel onClose={() => setCopilotOpen(false)} />}
+          {copilotPanel}
         </div>
       ) : (
         <div className="app__body">
-          {showExplorer && (
-            <ModelExplorer
-              onNewModel={() => setNewModelOpen(true)}
-              onDeleteModel={(id, name) => setDeleteModel({ id, name })}
-              onOpenSemantic={() => setSemanticOpen(true)}
-            />
-          )}
+          {explorerPanel}
           <div className="app__canvas">
             {activeTab?.loadError ? (
               <div className="canvas-error">
@@ -200,8 +234,8 @@ export default function App() {
               </div>
             )}
           </div>
-          {showProperties && <SidePanel />}
-          {copilotOpen && <CopilotPanel onClose={() => setCopilotOpen(false)} />}
+          {propertiesPanel}
+          {copilotPanel}
         </div>
       )}
       {wsPath && showValidation && <ValidationPanel />}

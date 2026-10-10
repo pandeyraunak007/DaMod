@@ -5,6 +5,10 @@ import {
   mergePrefs,
   pickPersisted,
   clampToBounds,
+  clampWidth,
+  layoutVisibility,
+  PANEL_MIN_WIDTH,
+  PANEL_MAX_WIDTH,
 } from "./uiStore";
 import { useModelStore } from "./modelStore";
 import { newModel } from "../model/model";
@@ -76,6 +80,48 @@ describe("prefs (de)serialization", () => {
   it("ignores a non-object blob", () => {
     expect(mergePrefs(null)).toEqual(defaultUiPrefs());
     expect(mergePrefs("x")).toEqual(defaultUiPrefs());
+  });
+});
+
+describe("Req 16: collapsible/resizable panels", () => {
+  beforeEach(reset);
+
+  it("Copilot visibility toggles independently and persists in the prefs slice", () => {
+    expect(defaultUiPrefs().copilotOpen).toBe(false);
+    ui().toggleCopilot();
+    expect(ui().copilotOpen).toBe(true);
+    expect(pickPersisted(ui()).copilotOpen).toBe(true);
+    // Toggling Copilot does not change the other panels.
+    expect(ui().showExplorer).toBe(true);
+    expect(ui().showProperties).toBe(true);
+  });
+
+  it("clamps panel widths to the min/max", () => {
+    expect(clampWidth(10)).toBe(PANEL_MIN_WIDTH);
+    expect(clampWidth(9999)).toBe(PANEL_MAX_WIDTH);
+    ui().setPanelWidth("explorerWidth", 99999);
+    expect(ui().explorerWidth).toBe(PANEL_MAX_WIDTH);
+    ui().setPanelWidth("propertiesWidth", 300);
+    expect(ui().propertiesWidth).toBe(300);
+  });
+
+  it("applyLayout sets the preset panel visibility", () => {
+    ui().applyLayout("full");
+    expect(ui()).toMatchObject({ showExplorer: false, showProperties: false, copilotOpen: false });
+    ui().applyLayout("ai");
+    expect(ui()).toMatchObject({ showExplorer: true, copilotOpen: true });
+    ui().applyLayout("modeling");
+    expect(ui()).toMatchObject({ showExplorer: true, showProperties: true, copilotOpen: false });
+  });
+
+  it("layoutVisibility is a pure mapping", () => {
+    expect(layoutVisibility("full")).toEqual({ showExplorer: false, showProperties: false, copilotOpen: false });
+    expect(layoutVisibility("review")).toEqual({ showExplorer: true, showProperties: true, copilotOpen: false });
+  });
+
+  it("widths + copilotOpen survive a persist round-trip (AC #6)", () => {
+    const s = { ...defaultUiPrefs(), explorerWidth: 300, copilotOpen: true, propertiesWidth: 420 };
+    expect(mergePrefs(JSON.parse(JSON.stringify(pickPersisted(s))))).toEqual(s);
   });
 });
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { KeyRound } from "lucide-react";
+import { KeyRound, PanelLeftClose } from "lucide-react";
 import { useModelStore } from "../store/modelStore";
 import { useWorkspaceStore } from "../store/workspaceStore";
 import { fieldTypeLabel } from "../model/fieldDisplay";
@@ -45,13 +45,14 @@ interface ExplorerProps {
   onNewModel: () => void;
   onDeleteModel: (id: string, name: string) => void;
   onOpenSemantic: () => void;
+  onCollapse: () => void;
 }
 
 // The dockable workspace tree (FR-12): Workspace → Models → Entities /
 // Relationships / Fields, plus a Semantic node. Nodes navigate (click), rename
 // (double-click) and can create/delete metaobjects via + buttons and a
 // right-click menu (FR-12.6).
-export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic }: ExplorerProps) {
+export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCollapse }: ExplorerProps) {
   const path = useWorkspaceStore((s) => s.path);
   const tabs = useWorkspaceStore((s) => s.tabs);
   const activeId = useWorkspaceStore((s) => s.activeId);
@@ -62,7 +63,6 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic }: Exp
   const activeModel = useModelStore((s) => s.model);
 
   const [query, setQuery] = useState("");
-  const [collapsed, setCollapsed] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
   const openMenu: OpenMenu = (x, y, items) => setMenu({ x, y, items });
 
@@ -220,16 +220,6 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic }: Exp
     else st.deleteRawObject(oid);
   };
 
-  if (collapsed) {
-    return (
-      <div className="explorer explorer--collapsed">
-        <button className="explorer__toggle" title="Show explorer" onClick={() => setCollapsed(false)}>
-          ›
-        </button>
-      </div>
-    );
-  }
-
   return (
     <aside className="explorer" onClick={() => menu && setMenu(null)}>
       <div className="explorer__head">
@@ -241,8 +231,8 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic }: Exp
           <button className="icon-btn" title="Collapse all" onClick={collapseAll}>
             ⊟
           </button>
-          <button className="icon-btn" title="Hide explorer" onClick={() => setCollapsed(true)}>
-            ‹
+          <button className="icon-btn" title="Hide explorer" aria-label="Hide explorer" onClick={onCollapse}>
+            <PanelLeftClose size={15} strokeWidth={1.8} aria-hidden />
           </button>
         </div>
       </div>

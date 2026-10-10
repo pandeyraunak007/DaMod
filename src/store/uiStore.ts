@@ -8,6 +8,9 @@ import { create } from "zustand";
 
 export type ToolbarMode = "bottom" | "floating" | "hidden";
 
+export const PANEL_MIN_WIDTH = 220;
+export const PANEL_MAX_WIDTH = 620;
+
 export interface UiPrefs {
   toolbarMode: ToolbarMode;
   floatingPos: { x: number; y: number };
@@ -16,6 +19,11 @@ export interface UiPrefs {
   showValidation: boolean;
   showGrid: boolean;
   snapToGrid: boolean;
+  /** Copilot drawer visibility (persisted, like the other panels). */
+  copilotOpen: boolean;
+  explorerWidth: number;
+  propertiesWidth: number;
+  copilotWidth: number;
 }
 
 export function defaultUiPrefs(): UiPrefs {
@@ -27,8 +35,18 @@ export function defaultUiPrefs(): UiPrefs {
     showValidation: true,
     showGrid: true,
     snapToGrid: false,
+    copilotOpen: false,
+    explorerWidth: 260,
+    propertiesWidth: 340,
+    copilotWidth: 360,
   };
 }
+
+export function clampWidth(w: number): number {
+  return Math.min(PANEL_MAX_WIDTH, Math.max(PANEL_MIN_WIDTH, Math.round(w)));
+}
+
+export type LayoutMode = "full" | "modeling" | "ai" | "review";
 
 const STORAGE_KEY = "damod.ui";
 
@@ -46,6 +64,7 @@ export function mergePrefs(raw: unknown): UiPrefs {
       ? { x: r.floatingPos.x, y: r.floatingPos.y }
       : d.floatingPos;
   const bool = (v: unknown, fallback: boolean) => (typeof v === "boolean" ? v : fallback);
+  const width = (v: unknown, fallback: number) => (typeof v === "number" ? clampWidth(v) : fallback);
   return {
     toolbarMode: mode,
     floatingPos: pos,
@@ -54,6 +73,10 @@ export function mergePrefs(raw: unknown): UiPrefs {
     showValidation: bool(r.showValidation, d.showValidation),
     showGrid: bool(r.showGrid, d.showGrid),
     snapToGrid: bool(r.snapToGrid, d.snapToGrid),
+    copilotOpen: bool(r.copilotOpen, d.copilotOpen),
+    explorerWidth: width(r.explorerWidth, d.explorerWidth),
+    propertiesWidth: width(r.propertiesWidth, d.propertiesWidth),
+    copilotWidth: width(r.copilotWidth, d.copilotWidth),
   };
 }
 
@@ -67,7 +90,25 @@ export function pickPersisted(s: UiPrefs): UiPrefs {
     showValidation: s.showValidation,
     showGrid: s.showGrid,
     snapToGrid: s.snapToGrid,
+    copilotOpen: s.copilotOpen,
+    explorerWidth: s.explorerWidth,
+    propertiesWidth: s.propertiesWidth,
+    copilotWidth: s.copilotWidth,
   };
+}
+
+/** Resolve a named workspace layout (§1.3) to its panel visibility. */
+export function layoutVisibility(mode: LayoutMode): Pick<UiPrefs, "showExplorer" | "showProperties" | "copilotOpen"> {
+  switch (mode) {
+    case "full":
+      return { showExplorer: false, showProperties: false, copilotOpen: false };
+    case "modeling":
+      return { showExplorer: true, showProperties: true, copilotOpen: false };
+    case "ai":
+      return { showExplorer: true, showProperties: false, copilotOpen: true };
+    case "review":
+      return { showExplorer: true, showProperties: true, copilotOpen: false };
+  }
 }
 
 /** Clamp a toolbar position so it stays fully inside the canvas bounds (§13.3). */
@@ -105,6 +146,7 @@ function persist(s: UiPrefs): void {
 }
 
 type Panel = "showExplorer" | "showProperties" | "showValidation";
+type WidthKey = "explorerWidth" | "propertiesWidth" | "copilotWidth";
 
 interface UiStore extends UiPrefs {
   setToolbarMode: (mode: ToolbarMode) => void;
@@ -113,6 +155,10 @@ interface UiStore extends UiPrefs {
   setPanel: (panel: Panel, value: boolean) => void;
   toggleGrid: () => void;
   toggleSnap: () => void;
+  toggleCopilot: () => void;
+  setCopilotOpen: (open: boolean) => void;
+  setPanelWidth: (key: WidthKey, width: number) => void;
+  applyLayout: (mode: LayoutMode) => void;
 }
 
 export const useUiStore = create<UiStore>((set, get) => {
@@ -128,5 +174,9 @@ export const useUiStore = create<UiStore>((set, get) => {
     setPanel: (panel, value) => commit({ [panel]: value } as Partial<UiPrefs>),
     toggleGrid: () => commit({ showGrid: !get().showGrid }),
     toggleSnap: () => commit({ snapToGrid: !get().snapToGrid }),
+    toggleCopilot: () => commit({ copilotOpen: !get().copilotOpen }),
+    setCopilotOpen: (copilotOpen) => commit({ copilotOpen }),
+    setPanelWidth: (key, width) => commit({ [key]: clampWidth(width) } as Partial<UiPrefs>),
+    applyLayout: (mode) => commit(layoutVisibility(mode)),
   };
 });

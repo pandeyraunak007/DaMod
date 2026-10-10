@@ -52,7 +52,15 @@ export function ViewMenu() {
           <p className="viewmenu__label">Panels</p>
           <Toggle label="Model Explorer" on={ui.showExplorer} onClick={() => ui.togglePanel("showExplorer")} />
           <Toggle label="Properties panel" on={ui.showProperties} onClick={() => ui.togglePanel("showProperties")} />
+          <Toggle label="AI Copilot" on={ui.copilotOpen} onClick={ui.toggleCopilot} />
           <Toggle label="Validation panel" on={ui.showValidation} onClick={() => ui.togglePanel("showValidation")} />
+
+          <div className="viewmenu__sep" />
+          <p className="viewmenu__label">Layout</p>
+          <Item label="Full canvas" Icon={Maximize2} onClick={() => ui.applyLayout("full")} />
+          <Item label="Modeling" Icon={Scan} onClick={() => ui.applyLayout("modeling")} />
+          <Item label="AI-assisted" Icon={Scan} onClick={() => ui.applyLayout("ai")} />
+          <Item label="Review" Icon={Scan} onClick={() => ui.applyLayout("review")} />
 
           <div className="viewmenu__sep" />
           <p className="viewmenu__label">Toolbar</p>

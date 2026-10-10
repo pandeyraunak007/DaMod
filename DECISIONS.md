@@ -94,6 +94,33 @@ groups were unconditional. Not stale state, not caching.
 - **Still open (future):** per-level validation *message wording*; a formal shared
   command-capability registry (§8) beyond the current per-level gating.
 
+## 2026-10-10 — Req 16 Phase 1: collapsible + resizable workspace panels
+
+The immediate usability issue (§8 Phase 1): make Explorer, Properties and Copilot
+independently collapsible, resizable, and persisted, so the canvas can reclaim space.
+- **One shared chrome** (`workspace/PanelChrome.tsx`): a `ResizeHandle` (drag the
+  canvas-facing edge, width clamped 220–620) and a `PanelRail` (collapsed strip with
+  a lucide restore button) — reused by all three panels instead of per-panel
+  collapse code. Removed the Explorer's ad-hoc internal `collapsed` state.
+- **uiStore** gains `copilotOpen` + `explorerWidth`/`propertiesWidth`/`copilotWidth`
+  + `applyLayout(mode)` (full/modeling/ai/review presets, §1.3), all persisted to
+  localStorage (never model JSON, no undo entries). Copilot visibility moved from
+  App local state into uiStore so it persists.
+- **App layout**: each panel is a width-controlled frame with a resize handle, or a
+  rail when hidden; the canvas is `flex:1` so React Flow's ResizeObserver reclaims
+  the space automatically (no `fitView` call → node positions preserved). Copilot
+  stays **mounted-but-hidden** when closed so its draft/plan survive (§3.4, AC #13).
+- View menu adds an **AI Copilot** toggle and a **Layout** preset section.
+- Panels fill their frame and scroll internally (Properties got a sticky header +
+  `.side__scroll`), so the workspace never overflows horizontally.
+- **Verified**: 5 new uiStore tests (independent copilot toggle, width clamping,
+  layout presets, persist round-trip of widths+copilotOpen); **230 tests**;
+  typecheck + build clean.
+- **Deferred (reported, not done)**: Phase 2 (structured Properties Inspector /
+  compact column grid), Phase 3 (Copilot panel visual redesign + suggested prompts),
+  Phase 4 (deeper inspector↔copilot integration). The level-aware inspector + Copilot
+  review flow already exist from earlier work; this phase was layout only.
+
 ## 2026-10-10 — AI Modeling Copilot (§14) — Stages 1–4 foundation
 
 Optional BYOLLM copilot that proposes structured, reviewable plans applied through
