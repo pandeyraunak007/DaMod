@@ -41,6 +41,15 @@ const zCheck = z.object({
   expression: z.string(),
 });
 
+const zObjectSource = z.object({
+  system: z.string().optional(),
+  schema: z.string().optional(),
+  nativeId: z.string().optional(),
+  product: z.string().optional(),
+  provenance: z.string().optional(),
+  confidence: z.number().min(0).max(1).optional(),
+});
+
 const zEntity = z.object({
   id: z.string(),
   name: z.string(),
@@ -54,6 +63,7 @@ const zEntity = z.object({
   position: z.object({ x: z.number(), y: z.number() }),
   fields: z.array(zField),
   checks: z.array(zCheck).optional(),
+  source: zObjectSource.optional(),
 });
 
 const zRelationship = z.object({

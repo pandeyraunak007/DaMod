@@ -9,11 +9,11 @@
 
 ## NEXT SESSION — START HERE
 
-**Current status:** Branch `main`. Reqs 17–20 are committed + pushed (`36adff3`).
-**Req 21 Phase 1 (Oracle EBS offline/mock foundation) just landed — uncommitted in the
-working tree**; author commits/pushes explicitly, do not commit or push unless asked.
-**285 TS tests pass · typecheck clean · `npm run build` clean · `cargo build` clean.**
-See the top DECISIONS entries:
+**Current status:** Branch `main`. Pushed: `1769aaa` (Req 21 Phase 1), Reqs 17–20 in
+`36adff3`. **Req 21 Phase 2 "do-now" item 1 (source provenance + idempotent re-discovery)
+just landed — uncommitted in the working tree.** Author commits/pushes explicitly, do
+not commit or push unless asked. **291 TS tests pass · typecheck clean · `npm run build`
+clean · `cargo build` clean.** See the top DECISIONS entries:
 - **Req 21 (Phase 1)** — Oracle **EBS offline/mock** foundation (no live driver, no Rust,
   no deps): mock `oracle-ebs` connector + eTRM-style fixture, `mapOracleType`,
   `ebsSnapshotToModel` (reuses `metadataToModel`), FK provenance/confidence + EBS release
@@ -32,50 +32,55 @@ See the top DECISIONS entries:
 - **Req 17** — New Model dialog's required Target database selector; `model.dialect`
   persisted + authoritative (ExportDialog + Inspector SQL tab); optional Zod field.
 
-**Highest-priority next task (author's stated direction): Phase 7 — Oracle connector.**
-The user said "then we will move to another databases". Build an Oracle DB connector
-on the *existing* connector contract (do NOT invent a parallel path).
+**Highest-priority next task: Req 21 Phase 2 — Oracle EBS live discovery + EBS-aware
+Explorer.** Phase 1 (offline/mock foundation) is done and pushed (`1769aaa`): the
+`oracle-ebs` mock connector, `mapOracleType`, `ebsSnapshotToModel`, FK provenance/
+confidence, EBS-release-vs-DB-version, and `docs/ORACLE_EBS.md` (capability matrix +
+driver trade-off + roadmap). Phase 2 has a **driver-gated track** and a **do-now track**
+— start with the do-now track since it needs no sign-off and no Oracle instance.
 
-Steps:
-1. **Driver/eval first (blocker to resolve):** evaluate an Oracle driver usable from
-   Rust/Tauri on macOS/Apple-Silicon — licensing, distribution, packaging. Options:
-   `oracle` crate (needs Oracle Instant Client libs → distribution concern) vs a
-   thin worker. **Document the trade-off in `DECISIONS.md` and get author sign-off
-   before adding the dependency** (same gate we used for `tokio-postgres`).
-2. Mirror `src-tauri/src/pg.rs` → an Oracle module: `test_connection`, `list_schemas`,
-   `discover` via Oracle catalog views (`ALL_TAB_COLUMNS`, `ALL_CONSTRAINTS`,
-   `ALL_CONS_COLUMNS`, `ALL_INDEXES`, `ALL_VIEWS`) — **metadata only, never table rows**.
-3. TS side: `src/connectors/oracle/` with `oracleConnector.ts` (implements the
-   `Connector` contract over `invoke`) + a pure `normalizeOracleDiscovery` reusing
-   `import/reverse.ts`'s `mapSqlType` (extend it for Oracle type spellings: `NUMBER`,
-   `VARCHAR2`, `CLOB`, `TIMESTAMP(6)`, etc.). Register in `connectors/registry.ts`.
-   Preserve Oracle-native type names (`metadata.ts` already keeps `nativeType`).
-4. Reuse everything downstream: `toModel.ts`, drift (`drift.ts`), pipeline planner —
-   no changes needed if the canonical metadata is produced correctly.
-5. Tests: pure `normalizeOracleDiscovery` (fixtures for composite keys, FKs, views) +
-   a gated `#[tokio::test]`-style integration test behind an env var (`DAMOD_TEST_ORACLE_URL`)
-   that skips cleanly without a DB. Mock/fixtures for the standard suite.
+**Do-now track (no driver, testable against the mock snapshot):**
+1. ✅ **DONE** — Source-identifier provenance (`Entity.source`) + idempotent in-place
+   re-discovery (`connectors/reconcile.ts` `reconcileDiscoveredModel`): matches by
+   `source.nativeId`, preserves manual edits, keeps removed objects pending review.
+2. **← NEXT: EBS-aware Model Explorer view** driven by `ebsProducts` + `ebs:<CODE>` tags
+   (and now `entity.source.product`): products → schemas → objects, scoped to the active
+   tab (reuse the Req 18 scoping + the registry-driven approach from `objectRegistry.ts`).
+   Navigate business entity ↔ physical tables. Filter DB-object vs application-metadata.
+   Read-only. Then surface `entity.source` provenance in the Properties Inspector (§5/§7).
+3. **Snapshot compare/refresh UX** for EBS: wire `computeDrift` + `reconcileDiscoveredModel`
+   into the connectors UI (engine is done; this is the review/apply UX).
 
-**Files to inspect before starting:** `docs/CONNECTORS.md` (the contract), `src-tauri/src/pg.rs`
-(the reference connector), `src/connectors/postgres/` (TS client + normalizer),
-`src/connectors/{metadata,connector,registry,toModel}.ts`, `src/import/reverse.ts`
-(`mapSqlType`).
+**Driver-gated track (needs author sign-off FIRST, then an Oracle instance to verify):**
+4. Pick the Oracle driver approach (the `oracle` crate + Instant Client vs a thin worker
+   vs imported-only) — trade-off table is in `docs/ORACLE_EBS.md`. **Document the choice
+   in `DECISIONS.md` and get sign-off before adding the dependency** (NFR-8 gate).
+5. Mirror `src-tauri/src/pg.rs` → an Oracle module (`test_connection`/`list_schemas`/
+   `discover` via `ALL_TAB_COLUMNS`/`ALL_CONSTRAINTS`/`ALL_CONS_COLUMNS`/`ALL_INDEXES`/
+   `ALL_VIEWS` — **metadata only, never rows**). TS `oracleConnector.ts` implements the
+   `Connector` contract over `invoke`, normalizing via `mapOracleType`; register it for
+   `oracle` (and back `oracle-ebs` with it). A gated integration test behind
+   `DAMOD_TEST_ORACLE_URL` that skips cleanly without a DB.
 
-**Acceptance:** connect to Oracle → discover schemas/tables/columns/keys → import a
-model via the existing reverse-engineering flow → model round-trips byte-identical →
-refresh & drift works → all 238 existing tests stay green.
+**Files to inspect first:** `docs/ORACLE_EBS.md` (matrix + roadmap), `src/connectors/oracle/`
+(Phase 1 foundation), `src/connectors/{metadata,connector,registry,toModel,drift}.ts`,
+`src-tauri/src/pg.rs` (reference connector), `src/explorer/ModelExplorer.tsx` (Req 18
+active-model scoping to extend), `src/model/objectRegistry.ts`.
+
+**Acceptance (do-now track):** re-running `ebsSnapshotToModel` over an unchanged snapshot
+updates in place (no duplicate entities) via `source.nativeId`; EBS Explorer shows
+products→schemas→objects for the active tab only; snapshot refresh preserves manual
+edits; all existing tests stay green.
 
 **Blockers / unresolved decisions:**
-- Oracle driver/licensing/packaging on macOS (must decide + document before coding).
-- **15k LOC budget was raised to ~20k** (documented in DECISIONS, NFR-10); src is ~15.8k now.
-- **Req 16 Phase 4 is deferred** (smaller alternative task): deeper Inspector↔Copilot
-  integration polish — e.g. clicking a Copilot conversation entry selects the affected
-  objects. The core integration already works.
+- Oracle driver/licensing/packaging on macOS — **must decide + document + get sign-off
+  before adding the dependency** (gates only the driver-gated track above).
+- **15k LOC budget was raised to ~20k** (documented in DECISIONS, NFR-10).
+- **Req 16 Phase 4 is deferred:** deeper Inspector↔Copilot integration polish.
 
-**Smaller alternative tasks if Oracle is blocked:** Req 16 Phase 4 (above); connector
-Phase 6 (a minimal, explicitly-authorized full-load *execution* proof, kept separate
-from the planner); per-level validation message wording; naming-standard / business-term
-Copilot actions (Stage 5).
+**Smaller alternative tasks:** Req 19 next objects (functions/procedures/triggers, UDTs,
+or the §4 PostgreSQL type-system expansion — all catalogued in `docs/POSTGRES_OBJECTS.md`);
+Req 16 Phase 4; connector Phase 6 (authorized full-load *execution* proof).
 
 ---
 

@@ -49,6 +49,13 @@ export function metadataToModel(
     const entity = newEntity(object.name, { x: 80 + (i % 4) * 300, y: 80 + Math.floor(i / 4) * 240 });
     if (object.kind === "view" || object.kind === "materialized-view") entity.tags = ["view"];
     if (object.comment) entity.description = object.comment;
+    // Discovery provenance (Req 21 Phase 2): a stable source key so re-discovery
+    // can match this object in place instead of duplicating it.
+    entity.source = {
+      system: md.source.systemType,
+      schema,
+      nativeId: object.nativeId ?? `${schema}.${object.name}`,
+    };
 
     const pk = new Set(object.primaryKey ?? []);
     // A unique single-column index expresses column uniqueness on the model;

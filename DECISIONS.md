@@ -5,6 +5,28 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-10 — Req 21 Phase 2 (do-now track): source provenance + idempotent re-discovery
+
+Built the driver-independent half of Phase 2 (needs no Oracle instance / no sign-off).
+
+- **`Entity.source` provenance** ({system, schema, nativeId, product, provenance,
+  confidence}) — optional, backward-compatible, deterministic serialize + Zod. Set by
+  `metadataToModel` for EVERY connector (nativeId, else `schema.name` as the stable key),
+  enriched with product for EBS in `ebsSnapshotToModel`. Reusable beyond EBS (Postgres
+  re-discovery benefits too).
+- **`reconcileDiscoveredModel(existing, fresh)`** (`connectors/reconcile.ts`) — the real
+  idempotency: matches entities by `source.nativeId`, so repeated discovery UPDATES in
+  place instead of duplicating (§6/AC-6). Fresh discovery is the source of truth only for
+  physical STRUCTURE; manual edits are preserved — entity logical names, descriptions,
+  canvas layout, stereotype, note, udps, tags (union with discovered tags), and per-field
+  logical name/description (matched by column name). Relationships are remapped onto the
+  reconciled ids and keep their existing id + manual verb phrases when the same edge
+  existed. **Removed objects are reported but KEPT pending review (§11)** — removal is a
+  structural change, not something a refresh does silently; edges to kept-undiscovered
+  entities are preserved so nothing dangles.
+- No new deps, no Rust. 291 TS tests (+6: `reconcile.test.ts`); tsc/build/cargo clean.
+- Still deferred: the EBS-aware Explorer UI and the live Oracle adapter (driver sign-off).
+
 ## 2026-10-10 — Req 21 (Phase 1): Oracle EBS offline/mock foundation
 
 The author chose the **offline/mock** scope (no live driver this session). Rationale:

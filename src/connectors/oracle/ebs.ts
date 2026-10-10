@@ -80,6 +80,8 @@ export function ebsSnapshotToModel(
     const tags = new Set(entity.tags ?? []);
     tags.add(`ebs:${a.product}`);
     entity.tags = [...tags];
+    // Record the owning product on the provenance set by metadataToModel.
+    if (entity.source) entity.source.product = a.product;
     if (a.verified && a.businessDescription && !entity.description) {
       entity.description = a.businessDescription;
     }

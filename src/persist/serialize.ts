@@ -81,6 +81,17 @@ function serializeEntity(e: Entity): Record<string, unknown> {
   if (e.checks && e.checks.length) {
     out.checks = e.checks.map((c) => ({ id: c.id, name: c.name, expression: c.expression }));
   }
+  if (e.source) {
+    const s = e.source;
+    const src: Record<string, unknown> = {};
+    if (s.system) src.system = s.system;
+    if (s.schema) src.schema = s.schema;
+    if (s.nativeId) src.nativeId = s.nativeId;
+    if (s.product) src.product = s.product;
+    if (s.provenance) src.provenance = s.provenance;
+    if (s.confidence !== undefined) src.confidence = s.confidence;
+    if (Object.keys(src).length) out.source = src;
+  }
   udpsOut(out, e.note, e.udps);
   return out;
 }

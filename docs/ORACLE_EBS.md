@@ -38,7 +38,9 @@ snapshot, awaits the live driver · **Live** = needs an accessible Oracle/EBS in
 | EBS application dictionary (products, concurrent programs, lookups) | **Imported / Live** | Modeled via `native.ebs` today; full dictionary discovery (FND_* / eTRM) is Phase 3. |
 | EBS-aware Model Explorer hierarchy | **Deferred** | Phase 2 UI (products → schemas → objects). |
 | EBS-aware Properties Inspector | **Deferred** | Phase 2/3 UI. |
-| Snapshot compare / refresh preserving manual edits | **Mock** | `computeDrift`/`applyDrift` already preserve manual names/descriptions by name; EBS refresh UX is Phase 4. |
+| Source-identifier provenance on model objects | **Done** | `Entity.source` ({system, schema, nativeId, product, provenance, confidence}); set by `metadataToModel` for all connectors, enriched for EBS; serialize + Zod optional, round-trips. |
+| Idempotent re-discovery (in-place merge) | **Done** | `reconcileDiscoveredModel` matches by `source.nativeId`, preserves stable ids + manual edits (logical names, descriptions, layout, tags, verb phrases); removed objects kept pending review (§11). |
+| Snapshot compare / refresh preserving manual edits | **Done (engine)** | `computeDrift` reports changes; `reconcileDiscoveredModel` merges preserving manual edits. EBS refresh *UX* wiring is Phase 4. |
 | Copilot EBS context + reviewed actions | **Deferred** | Phase 5. |
 | Pipeline planning from EBS metadata | **Deferred** | Phase 6 — the planner already consumes canonical metadata, so this is mostly wiring + Oracle→target type mapping. |
 | Live Rust Oracle adapter | **Deferred (sign-off)** | See the driver decision below. |
@@ -67,9 +69,10 @@ Document the final choice here and in `DECISIONS.md` before adding any dependenc
 
 ## Phased roadmap (Req 21 §12) — build later
 
-- **Phase 2** — live DB discovery via the Oracle adapter (catalog views) + the EBS-aware
-  Explorer; reverse-engineer selected tables/schemas; preserve source identifiers
-  (add an optional `source` provenance field to model entities/fields).
+- **Phase 2** — *source provenance + idempotent re-discovery are DONE* (`Entity.source`
+  + `reconcileDiscoveredModel`). Remaining: the EBS-aware Explorer (products → schemas →
+  objects, scoped to the active tab), reverse-engineer selected tables/schemas, and the
+  live DB discovery via the Oracle adapter (driver-gated).
 - **Phase 3** — EBS application awareness: FND dictionary, product↔object association,
   documented relationships, concurrent programs/lookups; new canonical object kinds
   (packages/procedures/functions/triggers/synonyms/types).

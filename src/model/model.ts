@@ -77,6 +77,26 @@ export interface Domain {
 
 export type Stereotype = "fact" | "dimension";
 
+/** Discovery provenance for a reverse-engineered object (Req 21 Phase 2). Lets a
+ *  re-discovery match an existing model object by its stable source identifier so
+ *  repeated imports update in place instead of duplicating (§6/AC-6), and records
+ *  where an EBS object's product/relationship mapping came from (§5/§7). Absent for
+ *  hand-authored objects. */
+export interface ObjectSource {
+  /** Source system type, e.g. "oracle-ebs" / "postgres". */
+  system?: string;
+  /** Source schema the object was discovered in. */
+  schema?: string;
+  /** Stable source identifier (e.g. "AP.AP_INVOICES_ALL"); the match key. */
+  nativeId?: string;
+  /** EBS product/module short code (e.g. "AP"). */
+  product?: string;
+  /** How this object's mapping was established (see RELATIONSHIP_PROVENANCE kin). */
+  provenance?: string;
+  /** 0..1 confidence for inferred mappings. */
+  confidence?: number;
+}
+
 export interface Entity {
   id: string;
   /** Physical/identifier name (used for references and DDL). */
@@ -99,6 +119,8 @@ export interface Entity {
   schema?: string;
   /** Table-level CHECK constraints (Req 19). */
   checks?: CheckConstraint[];
+  /** Discovery provenance (Req 21 Phase 2); absent for hand-authored entities. */
+  source?: ObjectSource;
 }
 
 export type Cardinality = "one-to-one" | "one-to-many" | "many-to-many";
