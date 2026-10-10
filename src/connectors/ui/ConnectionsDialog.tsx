@@ -29,12 +29,23 @@ function buildSnapshot(connectionRef: string, d: DiscoveryResult): SourceSnapsho
 // (never in workspace JSON).
 type Mode = "edit" | "reverse" | "refresh";
 
-export function ConnectionsDialog({ onClose }: { onClose: () => void }) {
+export function ConnectionsDialog({
+  onClose,
+  startReverse = false,
+}: {
+  onClose: () => void;
+  startReverse?: boolean;
+}) {
   const connections = useWorkspaceStore((s) => s.connections);
   const upsertConnection = useWorkspaceStore((s) => s.upsertConnection);
   const deleteConnection = useWorkspaceStore((s) => s.deleteConnection);
-  const [selectedId, setSelectedId] = useState<string | null>(connections[0]?.id ?? null);
-  const [mode, setMode] = useState<Mode>("edit");
+  // When launched via the Data-tab "Reverse-engineer" shortcut, jump straight to
+  // the reverse panel of the first ready (host+database+user) connection.
+  const readyConn = connections.find((c) => c.params.host && c.params.database && c.params.user);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    (startReverse && readyConn?.id) || connections[0]?.id || null,
+  );
+  const [mode, setMode] = useState<Mode>(startReverse && readyConn ? "reverse" : "edit");
 
   const selected = connections.find((c) => c.id === selectedId) ?? null;
 

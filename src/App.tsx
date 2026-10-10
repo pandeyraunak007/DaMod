@@ -42,6 +42,7 @@ export default function App() {
   const [domainsOpen, setDomainsOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
+  const [connectionsReverse, setConnectionsReverse] = useState(false);
   const [pipelinesOpen, setPipelinesOpen] = useState(false);
   const [semanticOpen, setSemanticOpen] = useState(false);
   const [deleteModel, setDeleteModel] = useState<{ id: string; name: string } | null>(null);
@@ -126,7 +127,14 @@ export default function App() {
       <Toolbar
         onNewModel={() => setNewModelOpen(true)}
         onImport={() => setImportOpen(true)}
-        onOpenConnections={() => setConnectionsOpen(true)}
+        onOpenConnections={() => {
+          setConnectionsReverse(false);
+          setConnectionsOpen(true);
+        }}
+        onReverseEngineer={() => {
+          setConnectionsReverse(true);
+          setConnectionsOpen(true);
+        }}
         onOpenPipelines={() => setPipelinesOpen(true)}
         onOpenHistory={() => setHistoryOpen(true)}
         onOpenMap={() => setMapOpen(true)}
@@ -203,7 +211,12 @@ export default function App() {
       {exportOpen && <ExportDialog onClose={() => setExportOpen(false)} />}
       {domainsOpen && <DomainsDialog onClose={() => setDomainsOpen(false)} />}
       {importOpen && <ImportDialog onClose={() => setImportOpen(false)} />}
-      {connectionsOpen && <ConnectionsDialog onClose={() => setConnectionsOpen(false)} />}
+      {connectionsOpen && (
+        <ConnectionsDialog
+          startReverse={connectionsReverse}
+          onClose={() => setConnectionsOpen(false)}
+        />
+      )}
       {pipelinesOpen && <PipelineDialog onClose={() => setPipelinesOpen(false)} />}
       {confirmDelete && selection && <DeleteConfirm onClose={() => setConfirmDelete(false)} />}
       {deleteModel && (

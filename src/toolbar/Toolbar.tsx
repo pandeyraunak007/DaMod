@@ -3,6 +3,7 @@ import {
   type LucideIcon,
   Copy,
   Database,
+  DatabaseZap,
   Download,
   FileInput,
   FilePlus2,
@@ -36,6 +37,7 @@ interface Props {
   onNewModel: () => void;
   onImport: () => void;
   onOpenConnections: () => void;
+  onReverseEngineer: () => void;
   onOpenPipelines: () => void;
   onOpenHistory: () => void;
   onOpenMap: () => void;
@@ -95,7 +97,13 @@ export function Toolbar(props: Props) {
         {tab === "File" && <FileTab {...props} />}
         {tab === "Home" && <HomeTab onOpenDomains={props.onOpenDomains} />}
         {tab === "Diagram" && <DiagramTab onOpenMap={props.onOpenMap} onToggleSemantic={onToggleSemantic} semanticActive={semanticActive} />}
-        {tab === "Data" && <DataTab onOpenConnections={props.onOpenConnections} onOpenPipelines={props.onOpenPipelines} />}
+        {tab === "Data" && (
+          <DataTab
+            onOpenConnections={props.onOpenConnections}
+            onReverseEngineer={props.onReverseEngineer}
+            onOpenPipelines={props.onOpenPipelines}
+          />
+        )}
       </div>
     </div>
   );
@@ -277,13 +285,26 @@ function DiagramTab({
   );
 }
 
-function DataTab({ onOpenConnections, onOpenPipelines }: { onOpenConnections: () => void; onOpenPipelines: () => void }) {
+function DataTab({
+  onOpenConnections,
+  onReverseEngineer,
+  onOpenPipelines,
+}: {
+  onOpenConnections: () => void;
+  onReverseEngineer: () => void;
+  onOpenPipelines: () => void;
+}) {
   const wsPath = useWorkspaceStore((s) => s.path);
   return (
-    <RGroup title="Sources & pipelines">
-      <RibbonButton Icon={Database} label="Connect" title="Connect to a database and reverse-engineer" onClick={onOpenConnections} disabled={!wsPath} />
-      <RibbonButton Icon={Workflow} label="Pipelines" title="Design an ETL pipeline" onClick={onOpenPipelines} disabled={!wsPath} />
-    </RGroup>
+    <>
+      <RGroup title="Reverse-engineer">
+        <RibbonButton Icon={Database} label="Connect" title="Manage database connections" onClick={onOpenConnections} disabled={!wsPath} />
+        <RibbonButton Icon={DatabaseZap} label="Reverse-engineer" title="Discover a database schema into a new model" onClick={onReverseEngineer} disabled={!wsPath} />
+      </RGroup>
+      <RGroup title="ETL">
+        <RibbonButton Icon={Workflow} label="Pipelines" title="Design an ETL pipeline" onClick={onOpenPipelines} disabled={!wsPath} />
+      </RGroup>
+    </>
   );
 }
 

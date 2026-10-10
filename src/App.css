@@ -1429,6 +1429,16 @@ body,
   max-height: 120px;
   overflow: auto;
 }
+/* Checkboxes sit inside a .field, so neutralise the `.field input { width:100% }`
+   rule that would otherwise stretch them over their labels. */
+.checkbox input[type="checkbox"] {
+  width: auto;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: none;
+  flex: none;
+}
 .modal__subtitle {
   margin: 0.5rem 0;
   font-size: 0.95rem;
