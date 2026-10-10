@@ -7,6 +7,7 @@ interface Props {
   onNewModel: () => void;
   onImport: () => void;
   onOpenConnections: () => void;
+  onOpenPipelines: () => void;
   onOpenHistory: () => void;
   onOpenMap: () => void;
   onOpenExport: () => void;
@@ -19,6 +20,7 @@ export function Toolbar({
   onNewModel,
   onImport,
   onOpenConnections,
+  onOpenPipelines,
   onOpenHistory,
   onOpenMap,
   onOpenExport,
@@ -102,6 +104,14 @@ export function Toolbar({
           title="Connect to a database and reverse-engineer a model"
         >
           Connect
+        </button>
+        <button
+          className="btn btn--small"
+          onClick={onOpenPipelines}
+          disabled={!wsPath}
+          title="Design an ETL pipeline from a model"
+        >
+          Pipelines
         </button>
         <button className="btn btn--small" onClick={onOpenMap} disabled={!wsPath}>
           Map

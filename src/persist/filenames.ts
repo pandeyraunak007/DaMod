@@ -7,6 +7,7 @@ export const WORKSPACE_FILE = "workspace.json";
 export const LINKS_FILE = "links.json";
 export const SEMANTIC_FILE = "semantic.json";
 export const CONNECTIONS_FILE = "connections.json";
+export const PIPELINES_FILE = "pipelines.json";
 export const SOURCES_DIR = "sources";
 export const HISTORY_DIR = ".history";
 

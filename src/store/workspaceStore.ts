@@ -11,6 +11,7 @@ import {
   isModelFile,
   snapshotFileName,
   CONNECTIONS_FILE,
+  PIPELINES_FILE,
   LINKS_FILE,
   SEMANTIC_FILE,
   WORKSPACE_FILE,
@@ -28,6 +29,13 @@ import {
   serializeConnections,
 } from "../connectors/connectionsPersist";
 import { secretDelete } from "../connectors/postgres/postgresConnector";
+import type { PipelineSpec } from "../connectors/pipeline/spec";
+import {
+  type PipelinesDoc,
+  emptyPipelinesDoc,
+  parsePipelinesFile,
+  serializePipelines,
+} from "../connectors/pipeline/pipelinesPersist";
 import {
   type WorkspaceMeta,
   serializeWorkspace,
@@ -90,6 +98,7 @@ interface WorkspaceState {
   links: LinksDoc;
   semantic: SemanticDoc;
   connections: ConnectionProfile[];
+  pipelines: PipelineSpec[];
 
   openWorkspacePicker: () => Promise<void>;
   openWorkspace: (path: string) => Promise<void>;
@@ -121,6 +130,10 @@ interface WorkspaceState {
   deleteConnection: (id: string) => Promise<void>;
   saveSnapshot: (connectionName: string, snapshot: SourceSnapshot) => Promise<void>;
   loadSnapshot: (connectionName: string) => Promise<SourceSnapshot | null>;
+
+  // ETL pipeline specs (connector framework Phase 5).
+  upsertPipeline: (spec: PipelineSpec) => Promise<void>;
+  deletePipeline: (id: string) => Promise<void>;
 
   // semantic layer (FR-7)
   addTerm: (term: Term) => void;
@@ -193,6 +206,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     if (path) await writeFile(joinPath(path, CONNECTIONS_FILE), serializeConnections(doc), false);
   }
 
+  /** Update pipeline state and persist pipelines.json. */
+  async function commitPipelines(doc: PipelinesDoc): Promise<void> {
+    set({ pipelines: doc.pipelines });
+    const { path } = get();
+    if (path) await writeFile(joinPath(path, PIPELINES_FILE), serializePipelines(doc), false);
+  }
+
   /** Load a valid tab's model into the editor; sync the previously active tab back. */
   function activate(id: string): void {
     const { tabs, activeId } = get();
@@ -220,6 +240,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     links: emptyLinksDoc(),
     semantic: emptySemanticDoc(),
     connections: [],
+    pipelines: [],
 
     openWorkspacePicker: async () => {
       const dir = await pickWorkspaceFolder();
@@ -262,6 +283,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
         else useModelStore.getState().pushNotice(`connections.json: ${parsedConn.error}`);
       } catch {
         // No connections.json yet — that's fine.
+      }
+
+      // Pipeline specs (optional file).
+      let pipelines: PipelineSpec[] = [];
+      try {
+        const pipeText = await readTextFile(joinPath(path, PIPELINES_FILE));
+        const parsedPipe = parsePipelinesFile(pipeText);
+        if (parsedPipe.ok) pipelines = parsedPipe.value.pipelines;
+        else useModelStore.getState().pushNotice(`pipelines.json: ${parsedPipe.error}`);
+      } catch {
+        // No pipelines.json yet.
       }
 
       let meta: Partial<WorkspaceMeta> = {};
@@ -318,6 +350,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
         links,
         semantic,
         connections,
+        pipelines,
         activeId: active?.id ?? tabs[0]?.id ?? null,
       });
       if (active?.model) useModelStore.getState().loadModel(active.model);
@@ -669,6 +702,20 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       } catch {
         return null; // no prior snapshot
       }
+    },
+
+    upsertPipeline: async (spec) => {
+      const current = get().pipelines;
+      const exists = current.some((p) => p.id === spec.id);
+      const next = exists ? current.map((p) => (p.id === spec.id ? spec : p)) : [...current, spec];
+      await commitPipelines({ ...emptyPipelinesDoc(), pipelines: next });
+    },
+
+    deletePipeline: async (id) => {
+      await commitPipelines({
+        ...emptyPipelinesDoc(),
+        pipelines: get().pipelines.filter((p) => p.id !== id),
+      });
     },
 
     addTerm: (term) => {

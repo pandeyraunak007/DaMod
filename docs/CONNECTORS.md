@@ -1,9 +1,21 @@
 # Connector Framework & ETL Planning — Architecture
 
-Status: **Phases 1–4 implemented** (foundation, PostgreSQL discovery, reverse-
-engineering integration, schema refresh & drift). Phase 5+ (pipeline planning) is
-specified here but not yet built. This document is the contract reference;
-`DECISIONS.md` carries the dated decision log.
+Status: **Phases 1–5 implemented** (foundation, PostgreSQL discovery, reverse-
+engineering integration, schema refresh & drift, ETL pipeline planning). The full
+"first meaningful release" loop is in place. Phases 6+ (optional execution, Oracle,
+Fusion, MCP) are specified here but not yet built. This document is the contract
+reference; `DECISIONS.md` carries the dated decision log.
+
+Phase 5 (pipeline planning): `pipeline/spec.ts` is a versioned, Zod-validated,
+deterministically-serialized `PipelineSpec` referencing its source model/snapshot.
+`pipeline/planner.ts` consumes a source model already discovered (no re-discovery):
+`planFullLoad` auto-maps selected objects 1:1; `validatePipeline` flags type
+mismatches (no silent inference), required-but-unmapped target columns, and source
+drift; `pipelineReport` renders a deterministic mapping+validation report; and
+`targetDdl` reuses `exportModelDDL` for target schema generation. Specs persist in
+`pipelines.json`. The `PipelineDialog` designs, validates, previews (report + DDL)
+and exports plans. Pipeline execution is explicitly out of scope (a later,
+authorized milestone) — generating target DDL is not running a pipeline.
 
 Phase 4 (refresh & drift): snapshots persist at `sources/<connection>.snapshot.json`
 (saved on import and on refresh). `drift.ts` projects the previous snapshot and a

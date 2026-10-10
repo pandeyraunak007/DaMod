@@ -132,9 +132,45 @@ need a documented raise as the platform grows.
 **This delivers the full "first meaningful release" loop except Phase 5 (ETL
 pipeline planning).**
 
-**Next task:** Phase 5 — ETL pipeline specification + planner (source/target
-mapping, type-compat + required-field validation, deterministic plan export),
-consuming the saved snapshot/metadata without re-discovery.
+**Phase 5 implemented — ETL pipeline planning (design/spec, not execution):**
+- **`pipeline/spec.ts`** — versioned, Zod-validated `PipelineSpec`: source
+  (connectionRef?/modelId/modelName/snapshotId), target (dialect platform +
+  schema), per-object column mappings (source, target, source/target types,
+  optional transform, required), load strategy (`full` only for now).
+  Deterministic serialization (fixed key order). **References the source
+  model/snapshot** so a later schema change is detectable.
+- **`pipeline/planner.ts`** — consumes an **already-discovered source model** (no
+  re-discovery, §5.2). `planFullLoad` auto-maps selected objects 1:1;
+  `validatePipeline` flags **type mismatches (no silent inference)**,
+  required-but-unmapped target columns, invalid identifiers, and **source drift**
+  (object/column gone); `pipelineReport` is a deterministic mapping+validation
+  report; `targetDdl` **reuses `exportModelDDL`** (§5.3 — generating DDL is not
+  executing a pipeline).
+- **Persistence:** `pipelines.json` (one file for all specs, mirroring
+  connections.json; versioned, deterministic). Store gains `upsertPipeline`/
+  `deletePipeline` and loads on open.
+- **`PipelineDialog`** (toolbar **Pipelines**): pick a model → choose objects →
+  target platform → plan + save; view re-validates against the current model,
+  shows the report + target DDL, and exports both to files.
+- **Verified:** 9 new tests (plan, validate incl. type-mismatch/required/drift,
+  deterministic report, target DDL reuse, spec + doc round-trips); **161 TS tests**;
+  typecheck + build clean.
+- **Explicitly out of scope:** pipeline *execution* (Phase 6, authorized milestone),
+  incremental/CDC, distributed scheduling.
+
+**MILESTONE: the full "first meaningful release" loop now exists** — connect →
+discover → model → save/reopen → refresh & review drift → plan a validated ETL
+pipeline — on the reusable connector framework, with all prior modeling/
+persistence/DDL/semantic/validation behavior preserved.
+
+**Code-size budget:** app code is ~13.2k of the 15k target. Remaining roadmap
+(execution, Oracle, Fusion, MCP) will require a **documented budget raise** — to be
+agreed with the author when Phase 6/7 starts; connector modules are small and
+isolated, so the modeling core stays well within its original footprint.
+
+**Next task:** Phase 6 (optional) — a minimal, explicitly-authorized full-load
+*execution* proof against one target, kept independent of the planner; OR Phase 7 —
+Oracle connector (driver/licensing eval first). Author's call.
 
 ## 2026-10-10 — Domains, reverse-engineering and forward-engineering (beyond-spec, ERwin)
 
