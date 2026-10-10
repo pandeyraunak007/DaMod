@@ -9,11 +9,12 @@
 
 ## NEXT SESSION — START HERE
 
-**Current status:** Branch `main`. Pushed: `8c546b6` (Req 21 Phase 2 do-now 1), `1769aaa`
-(Phase 1), Reqs 17–20 in `36adff3`. **Req 21 Phase 2 do-now item 2 (EBS-aware Explorer
-view) just landed — uncommitted in the working tree.** Author commits/pushes explicitly,
-do not commit or push unless asked. **300 TS tests pass · typecheck clean · `npm run
-build` clean · `cargo build` clean.** See the top DECISIONS entries:
+**Current status:** Branch `main`. Pushed: `fcfb760` (Req 21 Phase 2 do-now 2), `8c546b6`
+(do-now 1), `1769aaa` (Phase 1), Reqs 17–20 in `36adff3`. **Req 21 Phase 2 do-now item 3
+(connector-generic Connections UI for EBS) just landed — uncommitted in the working
+tree.** Author commits/pushes explicitly, do not commit or push unless asked. **303 TS
+tests pass · typecheck clean · `npm run build` clean · `cargo build` clean.** See the top
+DECISIONS entries:
 - **Req 21 (Phase 1)** — Oracle **EBS offline/mock** foundation (no live driver, no Rust,
   no deps): mock `oracle-ebs` connector + eTRM-style fixture, `mapOracleType`,
   `ebsSnapshotToModel` (reuses `metadataToModel`), FK provenance/confidence + EBS release
@@ -45,11 +46,19 @@ driver trade-off + roadmap). Phase 2 has a **driver-gated track** and a **do-now
 2. ✅ **DONE** — EBS-aware Explorer view (`explorer/EbsExplorer.tsx` + `ebsTree.ts`):
    Model/EBS toggle, product/schema grouping, counts, search, click-to-reveal, scoped to
    the active tab; `entity.source` provenance surfaced read-only in the Inspector.
-3. **← NEXT: connection-setup wiring + refresh UX.** Offer the `oracle-ebs` source in the
-   New Model / Connections dialog (§2: source type, EBS release, discovery scope) so a
-   user can actually create an EBS model (today the mock connector is registered + fully
-   tested but has no UI entry point). Then wire `computeDrift` + `reconcileDiscoveredModel`
-   into a review/apply refresh UX (engine done). Both are driver-independent (mock-backed).
+3. ✅ **DONE** — connector-generic Connections UI: "+ Oracle EBS (mock)" connection,
+   EBS-specific editor, Test (EBS release + DB version), reverse-engineer (EBS-enriched),
+   refresh & compare. The whole mock EBS path is now reachable end-to-end in the app.
+
+**The do-now track is complete.** Remaining Req 21 work is driver-gated or later-phase:
+- **Live Oracle adapter (needs driver sign-off + an Oracle instance):** pick the driver
+  (trade-off in `docs/ORACLE_EBS.md`), document in DECISIONS, then mirror `pg.rs` →
+  Oracle catalog-view discovery; register it for `oracle`/`oracle-ebs`. A gated
+  integration test behind `DAMOD_TEST_ORACLE_URL`.
+- **Phase 3+ (app awareness, Copilot, pipeline):** FND dictionary / concurrent programs /
+  lookups; new canonical object kinds (packages/procedures/triggers/synonyms/types); EBS
+  Copilot context + reviewed actions; pipeline planning from EBS metadata. All catalogued
+  in `docs/ORACLE_EBS.md`.
 
 **Driver-gated track (needs author sign-off FIRST, then an Oracle instance to verify):**
 4. Pick the Oracle driver approach (the `oracle` crate + Instant Client vs a thin worker

@@ -6,12 +6,28 @@ import { validateIdentifier } from "../../model/identifiers";
 import type { ConnectionProfile } from "../connection";
 import { getConnector } from "../registry";
 import { pgTestConnection, secretStore } from "../postgres/postgresConnector";
-import { metadataToModel } from "../toModel";
+import { metadataToModel, type ToModelResult } from "../toModel";
+import { ebsSnapshotToModel } from "../oracle/ebs";
 import { computeDrift, applyDrift, type DriftChange } from "../drift";
 import type { ModelDiff } from "../../export/migrate";
 import type { Model } from "../../model/model";
+import type { CanonicalMetadata, SourceSystemType } from "../metadata";
 import type { SourceSnapshot } from "../snapshot";
 import type { Connector, DiscoveryResult } from "../connector";
+
+/** Resolve the connector for a profile's system type. */
+function connectorFor(p: ConnectionProfile): Connector | null {
+  return getConnector(p.systemType as SourceSystemType) ?? null;
+}
+
+/** Build a model from discovered metadata, EBS-enriched for an oracle-ebs source. */
+function buildModel(p: ConnectionProfile, md: CanonicalMetadata, name: string, now: string): ToModelResult {
+  return p.systemType === "oracle-ebs" ? ebsSnapshotToModel(md, name, now) : metadataToModel(md, name, now);
+}
+
+function isEbs(p: ConnectionProfile): boolean {
+  return p.systemType === "oracle-ebs";
+}
 
 function buildSnapshot(connectionRef: string, d: DiscoveryResult): SourceSnapshot {
   return {
@@ -49,19 +65,26 @@ export function ConnectionsDialog({
 
   const selected = connections.find((c) => c.id === selectedId) ?? null;
 
-  const newConnection = () => {
+  const addConnection = (draft: ConnectionProfile) => {
+    void upsertConnection(draft).then(() => {
+      setSelectedId(draft.id);
+      setMode("edit");
+    });
+  };
+  const newPgConnection = () => {
     const id = newId("connection");
-    const draft: ConnectionProfile = {
+    addConnection({
       id,
       name: "new_connection",
       systemType: "postgres",
       params: { host: "localhost", port: "5432", database: "", user: "" },
       secretRef: id,
-    };
-    void upsertConnection(draft).then(() => {
-      setSelectedId(id);
-      setMode("edit");
     });
+  };
+  const newEbsConnection = () => {
+    const id = newId("connection");
+    // Mock/offline Oracle EBS source — no host/credentials needed (Req 21 Phase 1/2).
+    addConnection({ id, name: "oracle_ebs", systemType: "oracle-ebs", params: { database: "VIS" } });
   };
 
   return (
@@ -83,11 +106,12 @@ export function ConnectionsDialog({
                 }}
               >
                 <strong>{c.name}</strong>
-                <span className="field__hint">{c.systemType} · {c.params.host}/{c.params.database}</span>
+                <span className="field__hint">{c.systemType} · {c.params.host ? `${c.params.host}/` : ""}{c.params.database}</span>
               </button>
             ))}
             {connections.length === 0 && <p className="side__hint">No connections yet.</p>}
-            <button className="btn btn--small" onClick={newConnection}>+ PostgreSQL connection</button>
+            <button className="btn btn--small" onClick={newPgConnection}>+ PostgreSQL connection</button>
+            <button className="btn btn--small" onClick={newEbsConnection}>+ Oracle EBS (mock)</button>
           </div>
           <div className="conn__panel">
             {!selected ? (
@@ -116,10 +140,6 @@ export function ConnectionsDialog({
   );
 }
 
-function pgConnector(): Connector | null {
-  return getConnector("postgres") ?? null;
-}
-
 function ConnectionEditor({
   profile,
   onSave,
@@ -144,17 +164,23 @@ function ConnectionEditor({
 
   // Discovery uses the SAVED profile + the keychain secret, so the connection
   // must be fully filled in AND saved (no unsaved edits) before reverse-engineer
-  // or refresh. Guard the buttons and explain why they are disabled.
-  const configured = !!(params.host?.trim() && params.database?.trim() && params.user?.trim());
+  // or refresh. Guard the buttons and explain why they are disabled. An EBS (mock)
+  // source needs only an instance name and carries no credentials.
+  const ebs = isEbs(profile);
+  const configured = ebs ? !!params.database?.trim() : !!(params.host?.trim() && params.database?.trim() && params.user?.trim());
   const dirty =
     password.length > 0 ||
     name !== profile.name ||
     JSON.stringify(params) !== JSON.stringify(profile.params);
   const ready = configured && !dirty;
   const readyReason = !configured
-    ? "Fill in host, database and user."
+    ? ebs
+      ? "Enter the EBS instance / service name."
+      : "Fill in host, database and user."
     : dirty
-      ? "Save your changes first (stores the password in the OS keychain)."
+      ? ebs
+        ? "Save your changes first."
+        : "Save your changes first (stores the password in the OS keychain)."
       : null;
 
   const save = async () => {
@@ -176,9 +202,17 @@ function ConnectionEditor({
     setBusy(true);
     setStatus("Testing…");
     try {
-      // Pass the typed password transiently so a test works before the first save.
-      const res = await pgTestConnection({ ...profile, params }, password || undefined);
-      setStatus(res.ok ? `OK — ${res.productVersion ?? "connected"}` : `Failed: ${res.message}`);
+      if (ebs) {
+        const c = connectorFor(profile);
+        const res = c
+          ? await c.testConnection({ ...profile, params })
+          : { ok: false, message: "No connector registered" };
+        setStatus(res.ok ? `OK — ${res.message}` : `Failed: ${res.message}`);
+      } else {
+        // Pass the typed password transiently so a test works before the first save.
+        const res = await pgTestConnection({ ...profile, params }, password || undefined);
+        setStatus(res.ok ? `OK — ${res.productVersion ?? "connected"}` : `Failed: ${res.message}`);
+      }
     } catch (e) {
       setStatus(`Failed: ${(e as Error).message}`);
     } finally {
@@ -193,35 +227,51 @@ function ConnectionEditor({
         <input className={nameError ? "is-error" : ""} value={name} onChange={(e) => setName(e.target.value)} />
         {nameError && <span className="toolbar__model-error">{nameError}</span>}
       </div>
-      <div className="modal__row modal__row--pair">
-        <div className="field">
-          <label>Host</label>
-          <input value={params.host ?? ""} onChange={(e) => setParam("host", e.target.value)} />
-        </div>
-        <div className="field">
-          <label>Port</label>
-          <input value={params.port ?? "5432"} onChange={(e) => setParam("port", e.target.value)} />
-        </div>
-      </div>
-      <div className="modal__row modal__row--pair">
-        <div className="field">
-          <label>Database</label>
-          <input value={params.database ?? ""} onChange={(e) => setParam("database", e.target.value)} />
-        </div>
-        <div className="field">
-          <label>User</label>
-          <input value={params.user ?? ""} onChange={(e) => setParam("user", e.target.value)} />
-        </div>
-      </div>
-      <div className="field">
-        <label>Password {profile.secretRef ? "(stored in keychain)" : ""}</label>
-        <input
-          type="password"
-          placeholder="•••••• (leave blank to keep stored)"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-      </div>
+      {ebs ? (
+        <>
+          <div className="field">
+            <label>EBS instance / service name</label>
+            <input value={params.database ?? ""} placeholder="e.g. VIS" onChange={(e) => setParam("database", e.target.value)} />
+          </div>
+          <p className="field__hint">
+            Oracle E-Business Suite (mock/offline source). Read-only metadata discovery — no
+            credentials required; the live Oracle adapter is pending a driver sign-off
+            (see docs/ORACLE_EBS.md). EBS release &amp; DB version are reported on Test.
+          </p>
+        </>
+      ) : (
+        <>
+          <div className="modal__row modal__row--pair">
+            <div className="field">
+              <label>Host</label>
+              <input value={params.host ?? ""} onChange={(e) => setParam("host", e.target.value)} />
+            </div>
+            <div className="field">
+              <label>Port</label>
+              <input value={params.port ?? "5432"} onChange={(e) => setParam("port", e.target.value)} />
+            </div>
+          </div>
+          <div className="modal__row modal__row--pair">
+            <div className="field">
+              <label>Database</label>
+              <input value={params.database ?? ""} onChange={(e) => setParam("database", e.target.value)} />
+            </div>
+            <div className="field">
+              <label>User</label>
+              <input value={params.user ?? ""} onChange={(e) => setParam("user", e.target.value)} />
+            </div>
+          </div>
+          <div className="field">
+            <label>Password {profile.secretRef ? "(stored in keychain)" : ""}</label>
+            <input
+              type="password"
+              placeholder="•••••• (leave blank to keep stored)"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+        </>
+      )}
       {status && <p className="field__hint">{status}</p>}
       <div className="modal__actions">
         <button className="btn btn--danger btn--small" onClick={onDelete} disabled={busy}>Delete</button>
@@ -275,7 +325,7 @@ function ReversePanel({
   const [error, setError] = useState<string | null>(null);
 
   const runDiscover = async (sel: Set<string>) => {
-    const c = pgConnector();
+    const c = connectorFor(profile);
     if (!c) return;
     setBusy(true);
     setError(null);
@@ -297,7 +347,7 @@ function ReversePanel({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const c = pgConnector();
+      const c = connectorFor(profile);
       if (!c) return;
       try {
         const list = await c.listSchemas(profile);
@@ -328,7 +378,7 @@ function ReversePanel({
   };
 
   const preview = discovery
-    ? metadataToModel(discovery.metadata, modelName || "imported", new Date().toISOString())
+    ? buildModel(profile, discovery.metadata, modelName || "imported", new Date().toISOString())
     : null;
   const nameError = validateIdentifier(modelName);
 
@@ -445,7 +495,7 @@ function RefreshPanel({
   const [busy, setBusy] = useState(false);
 
   const refresh = async () => {
-    const c = pgConnector();
+    const c = connectorFor(profile);
     if (!c) return;
     setBusy(true);
     setStatus("Discovering and comparing…");

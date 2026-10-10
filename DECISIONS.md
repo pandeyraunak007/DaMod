@@ -5,6 +5,24 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-10 — Req 21 Phase 2 (do-now 3): connector-generic Connections UI for EBS
+
+Made the whole EBS path reachable in the app (previously the `oracle-ebs` connector was
+registered + tested but had no UI entry point).
+
+- **Connections dialog is now connector-generic** (was Postgres-hardcoded): `connectorFor`
+  resolves by `profile.systemType`; `buildModel` dispatches to `ebsSnapshotToModel` for
+  EBS (product tags + verified descriptions + provenance) vs `metadataToModel` otherwise.
+  Reverse + Refresh panels use the resolved connector, so Postgres behaviour is unchanged.
+- **"+ Oracle EBS (mock)" connection**: systemType `oracle-ebs`, instance-only params, NO
+  credentials/keychain (it's offline). EBS-specific editor; Test reports the EBS release +
+  Oracle DB version (separately) via the connector; Reverse-engineer imports an
+  EBS-enriched model; Refresh & compare works via the existing drift/apply path.
+- Kept the author-verified Postgres path intact (branch on `isEbs`, no behaviour change).
+- 303 TS tests (+3: `EbsConnection.render.test.tsx` — EBS editor fields, create button,
+  Test output); tsc/build/cargo clean.
+- The live Rust Oracle adapter remains the only EBS gap (driver sign-off + an instance).
+
 ## 2026-10-10 — Req 21 Phase 2 (do-now 2): EBS-aware Explorer view
 
 Read-only EBS view of the ACTIVE model, reusing the Req 18 active-model scoping.

@@ -31,6 +31,7 @@ snapshot, awaits the live driver · **Live** = needs an accessible Oracle/EBS in
 | Product catalog from metadata | **Done** | `ebsProducts` derives products from actual annotations (not an assumed fixed list). |
 | Idempotent re-discovery (no dupes) | **Done** | `computeDrift(prev, next)` — re-discovering an unchanged snapshot yields zero changes. |
 | Offline import of a metadata package | **Done** | `ebsMockMetadata()` ⇄ `parseMetadata`; any eTRM-derived JSON validating against the contract imports the same way. |
+| EBS connection setup + reverse + refresh (UI) | **Done (mock)** | Connections dialog is connector-generic: "+ Oracle EBS (mock)" creates an `oracle-ebs` connection (instance only, no credentials); Test reports EBS release + DB version; Reverse-engineer imports an EBS-enriched model; Refresh & compare works via the existing drift/apply path. |
 | Verified vs inferred distinction | **Done** | `EbsAnnotation.verified`; inferred descriptions are NOT promoted into model text (§5). |
 | Live connection + permission checks | **Live / Deferred** | Needs the Rust Oracle driver + instance. Contract method `testConnection` exists (mock). |
 | DB object discovery (tables/cols/keys/indexes/views) | **Mock → Live** | Canonical shapes support all of these; live catalog-view queries (`ALL_TAB_COLUMNS`, `ALL_CONSTRAINTS`, `ALL_CONS_COLUMNS`, `ALL_INDEXES`, `ALL_VIEWS`) are deferred to the driver. |
@@ -71,10 +72,10 @@ Document the final choice here and in `DECISIONS.md` before adding any dependenc
 
 - **Phase 2** — *DONE (do-now track):* source provenance + idempotent re-discovery
   (`Entity.source` + `reconcileDiscoveredModel`), the **EBS-aware Explorer view**
-  (`EbsExplorer`, product/schema grouping, scoped to the active tab), and EBS provenance
-  in the Inspector. *Remaining (driver-gated):* wire the `oracle-ebs` source into the
-  New Model / Connections UI (§2 connection setup), reverse-engineer selected
-  tables/schemas from a live instance, and live DB discovery via the Oracle adapter.
+  (`EbsExplorer`), EBS provenance in the Inspector, and the **connector-generic
+  Connections UI** — create/test/reverse/refresh an `oracle-ebs` (mock) connection
+  end-to-end. *Remaining (driver-gated):* live DB discovery via the Rust Oracle adapter
+  and reverse-engineering selected tables from a live instance.
 - **Phase 3** — EBS application awareness: FND dictionary, product↔object association,
   documented relationships, concurrent programs/lookups; new canonical object kinds
   (packages/procedures/functions/triggers/synonyms/types).
