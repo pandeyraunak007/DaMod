@@ -3,6 +3,7 @@ import {
   levelTerms,
   showsPhysicalObjects,
   showsKeys,
+  inspectorCaps,
   type ModelLevel,
 } from "./levels";
 import { useModelStore } from "../store/modelStore";
@@ -50,6 +51,28 @@ describe("level-aware visibility", () => {
     expect(showsKeys("Conceptual")).toBe(false);
     expect(showsKeys("Logical")).toBe(true);
     expect(showsKeys("Physical")).toBe(true);
+  });
+});
+
+describe("inspectorCaps — one shared capability object (§13.7)", () => {
+  it("Conceptual: business only (no types/keys/DDL/RI)", () => {
+    expect(inspectorCaps("Conceptual")).toEqual({
+      physicalType: false, logicalType: false, keys: false,
+      physicalProps: false, ddl: false, referentialIntegrity: false,
+    });
+  });
+  it("Logical: logical types + keys, no physical/DDL/RI", () => {
+    const c = inspectorCaps("Logical");
+    expect(c).toMatchObject({ logicalType: true, keys: true, physicalType: false, ddl: false, referentialIntegrity: false });
+  });
+  it("Physical/Logical: both types + physical props + DDL + RI", () => {
+    expect(inspectorCaps("Physical/Logical")).toEqual({
+      physicalType: true, logicalType: true, keys: true,
+      physicalProps: true, ddl: true, referentialIntegrity: true,
+    });
+  });
+  it("Physical: physical types + DDL + RI, no logical type", () => {
+    expect(inspectorCaps("Physical")).toMatchObject({ physicalType: true, logicalType: false, ddl: true, referentialIntegrity: true });
   });
 });
 

@@ -94,6 +94,37 @@ export function showsKeys(level: ModelLevel): boolean {
   return !isConceptual(level);
 }
 
+/**
+ * ONE shared capability descriptor the Properties Inspector (and anyone else)
+ * reads to decide what to show per level (§13.7) — no scattered level checks.
+ */
+export interface InspectorCaps {
+  /** Show the physical (Postgres) type editor. */
+  physicalType: boolean;
+  /** Show the generic logical-type editor. */
+  logicalType: boolean;
+  /** Show key/identifier controls (PK / unique / nullable). */
+  keys: boolean;
+  /** Show physical-only properties (SQL default, domain binding, dimensional role). */
+  physicalProps: boolean;
+  /** Offer a SQL/DDL preview + export (Physical and Physical/Logical only). */
+  ddl: boolean;
+  /** Referential-integrity actions are a physical foreign-key concern. */
+  referentialIntegrity: boolean;
+}
+
+export function inspectorCaps(level: ModelLevel): InspectorCaps {
+  const physical = usesPhysicalTypes(level);
+  return {
+    physicalType: physical,
+    logicalType: usesLogicalTypes(level),
+    keys: !isConceptual(level),
+    physicalProps: physical,
+    ddl: canExportDdl(level),
+    referentialIntegrity: physical,
+  };
+}
+
 export interface PhysicalMapping {
   type: DataTypeKind;
   length?: number;

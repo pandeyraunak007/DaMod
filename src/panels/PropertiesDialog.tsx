@@ -9,11 +9,11 @@ import { validateIdentifier } from "../model/identifiers";
 import {
   LOGICAL_TYPE_KINDS,
   type LogicalTypeKind,
-  isConceptual,
+  inspectorCaps,
   levelTerms,
-  usesLogicalTypes,
-  usesPhysicalTypes,
 } from "../model/levels";
+import { foreignKeys, tableDDL } from "../export/ddl";
+import { DIALECTS } from "../export/dialects";
 import type { Entity, Field, FieldRole, RiAction, Udp } from "../model/model";
 
 const RI_ACTIONS: RiAction[] = ["no action", "cascade", "restrict", "set null", "set default"];
@@ -96,6 +96,7 @@ function EntityProperties({ entity, onClose }: { entity: Entity; onClose: () => 
   const applyScd2 = useModelStore((s) => s.applyScd2);
   const level = useModelStore((s) => s.model.level);
   const terms = levelTerms(level); // pure; computed in render (never inside a selector)
+  const caps = inspectorCaps(level);
   const [tab, setTab] = useState("General");
   const patch = (p: Parameters<typeof updateEntity>[1]) => updateEntity(entity.id, p);
   const hasSurrogate = entity.fields.some((f) => f.name.toLowerCase() === `${entity.name.toLowerCase()}_key`);
@@ -106,7 +107,11 @@ function EntityProperties({ entity, onClose }: { entity: Entity; onClose: () => 
         <h2 className="modal__title">{terms.entity}: {entity.name}</h2>
         <button className="icon-btn" onClick={onClose}>✕</button>
       </div>
-      <Tabs tabs={["General", terms.fieldPlural, "Definition", "Note", "UDP"]} active={tab} onChange={setTab} />
+      <Tabs
+        tabs={["General", terms.fieldPlural, "Definition", "Note", "UDP", ...(caps.ddl ? ["SQL"] : [])]}
+        active={tab}
+        onChange={setTab}
+      />
       <div className="props__body">
         {tab === "General" && (
           <>
@@ -164,6 +169,7 @@ function EntityProperties({ entity, onClose }: { entity: Entity; onClose: () => 
           <textarea className="editor__input" rows={8} defaultValue={entity.note ?? ""} onChange={(e) => patch({ note: e.target.value })} />
         )}
         {tab === "UDP" && <UdpEditor udps={entity.udps} onChange={(u) => patch({ udps: u })} />}
+        {tab === "SQL" && caps.ddl && <EntityDdl entityId={entity.id} />}
       </div>
     </>
   );
@@ -192,6 +198,28 @@ function FieldsTab({ entity }: { entity: Entity }) {
 // (no type/keys), Logical shows a generic logical type + identifiers, and
 // Physical / Physical-Logical show the full physical column editor. Hidden
 // properties are never deleted from the underlying field — just not shown.
+// The table's CREATE TABLE DDL (Postgres) — only offered at Physical / Physical-
+// Logical (§13.2, §13.6-8). Reuses the existing DDL generator.
+function EntityDdl({ entityId }: { entityId: string }) {
+  const model = useModelStore((s) => s.model);
+  const entity = model.entities.find((e) => e.id === entityId);
+  if (!entity) return null;
+  const fks = foreignKeys(model).filter((fk) => fk.child.id === entity.id);
+  let ddl: string;
+  try {
+    ddl = tableDDL(DIALECTS.postgres, entity, fks, undefined);
+  } catch (e) {
+    ddl = `-- error: ${(e as Error).message}`;
+  }
+  return (
+    <div>
+      <pre className="export-preview">{ddl}</pre>
+      <button className="btn btn--small" onClick={() => navigator.clipboard?.writeText(ddl)}>Copy</button>
+      <p className="field__hint">Postgres CREATE TABLE for this table. Full export: Export (File tab).</p>
+    </div>
+  );
+}
+
 function FieldProps({ entityId, field }: { entityId: string; field: Field }) {
   const updateField = useModelStore((s) => s.updateField);
   const bindFieldDomain = useModelStore((s) => s.bindFieldDomain);
@@ -202,9 +230,11 @@ function FieldProps({ entityId, field }: { entityId: string; field: Field }) {
   const shape = field.type ? paramShape(field.type) : "none";
   const boundDomain = field.domainId ? domains.find((d) => d.id === field.domainId) : undefined;
 
-  const conceptual = isConceptual(level);
-  const showPhysical = usesPhysicalTypes(level);
-  const showLogical = usesLogicalTypes(level);
+  // All level-driven visibility comes from the one shared capability object.
+  const caps = inspectorCaps(level);
+  const conceptual = !caps.keys;
+  const showPhysical = caps.physicalType;
+  const showLogical = caps.logicalType;
 
   return (
     <div className="props__field-body">
@@ -339,6 +369,7 @@ function RelationshipProperties({ relId, onClose }: { relId: string; onClose: ()
   const rel = useModelStore((s) => s.model.relationships.find((r) => r.id === relId));
   const entities = useModelStore((s) => s.model.entities);
   const update = useModelStore((s) => s.updateRelationship);
+  const caps = inspectorCaps(useModelStore((s) => s.model.level));
   const [tab, setTab] = useState("General");
   if (!rel) return null;
   const parent = entities.find((e) => e.id === rel.parentEntity);
@@ -353,7 +384,11 @@ function RelationshipProperties({ relId, onClose }: { relId: string; onClose: ()
         </h2>
         <button className="icon-btn" onClick={onClose}>✕</button>
       </div>
-      <Tabs tabs={["General", "Verb phrases", "RI", "Definition", "Note", "UDP"]} active={tab} onChange={setTab} />
+      <Tabs
+        tabs={["General", "Verb phrases", ...(caps.referentialIntegrity ? ["RI"] : []), "Definition", "Note", "UDP"]}
+        active={tab}
+        onChange={setTab}
+      />
       <div className="props__body">
         {tab === "General" && (
           <>
