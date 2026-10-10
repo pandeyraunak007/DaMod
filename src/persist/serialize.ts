@@ -8,6 +8,7 @@
 // is NOT written to disk — the file format has no such key.
 
 import type {
+  Domain,
   Entity,
   Field,
   Index,
@@ -46,8 +47,23 @@ function serializeField(f: Field): Record<string, unknown> {
   if (f.primaryKey) out.primaryKey = true;
   if (f.unique) out.unique = true;
   if (f.default != null && f.default !== "") out.default = f.default;
+  if (f.domainId) out.domainId = f.domainId;
   if (f.description) out.description = f.description;
   udpsOut(out, f.note, f.udps);
+  return out;
+}
+
+function serializeDomain(d: Domain): Record<string, unknown> {
+  const out: Record<string, unknown> = { id: d.id, name: d.name, type: d.type };
+  const shape = paramShape(d.type);
+  if (shape === "length") out.length = d.length;
+  if (shape === "decimal") {
+    out.precision = d.precision;
+    out.scale = d.scale;
+  }
+  if (d.logicalType) out.logicalType = d.logicalType;
+  if (d.default != null && d.default !== "") out.default = d.default;
+  if (d.description) out.description = d.description;
   return out;
 }
 
@@ -133,6 +149,9 @@ export function modelToPlain(model: Model): Record<string, unknown> {
   }
   if (model.rawObjects && model.rawObjects.length) {
     out.rawObjects = model.rawObjects.map(serializeRawObject);
+  }
+  if (model.domains && model.domains.length) {
+    out.domains = model.domains.map(serializeDomain);
   }
   return out;
 }

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import {
   type DbDialect,
+  type Domain,
   type Entity,
   type Field,
   type Index,
@@ -13,6 +14,7 @@ import {
   type View,
   findEntity,
   findField,
+  newDomain,
   newEntity,
   newField,
   newIndex,
@@ -52,6 +54,7 @@ export type Selection =
   | { kind: "index"; id: string }
   | { kind: "sequence"; id: string }
   | { kind: "rawObject"; id: string }
+  | { kind: "domain"; id: string }
   | null;
 
 export interface Notice {
@@ -113,6 +116,12 @@ interface ModelStore {
   createRawObject: (dialect: DbDialect) => string;
   updateRawObject: (id: string, patch: Partial<RawObject>) => void;
   deleteRawObject: (id: string) => void;
+
+  // domains (reusable named types)
+  createDomain: () => string;
+  updateDomain: (id: string, patch: Partial<Domain>) => void;
+  deleteDomain: (id: string) => void;
+  bindFieldDomain: (entityId: string, fieldId: string, domainId: string | null) => void;
 
   // relationships
   openRelationshipDraft: (source: string, target: string) => void;
@@ -195,6 +204,16 @@ function normalizeFieldParams(field: Field): void {
     delete field.precision;
     delete field.scale;
   }
+}
+
+/** Copy a domain's physical type onto a field (keeping unused params clean). */
+function applyDomainType(field: Field, domain: Domain): void {
+  field.type = domain.type;
+  field.length = domain.length;
+  field.precision = domain.precision;
+  field.scale = domain.scale;
+  if (domain.logicalType) field.logicalType = domain.logicalType;
+  normalizeFieldParams(field);
 }
 
 function typeNoticeMessage(changes: TypeChange[]): string {
@@ -332,7 +351,11 @@ export const useModelStore = create<ModelStore>((set, get) => {
         const field = entity ? findField(entity, fieldId) : undefined;
         if (!entity || !field) return {};
         const wasPk = field.primaryKey;
+        // A manual type edit detaches the field from its domain (ERwin override).
+        const touchesType =
+          "type" in patch || "length" in patch || "precision" in patch || "scale" in patch;
         Object.assign(field, patch);
+        if (touchesType && field.domainId && !("domainId" in patch)) delete field.domainId;
         normalizeFieldParams(field);
         // Realign dependent foreign keys when a primary key's type changes (FR-3.7).
         let changes: TypeChange[] = [];
@@ -482,6 +505,76 @@ export const useModelStore = create<ModelStore>((set, get) => {
       set((s) =>
         s.selection?.kind === "rawObject" && s.selection.id === id ? { selection: null } : {},
       );
+    },
+
+    createDomain: () => {
+      const taken = new Set((get().model.domains ?? []).map((d) => d.name));
+      const domain = newDomain(uniqueName("NewDomain", taken));
+      commit((m) => {
+        m.domains = [...(m.domains ?? []), domain];
+      });
+      set({ selection: { kind: "domain", id: domain.id } });
+      return domain.id;
+    },
+    // Editing a domain's type propagates to every field bound to it (ERwin), and
+    // realigns any foreign keys that follow a bound primary key (FR-3.7).
+    updateDomain: (id, patch) => {
+      set((s) => {
+        const next = structuredClone(s.model);
+        const domain = (next.domains ?? []).find((d) => d.id === id);
+        if (!domain) return {};
+        Object.assign(domain, patch);
+        for (const e of next.entities) {
+          for (const f of e.fields) {
+            if (f.domainId === id) applyDomainType(f, domain);
+          }
+        }
+        const changes = reconcileForeignKeyTypes(next);
+        next.updatedAt = nowIso();
+        const notices = changes.length
+          ? [...s.notices, { id: newId("field"), message: typeNoticeMessage(changes) }]
+          : s.notices;
+        return { past: pushPast(s.past, s.model), model: next, future: [], notices };
+      });
+    },
+    // Deleting a domain unbinds its fields; they keep their last resolved type.
+    deleteDomain: (id) => {
+      commit((m) => {
+        m.domains = (m.domains ?? []).filter((d) => d.id !== id);
+        for (const e of m.entities) {
+          for (const f of e.fields) {
+            if (f.domainId === id) delete f.domainId;
+          }
+        }
+      });
+      set((s) =>
+        s.selection?.kind === "domain" && s.selection.id === id ? { selection: null } : {},
+      );
+    },
+    bindFieldDomain: (entityId, fieldId, domainId) => {
+      set((s) => {
+        const next = structuredClone(s.model);
+        const entity = findEntity(next, entityId);
+        const field = entity ? findField(entity, fieldId) : undefined;
+        if (!entity || !field) return {};
+        if (domainId == null) {
+          delete field.domainId;
+        } else {
+          const domain = (next.domains ?? []).find((d) => d.id === domainId);
+          if (!domain) return {};
+          field.domainId = domainId;
+          applyDomainType(field, domain);
+          if ((field.default == null || field.default === "") && domain.default) {
+            field.default = domain.default;
+          }
+        }
+        const changes = field.primaryKey ? reconcileForeignKeyTypes(next) : [];
+        next.updatedAt = nowIso();
+        const notices = changes.length
+          ? [...s.notices, { id: newId("field"), message: typeNoticeMessage(changes) }]
+          : s.notices;
+        return { past: pushPast(s.past, s.model), model: next, future: [], notices };
+      });
     },
 
     openRelationshipDraft: (source, target) =>

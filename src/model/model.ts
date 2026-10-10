@@ -6,6 +6,8 @@ import { newId } from "../lib/ids";
 import { type DataTypeKind, withTypeDefaults } from "./dataTypes";
 import type { LogicalTypeKind, ModelLevel } from "./levels";
 
+export type { LogicalTypeKind } from "./levels";
+
 export interface Position {
   x: number;
   y: number;
@@ -37,8 +39,29 @@ export interface Field {
   unique: boolean;
   default?: string;
   description?: string;
+  /** Bound reusable domain (ERwin). When set, the field's physical type is
+   *  governed by the domain and changes to the domain propagate here. */
+  domainId?: string;
   note?: string;
   udps?: Udp[];
+}
+
+/**
+ * A reusable named type (ERwin domain): a physical type spec authored once and
+ * bound to many fields, so changing the domain updates every field that uses it.
+ * Lives on the model alongside views/indexes/sequences.
+ */
+export interface Domain {
+  id: string;
+  name: string;
+  type: DataTypeKind;
+  length?: number;
+  precision?: number;
+  scale?: number;
+  logicalType?: LogicalTypeKind;
+  /** Default SQL applied to a field when it has none of its own. */
+  default?: string;
+  description?: string;
 }
 
 export type Stereotype = "fact" | "dimension";
@@ -157,6 +180,7 @@ export interface Model {
   indexes?: Index[];
   sequences?: Sequence[];
   rawObjects?: RawObject[];
+  domains?: Domain[];
 }
 
 // ---- factories ---------------------------------------------------------------
@@ -210,6 +234,10 @@ export function newSequence(name: string): Sequence {
 
 export function newRawObject(name: string, dialect: DbDialect): RawObject {
   return { id: newId("rawObject"), name, dialect, sql: "" };
+}
+
+export function newDomain(name: string, kind: DataTypeKind = "string"): Domain {
+  return { id: newId("domain"), name, ...withTypeDefaults(kind) };
 }
 
 export function newModel(name: string, now: string, level: ModelLevel = "Physical"): Model {

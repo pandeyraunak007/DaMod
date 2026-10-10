@@ -159,8 +159,11 @@ function FieldsTab({ entity }: { entity: Entity }) {
 
 function FieldProps({ entityId, field }: { entityId: string; field: Field }) {
   const updateField = useModelStore((s) => s.updateField);
+  const bindFieldDomain = useModelStore((s) => s.bindFieldDomain);
+  const domains = useModelStore((s) => s.model.domains ?? []);
   const patch = (p: Partial<Field>) => updateField(entityId, field.id, p);
   const shape = field.type ? paramShape(field.type) : "none";
+  const boundDomain = field.domainId ? domains.find((d) => d.id === field.domainId) : undefined;
   return (
     <div className="props__field-body">
       <div className="attr-row">
@@ -168,7 +171,12 @@ function FieldProps({ entityId, field }: { entityId: string; field: Field }) {
           defaultValue={field.name}
           onChange={(e) => !validateIdentifier(e.target.value) && patch({ name: e.target.value })}
         />
-        <select value={field.type ?? "string"} onChange={(e) => patch({ type: e.target.value as DataTypeKind })}>
+        <select
+          value={field.type ?? "string"}
+          disabled={!!boundDomain}
+          title={boundDomain ? `Type governed by domain “${boundDomain.name}”` : undefined}
+          onChange={(e) => patch({ type: e.target.value as DataTypeKind })}
+        >
           {DATA_TYPE_KINDS.map((k) => (
             <option key={k} value={k}>
               {k}
@@ -176,6 +184,22 @@ function FieldProps({ entityId, field }: { entityId: string; field: Field }) {
           ))}
         </select>
       </div>
+      {domains.length > 0 && (
+        <div className="field">
+          <label>Domain</label>
+          <select
+            value={field.domainId ?? ""}
+            onChange={(e) => bindFieldDomain(entityId, field.id, e.target.value || null)}
+          >
+            <option value="">— none (free type) —</option>
+            {domains.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       {shape === "length" && (
         <label className="field-row__params">
           length

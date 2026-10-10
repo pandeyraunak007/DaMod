@@ -469,6 +469,52 @@ function duplicateSemanticNames(ctx: ValidationContext): Issue[] {
   return issues;
 }
 
+function domainIssues(ctx: ValidationContext): Issue[] {
+  const issues: Issue[] = [];
+  for (const { id, model } of ctx.models) {
+    const domains = model.domains ?? [];
+    const domainIds = new Set(domains.map((d) => d.id));
+    // Duplicate domain names within a model.
+    const counts = new Map<string, number>();
+    for (const d of domains) counts.set(d.name, (counts.get(d.name) ?? 0) + 1);
+    for (const d of domains) {
+      if ((counts.get(d.name) ?? 0) > 1) {
+        issues.push({
+          id: `dupDomain:${id}:${d.id}`,
+          rule: "domainIssues",
+          severity: "error",
+          message: `Duplicate domain name “${d.name}” in ${model.name}`,
+          target: { model: id },
+        });
+      }
+      if (validateIdentifier(d.name)) {
+        issues.push({
+          id: `badDomainId:${id}:${d.id}`,
+          rule: "domainIssues",
+          severity: "error",
+          message: `Invalid domain identifier “${d.name}” in ${model.name}`,
+          target: { model: id },
+        });
+      }
+    }
+    // A field bound to a deleted domain.
+    for (const e of model.entities) {
+      for (const f of e.fields) {
+        if (f.domainId && !domainIds.has(f.domainId)) {
+          issues.push({
+            id: `dangDomain:${id}:${e.id}:${f.id}`,
+            rule: "domainIssues",
+            severity: "error",
+            message: `${model.name}.${e.name}.${f.name} is bound to a deleted domain`,
+            target: { model: id, entity: e.id, field: f.id },
+          });
+        }
+      }
+    }
+  }
+  return issues;
+}
+
 const RULES: ((ctx: ValidationContext) => Issue[])[] = [
   duplicateEntityNames,
   duplicateFieldNames,
@@ -485,6 +531,7 @@ const RULES: ((ctx: ValidationContext) => Issue[])[] = [
   metricAggregateFit,
   semanticBindingDangling,
   duplicateSemanticNames,
+  domainIssues,
 ];
 
 /** Run every rule over the workspace and return all issues (FR-10.1). */

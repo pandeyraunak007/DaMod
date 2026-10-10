@@ -16,6 +16,7 @@ import { Canvas } from "./canvas/Canvas";
 import { SidePanel } from "./panels/SidePanel";
 import { RelationshipDialog } from "./panels/RelationshipDialog";
 import { PropertiesDialog } from "./panels/PropertiesDialog";
+import { DomainsDialog } from "./panels/DomainsDialog";
 import { LinkDialog } from "./links/LinkDialog";
 import { useModelStore } from "./store/modelStore";
 import { useWorkspaceStore } from "./store/workspaceStore";
@@ -34,6 +35,7 @@ export default function App() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [domainsOpen, setDomainsOpen] = useState(false);
   const [semanticOpen, setSemanticOpen] = useState(false);
   const [deleteModel, setDeleteModel] = useState<{ id: string; name: string } | null>(null);
 
@@ -115,6 +117,7 @@ export default function App() {
         onOpenHistory={() => setHistoryOpen(true)}
         onOpenMap={() => setMapOpen(true)}
         onOpenExport={() => setExportOpen(true)}
+        onOpenDomains={() => setDomainsOpen(true)}
         onToggleSemantic={() => setSemanticOpen((v) => !v)}
         semanticActive={semanticOpen}
       />
@@ -180,6 +183,7 @@ export default function App() {
       {historyOpen && <HistoryDialog onClose={() => setHistoryOpen(false)} />}
       {mapOpen && <WorkspaceMap onClose={() => setMapOpen(false)} />}
       {exportOpen && <ExportDialog onClose={() => setExportOpen(false)} />}
+      {domainsOpen && <DomainsDialog onClose={() => setDomainsOpen(false)} />}
       {confirmDelete && selection && <DeleteConfirm onClose={() => setConfirmDelete(false)} />}
       {deleteModel && (
         <DeleteModelConfirm

@@ -5,6 +5,33 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-10 — Domains, reverse-engineering and forward-engineering (beyond-spec, ERwin)
+
+Author asked to continue development with three ERwin-style features: reusable
+**domains**, **reverse-engineering** a `.sql` file into a model, and
+**forward-engineering** an ALTER migration. Each ships as its own increment with
+unit tests; UI verified by typecheck/build/clean boot (author runs the app).
+
+### Domains: reusable named types (ERwin)
+- **What:** A model can define **domains** — named, reusable type specs (e.g.
+  `money` = `decimal(14,4)`, `email` = `string(320)`). A field can bind to a
+  domain; its physical type is then governed by the domain. Editing the domain's
+  type propagates to every bound field (and realigns dependent foreign keys,
+  FR-3.7). Deleting a domain unbinds its fields, which keep their last resolved
+  type. A manual type edit on a bound field detaches it (ERwin-style override).
+- **Where:** Domains live **per-model** as `domains: Domain[]` on the model file,
+  exactly like `views`/`indexes`/`sequences` — so they reuse all existing
+  persistence, serialization, undo/redo and determinism. A field carries an
+  optional `domainId`. Managed from the toolbar **Domains** button; bound from an
+  entity's Fields tab in the Properties dialog.
+- **Why:** Domains are a core ERwin concept the tool lacked. Per-model (rather
+  than workspace-level) keeps the change low-risk and inside one file; a future
+  shared-library scope can promote them if needed.
+- **Validation:** duplicate domain names, invalid domain identifiers, and a field
+  bound to a deleted domain are all errors (one rule, `domainIssues`).
+- **Not done:** No cross-model/shared domain library; no domain-level CHECK
+  constraints (only type + optional default + logical type).
+
 ## 2026-09-22 — Phase 4: semantic layer (FR-7) + export (FR-8/FR-9), multi-dialect
 
 84 unit tests cover the pure logic (semantic persistence, DDL across 3 dialects,

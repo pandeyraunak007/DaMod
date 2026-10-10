@@ -8,6 +8,7 @@ interface Props {
   onOpenHistory: () => void;
   onOpenMap: () => void;
   onOpenExport: () => void;
+  onOpenDomains: () => void;
   onToggleSemantic: () => void;
   semanticActive: boolean;
 }
@@ -17,6 +18,7 @@ export function Toolbar({
   onOpenHistory,
   onOpenMap,
   onOpenExport,
+  onOpenDomains,
   onToggleSemantic,
   semanticActive,
 }: Props) {
@@ -134,6 +136,9 @@ export function Toolbar({
         </button>
         <button className="btn" onClick={arrange} title="Auto-arrange layout">
           Arrange
+        </button>
+        <button className="btn" onClick={onOpenDomains} title="Reusable named types">
+          Domains
         </button>
         {hasStereotypes && (
           <button className="btn" onClick={arrangeStar} title="Star-schema layout (facts centre)">

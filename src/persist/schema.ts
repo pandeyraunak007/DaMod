@@ -28,6 +28,7 @@ const zField = z.object({
   primaryKey: z.boolean().optional().default(false),
   unique: z.boolean().optional().default(false),
   default: z.string().optional(),
+  domainId: z.string().optional(),
   description: z.string().optional(),
   note: z.string().optional(),
   udps: z.array(zUdp).optional(),
@@ -97,6 +98,18 @@ const zRawObject = z.object({
   sql: z.string(),
 });
 
+const zDomain = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.enum(DATA_TYPE_KINDS as unknown as [string, ...string[]]),
+  length: z.number().int().positive().optional(),
+  precision: z.number().int().positive().optional(),
+  scale: z.number().int().nonnegative().optional(),
+  logicalType: z.enum(LOGICAL_TYPE_KINDS as unknown as [string, ...string[]]).optional(),
+  default: z.string().optional(),
+  description: z.string().optional(),
+});
+
 const zModel = z.object({
   formatVersion: z.literal(CURRENT_FORMAT_VERSION),
   id: z.string(),
@@ -114,6 +127,7 @@ const zModel = z.object({
   indexes: z.array(zIndex).optional(),
   sequences: z.array(zSequence).optional(),
   rawObjects: z.array(zRawObject).optional(),
+  domains: z.array(zDomain).optional(),
 });
 
 export type ParseResult<T> =
