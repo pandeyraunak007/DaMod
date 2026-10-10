@@ -56,6 +56,16 @@ describe("EbsExplorer", () => {
     expect(s().selection?.kind).toBe("entity");
   });
 
+  it("creates a subject area from a product and lists it", () => {
+    const addBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "+ area") as HTMLButtonElement;
+    expect(addBtn).toBeTruthy();
+    act(() => addBtn.click());
+    expect(s().model.subjectAreas?.length).toBe(1);
+    // The parent re-passes the updated model (ModelExplorer subscribes to the store).
+    act(() => root.render(<EbsExplorer model={s().model} />));
+    expect(container.textContent).toContain("Subject areas");
+  });
+
   it("filters objects by the search box", () => {
     const input = container.querySelector(".explorer__filter") as HTMLInputElement;
     const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;

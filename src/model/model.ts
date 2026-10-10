@@ -214,6 +214,20 @@ export interface SchemaObj {
   comment?: string;
 }
 
+/** A subject area (Req 21 §6): a named grouping of entities for focus/navigation —
+ *  e.g. one per EBS product ("Payables", "General Ledger") or business process. It is
+ *  a lens over the model, not a container: an entity may belong to several areas and
+ *  deleting an area never deletes entities. */
+export interface SubjectArea {
+  id: string;
+  name: string;
+  description?: string;
+  /** Member entity ids. */
+  entities: string[];
+  /** EBS product short code this area was derived from, if any (e.g. "AP"). */
+  product?: string;
+}
+
 export type DbDialect = "postgres" | "snowflake" | "databricks";
 
 /** A free-form, dialect-specific object (Snowflake stage/stream/task, Databricks
@@ -246,6 +260,7 @@ export interface Model {
   entities: Entity[];
   relationships: Relationship[];
   schemas?: SchemaObj[];
+  subjectAreas?: SubjectArea[];
   views?: View[];
   indexes?: Index[];
   sequences?: Sequence[];
@@ -308,6 +323,10 @@ export function newCheckConstraint(name: string, expression = ""): CheckConstrai
 
 export function newSchemaObject(name: string): SchemaObj {
   return { id: newId("schema"), name };
+}
+
+export function newSubjectArea(name: string, entities: string[] = [], product?: string): SubjectArea {
+  return { id: newId("subjectArea"), name, entities, ...(product ? { product } : {}) };
 }
 
 export function newRawObject(name: string, dialect: DbDialect): RawObject {

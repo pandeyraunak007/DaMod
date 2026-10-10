@@ -5,6 +5,26 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Req 21 Phase 4 (part): subject areas by EBS product
+
+Subject areas (§6) — named entity groupings for focus/navigation. Generally useful, but
+the EBS product tags (`ebs:<CODE>` + `entity.source.product`) make them auto-derivable.
+
+- **`SubjectArea` model concept** (`model.subjectAreas`): id/name/description?/entities[]/
+  product?. A LENS, not a container — an entity can be in several areas and deleting an
+  area never deletes entities (tested). Optional, backward-compatible, deterministic
+  serialize + Zod; validation rule for dup names + dangling members.
+- **Store ops** via `commit` (undo/redo free): create/update/delete +
+  `createSubjectAreaFromProduct(code)` which collects the product's tables and
+  **refreshes an existing area for that product instead of duplicating** (returns null if
+  the product has no tables).
+- **EBS Explorer UI:** a "+ area" action on each product group + a Subject Areas list
+  (click reveals a member; ✕ deletes). Read-only navigation; creation/edit flows through
+  the store.
+- No new deps, no Rust. 320 TS tests (+7: `store/subjectAreas.test.ts` + an EbsExplorer
+  render test); tsc/build/cargo clean. Remaining Phase 4: logical/conceptual generation +
+  an EBS refresh/compare review UX on `reconcileDiscoveredModel`.
+
 ## 2026-10-11 — Req 21: Oracle driver decision = imported-metadata-only (+ file import)
 
 **Decision (author sign-off: "go with the easy fix for the driver"):** adopt the

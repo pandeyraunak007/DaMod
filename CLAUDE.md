@@ -9,15 +9,19 @@
 
 ## NEXT SESSION — START HERE
 
-**Current status:** Branch `main`. Pushed: `6c041d0` (Req 21 Phase 3) and the rest of
-Reqs 17–21 Phases 1–3. **Req 21 driver decision — imported-metadata-only — + offline
-file import just landed, uncommitted in the working tree.** Author commits/pushes
-explicitly, do not commit or push unless asked. **313 TS tests pass · typecheck clean ·
-`npm run build` clean · `cargo build` clean.** See the top DECISIONS entries:
+**Current status:** Branch `main`. Pushed: `cf8c8e2` (EBS sample fixture) and the rest of
+Reqs 17–21 Phases 1–3 + the driver decision + file import. **Req 21 Phase 4 (part) —
+subject areas by EBS product — just landed, uncommitted in the working tree.** Author
+commits/pushes explicitly, do not commit or push unless asked. **320 TS tests pass ·
+typecheck clean · `npm run build` clean · `cargo build` clean.** See the top DECISIONS
+entries:
+- **Req 21 Phase 4 (part):** `SubjectArea` model concept + `createSubjectAreaFromProduct`
+  + EBS Explorer "+ area" / Subject Areas list. A lens, not a container (delete never
+  deletes entities).
 - **Req 21 driver decision (2026-10-11):** imported-metadata-only — no native Oracle
-  driver (deferred indefinitely). "Import metadata file…" in the Connections dialog loads
-  an exported/eTRM canonical JSON (rejects credential leaks), previews + imports it. The
-  **driver gate that blocked the connector roadmap for the whole project is now closed.**
+  driver (deferred indefinitely). "Import metadata file…" loads an exported/eTRM canonical
+  JSON (rejects credential leaks). The driver gate that blocked the connector roadmap is
+  now closed.
 - **Req 21 (Phase 1)** — Oracle **EBS offline/mock** foundation (no live driver, no Rust,
   no deps): mock `oracle-ebs` connector + eTRM-style fixture, `mapOracleType`,
   `ebsSnapshotToModel` (reuses `metadataToModel`), FK provenance/confidence + EBS release

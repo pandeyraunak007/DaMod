@@ -13,6 +13,7 @@ import {
   type RawObject,
   type Relationship,
   type Sequence,
+  type SubjectArea,
   type View,
   findEntity,
   findField,
@@ -24,6 +25,7 @@ import {
   newModel,
   newRawObject,
   newSchemaObject,
+  newSubjectArea,
   newSequence,
   newView,
 } from "../model/model";
@@ -120,6 +122,13 @@ interface ModelStore {
   createSchema: () => string;
   updateSchema: (id: string, patch: Partial<SchemaObj>) => void;
   deleteSchema: (id: string) => void;
+
+  // subject areas (Req 21 §6)
+  createSubjectArea: (name: string, entities?: string[], product?: string) => string;
+  updateSubjectArea: (id: string, patch: Partial<Pick<SubjectArea, "name" | "description" | "entities">>) => void;
+  deleteSubjectArea: (id: string) => void;
+  /** Create (or refresh) a subject area from an EBS product's tables. */
+  createSubjectAreaFromProduct: (product: string, name?: string) => string | null;
 
   // other database objects (views, indexes, sequences, raw objects)
   createView: (position?: Position, materialized?: boolean) => string;
@@ -601,6 +610,38 @@ export const useModelStore = create<ModelStore>((set, get) => {
         if (removed) for (const e of m.entities) if (e.schema === removed) delete e.schema;
       });
       set((s) => (s.selection?.kind === "schema" && s.selection.id === id ? { selection: null } : {}));
+    },
+
+    createSubjectArea: (name, entities = [], product) => {
+      const taken = new Set((get().model.subjectAreas ?? []).map((a) => a.name));
+      const area = newSubjectArea(uniqueName(name, taken), entities, product);
+      commit((m) => {
+        m.subjectAreas = [...(m.subjectAreas ?? []), area];
+      });
+      return area.id;
+    },
+    updateSubjectArea: (id, patch) => {
+      commit((m) => {
+        m.subjectAreas = (m.subjectAreas ?? []).map((a) => (a.id === id ? { ...a, ...patch } : a));
+      });
+    },
+    deleteSubjectArea: (id) => {
+      commit((m) => {
+        m.subjectAreas = (m.subjectAreas ?? []).filter((a) => a.id !== id);
+      });
+    },
+    createSubjectAreaFromProduct: (product, name) => {
+      const inProduct = (e: Entity) =>
+        e.source?.product === product || (e.tags ?? []).includes(`ebs:${product}`);
+      const ids = get().model.entities.filter(inProduct).map((e) => e.id);
+      if (ids.length === 0) return null;
+      // Refresh an existing area for this product rather than duplicating it.
+      const existing = (get().model.subjectAreas ?? []).find((a) => a.product === product);
+      if (existing) {
+        get().updateSubjectArea(existing.id, { entities: ids });
+        return existing.id;
+      }
+      return get().createSubjectArea(name ?? product, ids, product);
     },
 
     createRawObject: (dialect) => {

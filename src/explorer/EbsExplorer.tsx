@@ -14,6 +14,9 @@ export function EbsExplorer({ model }: { model: Model }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<Set<string>>(new Set());
   const reveal = (id: string) => useModelStore.getState().revealEntity(id);
+  const makeArea = (product: string) => useModelStore.getState().createSubjectAreaFromProduct(product);
+  const deleteArea = (id: string) => useModelStore.getState().deleteSubjectArea(id);
+  const areas = model.subjectAreas ?? [];
 
   const q = query.trim().toLowerCase();
   const filtering = q.length > 0;
@@ -65,11 +68,36 @@ export function EbsExplorer({ model }: { model: Model }) {
       />
 
       <div className="explorer__tree">
+        {/* Subject areas (Req 21 §6) — named groupings; click reveals a member. */}
+        {areas.length > 0 && (
+          <>
+            <div className="tree-row" style={{ paddingLeft: 4 }}>
+              <span className="tree-row__caret tree-row__caret--empty" />
+              <span className="tree-row__label"><span className="tree__group">Subject areas <span className="tree__count">{areas.length}</span></span></span>
+            </div>
+            {areas.map((a) => (
+              <div key={a.id} className="tree-row" style={{ paddingLeft: 4 + 14 }}>
+                <span className="tree-row__caret tree-row__caret--empty" />
+                <span
+                  className="tree-row__label tree__entity"
+                  title={a.description ?? `${a.entities.length} tables`}
+                  onClick={() => a.entities[0] && reveal(a.entities[0])}
+                >
+                  {a.name} <span className="tree__count">{a.entities.length}</span>
+                </span>
+                <span className="tree-row__actions">
+                  <button className="tree-row__add" title="Delete subject area" onClick={() => deleteArea(a.id)}>✕</button>
+                </span>
+              </div>
+            ))}
+          </>
+        )}
         {groups.length === 0 ? (
           <p className="explorer__empty">No EBS objects match.</p>
         ) : (
           groups.map((g) => {
             const gkey = `g:${grouping}:${g.key}`;
+            const isProductGroup = grouping === "product" && g.key !== "ÿ";
             return (
               <div key={gkey}>
                 <div className="tree-row" style={{ paddingLeft: 4 }}>
@@ -82,6 +110,13 @@ export function EbsExplorer({ model }: { model: Model }) {
                       <span className="tree__count">{g.entities.length}</span>
                     </span>
                   </span>
+                  {isProductGroup && (
+                    <span className="tree-row__actions">
+                      <button className="tree-row__add" title={`Create subject area for ${g.label}`} onClick={() => makeArea(g.key)}>
+                        + area
+                      </button>
+                    </span>
+                  )}
                 </div>
                 {isOpen(gkey) &&
                   g.entities.map((e) => {

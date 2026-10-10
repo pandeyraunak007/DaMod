@@ -103,6 +103,14 @@ const zSchema = z.object({
   comment: z.string().optional(),
 });
 
+const zSubjectArea = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  product: z.string().optional(),
+  entities: z.array(z.string()).default([]),
+});
+
 const zIndex = z.object({
   id: z.string(),
   name: z.string(),
@@ -155,6 +163,7 @@ const zModel = z.object({
   entities: z.array(zEntity),
   relationships: z.array(zRelationship),
   schemas: z.array(zSchema).optional(),
+  subjectAreas: z.array(zSubjectArea).optional(),
   views: z.array(zView).optional(),
   indexes: z.array(zIndex).optional(),
   sequences: z.array(zSequence).optional(),

@@ -170,6 +170,15 @@ export function modelToPlain(model: Model): Record<string, unknown> {
   out.entities = model.entities.map(serializeEntity);
   out.relationships = model.relationships.map(serializeRelationship);
   if (model.schemas && model.schemas.length) out.schemas = model.schemas.map(serializeSchema);
+  if (model.subjectAreas && model.subjectAreas.length) {
+    out.subjectAreas = model.subjectAreas.map((a) => {
+      const sa: Record<string, unknown> = { id: a.id, name: a.name };
+      if (a.description) sa.description = a.description;
+      if (a.product) sa.product = a.product;
+      sa.entities = [...a.entities];
+      return sa;
+    });
+  }
   if (model.views && model.views.length) out.views = model.views.map(serializeView);
   if (model.indexes && model.indexes.length) out.indexes = model.indexes.map(serializeIndex);
   if (model.sequences && model.sequences.length) {

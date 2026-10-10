@@ -43,6 +43,7 @@ snapshot, awaits the live driver · **Live** = needs an accessible Oracle/EBS in
 | Source-identifier provenance on model objects | **Done** | `Entity.source` ({system, schema, nativeId, product, provenance, confidence}); set by `metadataToModel` for all connectors, enriched for EBS; serialize + Zod optional, round-trips. |
 | Idempotent re-discovery (in-place merge) | **Done** | `reconcileDiscoveredModel` matches by `source.nativeId`, preserves stable ids + manual edits (logical names, descriptions, layout, tags, verb phrases); removed objects kept pending review (§11). |
 | Snapshot compare / refresh preserving manual edits | **Done (engine)** | `computeDrift` reports changes; `reconcileDiscoveredModel` merges preserving manual edits. EBS refresh *UX* wiring is Phase 4. |
+| Subject areas by EBS product | **Done** | `SubjectArea` model concept (`model.subjectAreas`) + store ops; `createSubjectAreaFromProduct` derives one per product (refreshes, never duplicates); EBS Explorer "+ area" action + a Subject Areas list (click reveals a member); deleting an area never deletes entities. |
 | Copilot EBS context + reviewed actions | **Deferred** | Phase 5. |
 | Pipeline planning from EBS metadata | **Deferred** | Phase 6 — the planner already consumes canonical metadata, so this is mostly wiring + Oracle→target type mapping. |
 | Offline metadata-file import (UI) | **Done** | "Import metadata file…" in the Connections dialog: validates an exported/eTRM-derived canonical JSON (`parseMetadataFile`, rejects credential leaks), previews it, reverse-engineers into a model + snapshot. No connection, no driver. |
@@ -87,8 +88,9 @@ eTRM/FND/DBA export → canonical JSON lives outside DaMod.
   release + FK provenance. *Remaining:* live FND/eTRM discovery (driver-gated), and a
   snapshot browser showing app metadata for an already-imported model (per §11 app
   metadata is shown at discovery time, not grafted into the model).
-- **Phase 4** — logical/conceptual generation; snapshot compare/refresh UX that never
-  overwrites manual edits (the diff engine already keys by name).
+- **Phase 4** — *partly DONE:* **subject areas by EBS product** (model concept + store
+  ops + EBS Explorer UI). *Remaining:* logical/conceptual generation (business entities
+  from documented metadata); an EBS refresh/compare review UX wired on `reconcileDiscoveredModel`.
 - **Phase 5** — Copilot EBS context (scoped to instance/product/schema/objects; cites
   object names; verified-vs-inferred; reviewed actions through the command layer).
 - **Phase 6** — pipeline planning from EBS metadata (Oracle→target type mapping,

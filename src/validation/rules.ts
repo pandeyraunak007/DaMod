@@ -610,6 +610,37 @@ function schemaIssues(ctx: ValidationContext): Issue[] {
   return issues;
 }
 
+function subjectAreaIssues(ctx: ValidationContext): Issue[] {
+  const issues: Issue[] = [];
+  for (const { id, model } of ctx.models) {
+    const areas = model.subjectAreas ?? [];
+    const entityIds = new Set(model.entities.map((e) => e.id));
+    const counts = new Map<string, number>();
+    for (const a of areas) counts.set(a.name, (counts.get(a.name) ?? 0) + 1);
+    for (const a of areas) {
+      if ((counts.get(a.name) ?? 0) > 1) {
+        issues.push({
+          id: `dupArea:${id}:${a.id}`,
+          rule: "subjectAreaIssues",
+          severity: "error",
+          message: `Duplicate subject-area name “${a.name}” in ${model.name}`,
+          target: { model: id },
+        });
+      }
+      if (a.entities.some((eid) => !entityIds.has(eid))) {
+        issues.push({
+          id: `dangArea:${id}:${a.id}`,
+          rule: "subjectAreaIssues",
+          severity: "warning",
+          message: `Subject area “${a.name}” references a deleted entity`,
+          target: { model: id },
+        });
+      }
+    }
+  }
+  return issues;
+}
+
 const RULES: ((ctx: ValidationContext) => Issue[])[] = [
   duplicateEntityNames,
   duplicateFieldNames,
@@ -630,6 +661,7 @@ const RULES: ((ctx: ValidationContext) => Issue[])[] = [
   measureRoleFit,
   checkConstraintIssues,
   schemaIssues,
+  subjectAreaIssues,
 ];
 
 /** Run every rule over the workspace and return all issues (FR-10.1). */
