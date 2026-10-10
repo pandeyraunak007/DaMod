@@ -184,7 +184,7 @@ function HomeTab({ onOpenDomains }: { onOpenDomains: () => void }) {
   const arrange = useModelStore((s) => s.arrange);
   const arrangeStar = useModelStore((s) => s.arrangeStar);
   const hasStereotypes = useModelStore((s) => s.model.entities.some((e) => e.stereotype));
-  const terms = useModelStore((s) => levelTerms(s.model.level));
+  const terms = levelTerms(level); // pure; computed in render (never inside a selector)
   const undo = useModelStore((s) => s.undo);
   const redo = useModelStore((s) => s.redo);
   const canUndo = useModelStore((s) => s.past.length > 0);

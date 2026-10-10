@@ -87,7 +87,8 @@ function EntityProperties({ entity, onClose }: { entity: Entity; onClose: () => 
   const renameEntity = useModelStore((s) => s.renameEntity);
   const updateEntity = useModelStore((s) => s.updateEntity);
   const applyScd2 = useModelStore((s) => s.applyScd2);
-  const terms = useModelStore((s) => levelTerms(s.model.level));
+  const level = useModelStore((s) => s.model.level);
+  const terms = levelTerms(level); // pure; computed in render (never inside a selector)
   const [tab, setTab] = useState("General");
   const patch = (p: Parameters<typeof updateEntity>[1]) => updateEntity(entity.id, p);
   const hasSurrogate = entity.fields.some((f) => f.name.toLowerCase() === `${entity.name.toLowerCase()}_key`);
