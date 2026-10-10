@@ -25,6 +25,7 @@ Action is one of:
 - { "kind": "create_attribute", "entity": string, "name": string, "type"?: type, "primaryKey"?: boolean, "unique"?: boolean, "nullable"?: boolean }   // add a column/attribute to an EXISTING entity
 - { "kind": "update_attribute", "entity": string, "field": string, "newName"?: string, "type"?: type, "primaryKey"?: boolean, "unique"?: boolean, "nullable"?: boolean }   // change/rename a column
 - { "kind": "rename_entity", "entity": string, "newName": string }
+- { "kind": "create_subject_area", "name": string, "description"?: string, "tables"?: string[], "product"?: string }   // group tables into a named subject area; "tables" are entity names, or give a "product"/family code (e.g. "AP", "Financials") to auto-include its tables. Level-agnostic.
 - { "kind": "delete_entity", "entity": string }
 - { "kind": "delete_attribute", "entity": string, "field": string }
 - { "kind": "delete_relationship", "parent": string, "child": string }

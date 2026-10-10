@@ -5,6 +5,24 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Copilot can create subject areas (closing a reported gap)
+
+Reported: the Copilot refused "create a subject area" — the model/store/Explorer supported
+them (previous entry) but the Copilot had NO matching action, so it correctly said it
+couldn't. Added the action so the AI path matches the manual one.
+
+- New Zod action `create_subject_area` ({ name, description?, tables?: string[],
+  product? }) in `copilot/actions.ts`; documented in the `orchestrate` SYSTEM_PROMPT;
+  rendered by `CopilotPanel.describeAction`; classified structural (requires approval),
+  not destructive.
+- `execute.ts` applies it through the SAME store ops (`createSubjectArea` /
+  `createSubjectAreaFromProduct`): resolves `tables` names → ids (unknown names skipped
+  with a note), or derives members from an EBS product / Fusion family `product` code;
+  idempotent by name; validates the name. One undo group, like every other action.
+- Level-agnostic — works at Physical/Logical etc. (the error quoted a level/terminology
+  limitation; subject areas don't depend on level).
+- 339 TS tests (+3: Copilot subject-area execute tests); tsc/build/cargo clean.
+
 ## 2026-10-11 — Subject areas available for ALL databases (not just EBS)
 
 The `SubjectArea` model concept was already database-agnostic, but the only UI to

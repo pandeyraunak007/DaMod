@@ -318,6 +318,8 @@ function describeAction(a: CopilotPlan["actions"][number]): string {
       return `✎ column ${a.entity}.${a.field}${a.newName ? ` → ${a.newName}` : ""}${a.type ? ` (${a.type})` : ""}`;
     case "rename_entity":
       return `✎ rename ${a.entity} → ${a.newName}`;
+    case "create_subject_area":
+      return `▦ subject area ${a.name}${a.product ? ` (from ${a.product})` : a.tables?.length ? ` (${a.tables.length} tables)` : ""}`;
     case "delete_entity":
       return `🗑 delete table ${a.entity}`;
     case "delete_attribute":

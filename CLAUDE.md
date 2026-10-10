@@ -17,7 +17,9 @@ See the top DECISIONS entries:
 - **Subject areas for ALL databases:** the standard Model Explorer now has a Subject
   areas section (create/rename/delete, add selected table, entity-context "New subject
   area from this") for any source — the EBS/Fusion "from product/family" stays as a
-  convenience. Store op `addEntityToSubjectArea`.
+  convenience. Store op `addEntityToSubjectArea`. **Copilot** has a matching
+  `create_subject_area` action (by table names or product/family code; reviewed/approved
+  like other actions).
 - **Req 22 (Fusion Cloud, offline/mock):** `oracle-fusion` mock connector (Financials),
   `mapFusionType`, `fusionSnapshotToModel`, `metadata.fusion` (REST resources + extract
   data stores), `source.apiVersion`, connector-generic Connections UI ("+ Oracle Fusion

@@ -144,6 +144,30 @@ function applyAction(action: CopilotAction): ActionResult {
       return ok(`Renamed ${action.entity} → ${action.newName}`);
     }
 
+    case "create_subject_area": {
+      if (validateIdentifier(action.name)) return fail(`“${action.name}”: invalid name`);
+      // Derive from an EBS product / Fusion family when no explicit tables are given.
+      if (action.product && !action.tables?.length) {
+        const id = store.createSubjectAreaFromProduct(action.product, action.name);
+        if (!id) return fail(`No tables found for product/family “${action.product}”`);
+        return ok(`Created subject area “${action.name}” from ${action.product}`);
+      }
+      if ((model().subjectAreas ?? []).some((a) => a.name.toLowerCase() === action.name.toLowerCase())) {
+        return skip(`subject area “${action.name}” already exists`);
+      }
+      const ids: string[] = [];
+      const unknown: string[] = [];
+      for (const t of action.tables ?? []) {
+        const e = entityByName(model(), t);
+        if (e) ids.push(e.id);
+        else unknown.push(t);
+      }
+      const id = store.createSubjectArea(action.name, ids);
+      if (action.description) store.updateSubjectArea(id, { description: action.description });
+      const note = unknown.length ? ` (${unknown.length} unknown table(s) skipped: ${unknown.join(", ")})` : "";
+      return ok(`Created subject area “${action.name}” with ${ids.length} table(s)${note}`);
+    }
+
     case "delete_entity": {
       const e = entityByName(model(), action.entity);
       if (!e) return skip(`“${action.entity}” already gone`);

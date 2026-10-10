@@ -144,3 +144,40 @@ describe("executePlan (reuses existing ops, atomic, idempotent)", () => {
     expect(serializeModel(s().model)).toBe(before);
   });
 });
+
+describe("create_subject_area action (Req 21/22 §6)", () => {
+  function withTables() {
+    const e1 = s().createEntity(); s().renameEntity(e1, "Invoice");
+    const e2 = s().createEntity(); s().renameEntity(e2, "Supplier");
+  }
+
+  it("groups named tables into a subject area (applied through the store)", () => {
+    withTables();
+    const plan = parsePlan({
+      summary: "finance area",
+      actions: [{ kind: "create_subject_area", name: "Finance", tables: ["Invoice", "Supplier", "Ghost"] }],
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    const res = executePlan(plan.value);
+    expect(res.applied).toBe(1);
+    const area = s().model.subjectAreas!.find((a) => a.name === "Finance")!;
+    expect(area.entities).toHaveLength(2); // Invoice + Supplier; "Ghost" skipped
+  });
+
+  it("is idempotent (re-applying the same area name skips)", () => {
+    withTables();
+    const plan = parsePlan({ summary: "x", actions: [{ kind: "create_subject_area", name: "Finance", tables: ["Invoice"] }] });
+    if (!plan.ok) return;
+    executePlan(plan.value);
+    const r2 = executePlan(plan.value);
+    expect(r2.skipped).toBe(1);
+    expect(s().model.subjectAreas).toHaveLength(1);
+  });
+
+  it("validates the area name", () => {
+    const plan = parsePlan({ summary: "x", actions: [{ kind: "create_subject_area", name: "1bad name", tables: [] }] });
+    if (!plan.ok) return;
+    expect(executePlan(plan.value).failed).toBe(1);
+  });
+});

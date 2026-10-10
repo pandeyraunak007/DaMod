@@ -63,6 +63,17 @@ const zRenameEntity = z.object({
   newName: z.string(),
 });
 
+// Group tables into a named subject area (Req 21/22 §6). Members come from an
+// explicit `tables` list and/or an EBS product / Fusion family `product` code.
+// Level-agnostic: subject areas exist at every modeling level.
+const zCreateSubjectArea = z.object({
+  kind: z.literal("create_subject_area"),
+  name: z.string(),
+  description: z.string().optional(),
+  tables: z.array(z.string()).optional(),
+  product: z.string().optional(),
+});
+
 const zDeleteEntity = z.object({ kind: z.literal("delete_entity"), entity: z.string() });
 const zDeleteAttribute = z.object({
   kind: z.literal("delete_attribute"),
@@ -82,6 +93,7 @@ export const zAction = z.discriminatedUnion("kind", [
   zCreateAttribute,
   zUpdateAttribute,
   zRenameEntity,
+  zCreateSubjectArea,
   zDeleteEntity,
   zDeleteAttribute,
   zDeleteRelationship,
@@ -122,7 +134,11 @@ export function planMutates(plan: CopilotPlan): boolean {
 export function requiresApproval(plan: CopilotPlan): boolean {
   const mutating = plan.actions.length;
   const structural = plan.actions.some(
-    (a) => a.kind === "create_entity" || a.kind === "create_relationship" || a.kind === "rename_entity",
+    (a) =>
+      a.kind === "create_entity" ||
+      a.kind === "create_relationship" ||
+      a.kind === "rename_entity" ||
+      a.kind === "create_subject_area",
   );
   return structural || plan.actions.some(isDestructive) || mutating > 5;
 }
