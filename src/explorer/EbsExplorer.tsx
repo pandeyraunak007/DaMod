@@ -4,17 +4,33 @@ import { fieldTypeLabel } from "../model/fieldDisplay";
 import type { Model } from "../model/model";
 import { ebsGroups, type EbsGrouping } from "./ebsTree";
 
-// Read-only EBS-aware view of the ACTIVE model (Req 21 §4). Regroups the discovered
-// tables by application product or database schema, with counts, search, expand/
-// collapse and click-to-reveal. It never mutates the model — creation/editing stays
-// in the standard Explorer + Inspector. Scoped to the active model (its caller only
-// renders it for the active tab), so it inherits the Req 18 isolation.
-export function EbsExplorer({ model }: { model: Model }) {
+// Read-only application-aware view of the ACTIVE model (Req 21 §4 / Req 22 §4).
+// Regroups the discovered tables by their application grouping (EBS product /
+// database schema, or Fusion family / module) using the discovery provenance, with
+// counts, search, expand/collapse and click-to-reveal. Never mutates the model —
+// creation/editing stays in the standard Explorer + Inspector. Scoped to the active
+// model (its caller only renders it for the active tab), so it inherits Req 18.
+
+export interface AppExplorerLabels {
+  /** Short source noun, e.g. "EBS" / "Fusion" (filter + empty text). */
+  noun: string;
+  /** Primary grouping (source.product): plural toggle label + per-row prefix. */
+  primaryPlural: string; // "Products" / "Families"
+  primaryPrefix: string; // "Product"  / "Family"
+  /** Secondary grouping (source.schema): plural toggle label. */
+  secondaryPlural: string; // "Schemas" / "Modules"
+}
+
+const EBS_LABELS: AppExplorerLabels = { noun: "EBS", primaryPlural: "Products", primaryPrefix: "Product", secondaryPlural: "Schemas" };
+const FUSION_LABELS: AppExplorerLabels = { noun: "Fusion", primaryPlural: "Families", primaryPrefix: "Family", secondaryPlural: "Modules" };
+
+export function AppExplorer({ model, labels }: { model: Model; labels: AppExplorerLabels }) {
   const [grouping, setGrouping] = useState<EbsGrouping>("product");
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<Set<string>>(new Set());
   const reveal = (id: string) => useModelStore.getState().revealEntity(id);
   const makeArea = (product: string) => useModelStore.getState().createSubjectAreaFromProduct(product);
+  const openDiagram = (id: string) => useModelStore.getState().setActiveDiagram(id);
   const deleteArea = (id: string) => useModelStore.getState().deleteSubjectArea(id);
   const areas = model.subjectAreas ?? [];
 
@@ -41,14 +57,14 @@ export function EbsExplorer({ model }: { model: Model }) {
   return (
     <div className="ebsx">
       <div className="ebsx__controls">
-        <div className="ebsx__seg" role="tablist" aria-label="EBS grouping">
+        <div className="ebsx__seg" role="tablist" aria-label={`${labels.noun} grouping`}>
           <button
             role="tab"
             aria-selected={grouping === "product"}
             className={`ebsx__seg-btn ${grouping === "product" ? "ebsx__seg-btn--active" : ""}`}
             onClick={() => setGrouping("product")}
           >
-            Products
+            {labels.primaryPlural}
           </button>
           <button
             role="tab"
@@ -56,19 +72,19 @@ export function EbsExplorer({ model }: { model: Model }) {
             className={`ebsx__seg-btn ${grouping === "schema" ? "ebsx__seg-btn--active" : ""}`}
             onClick={() => setGrouping("schema")}
           >
-            Schemas
+            {labels.secondaryPlural}
           </button>
         </div>
       </div>
       <input
         className="explorer__filter"
-        placeholder="Filter EBS objects…"
+        placeholder={`Filter ${labels.noun} objects…`}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
 
       <div className="explorer__tree">
-        {/* Subject areas (Req 21 §6) — named groupings; click reveals a member. */}
+        {/* Subject areas (Req 21 §6) — named groupings; click opens their diagram. */}
         {areas.length > 0 && (
           <>
             <div className="tree-row" style={{ paddingLeft: 4 }}>
@@ -80,8 +96,8 @@ export function EbsExplorer({ model }: { model: Model }) {
                 <span className="tree-row__caret tree-row__caret--empty" />
                 <span
                   className="tree-row__label tree__entity"
-                  title={a.description ?? `${a.entities.length} tables`}
-                  onClick={() => a.entities[0] && reveal(a.entities[0])}
+                  title={a.description ?? `${a.entities.length} tables — open diagram`}
+                  onClick={() => openDiagram(a.id)}
                 >
                   {a.name} <span className="tree__count">{a.entities.length}</span>
                 </span>
@@ -93,11 +109,11 @@ export function EbsExplorer({ model }: { model: Model }) {
           </>
         )}
         {groups.length === 0 ? (
-          <p className="explorer__empty">No EBS objects match.</p>
+          <p className="explorer__empty">No {labels.noun} objects match.</p>
         ) : (
           groups.map((g) => {
             const gkey = `g:${grouping}:${g.key}`;
-            const isProductGroup = grouping === "product" && g.key !== "ÿ";
+            const isPrimaryGroup = grouping === "product" && g.key !== "ÿ";
             return (
               <div key={gkey}>
                 <div className="tree-row" style={{ paddingLeft: 4 }}>
@@ -106,11 +122,11 @@ export function EbsExplorer({ model }: { model: Model }) {
                   </button>
                   <span className="tree-row__label">
                     <span className="tree__group">
-                      {grouping === "product" ? `Product ${g.label}` : g.label}{" "}
+                      {grouping === "product" ? `${labels.primaryPrefix} ${g.label}` : g.label}{" "}
                       <span className="tree__count">{g.entities.length}</span>
                     </span>
                   </span>
-                  {isProductGroup && (
+                  {isPrimaryGroup && (
                     <span className="tree-row__actions">
                       <button className="tree-row__add" title={`Create subject area for ${g.label}`} onClick={() => makeArea(g.key)}>
                         + area
@@ -158,4 +174,12 @@ export function EbsExplorer({ model }: { model: Model }) {
       </div>
     </div>
   );
+}
+
+export function EbsExplorer({ model }: { model: Model }) {
+  return <AppExplorer model={model} labels={EBS_LABELS} />;
+}
+
+export function FusionExplorer({ model }: { model: Model }) {
+  return <AppExplorer model={model} labels={FUSION_LABELS} />;
 }

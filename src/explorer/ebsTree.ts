@@ -39,6 +39,13 @@ export function hasEbsContent(model: Model): boolean {
   );
 }
 
+/** True when the active model carries Oracle Fusion Cloud discovery provenance. */
+export function hasFusionContent(model: Model): boolean {
+  return model.entities.some(
+    (e) => e.source?.system === "oracle-fusion" || (e.tags ?? []).some((t) => t.startsWith("fusion:")),
+  );
+}
+
 const UNGROUPED = "ÿ"; // sorts last
 
 /** Group the model's entities by product or schema, sorted, each sorted by name. */

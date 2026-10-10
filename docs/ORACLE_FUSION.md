@@ -32,7 +32,7 @@ OAuth · **Deferred** = not yet built.
 | Idempotent re-discovery (no duplicates) | **Done** | `reconcileDiscoveredModel` matches by `source.nativeId` (shared with EBS/PG). |
 | Connection setup + test + reverse (UI) | **Done (mock)** | Connections dialog: "+ Oracle Fusion (mock)" (instance URL only, no credentials); Test reports API version; Reverse-engineer imports a Fusion-enriched model; offline "Import metadata file…" works too. |
 | Offline metadata-file import | **Done** | Any canonical JSON (incl. a Fusion package) imports via "Import metadata file…" (`parseMetadataFile`, rejects credential leaks). |
-| Fusion-aware Model Explorer view | **Deferred** | Fusion models use the standard Explorer this increment; a Fusion family/module grouping view (like the EBS view) is next. |
+| Fusion-aware Model Explorer view | **Done** | `FusionExplorer` — a Model/Fusion toggle (shown when the active model has Fusion provenance); groups business objects by **family** or **module** with counts, search, expand/collapse, click-to-reveal; subject-area shortcuts; scoped to the active tab; read-only. Shares the `AppExplorer` component with the EBS view. |
 | Fusion-specific Properties Inspector panels | **Deferred** | `entity.source` provenance shows in the General tab today; API-resource / extract-data-store panels are later. |
 | Source-to-target mapping | **Deferred** | The pipeline planner already consumes canonical metadata; Fusion→target mapping UI is Phase 5. |
 | Live data extraction / pipeline execution | **Deferred** | Out of scope by design — discovery, planning and execution stay separate (§8/§11). |
@@ -51,9 +51,10 @@ OAuth · **Deferred** = not yet built.
 
 ## Roadmap — deferred phases (Req 22 §12)
 
-- **Phase 2/3 (more):** a Fusion-aware Explorer view (family → module → business object →
-  attributes / child objects / API resources / extract definitions); Fusion Properties
-  panels (business object / attribute / API resource / extract data store); more families
+- **Phase 2/3 (more):** *DONE:* the Fusion-aware Explorer view (family / module grouping,
+  `FusionExplorer`). *Remaining:* Fusion Properties panels (business object / attribute /
+  API resource / extract data store); API-resource / extract-definition tree nodes
+  (they live on the snapshot, so they need a snapshot-reading surface); more families
   (Procurement, SCM, HCM, Sales) via fixtures.
 - **Phase 4:** live BICC / Data Extraction metadata (offerings, data stores, extract
   fields, full/incremental indicators) — kept separate from model discovery.

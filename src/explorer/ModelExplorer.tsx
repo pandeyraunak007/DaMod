@@ -15,8 +15,8 @@ import {
 } from "../model/levels";
 import { linksTouching } from "../links/links";
 import { validateWorkspace, type Severity } from "../validation/rules";
-import { EbsExplorer } from "./EbsExplorer";
-import { hasEbsContent } from "./ebsTree";
+import { EbsExplorer, FusionExplorer } from "./EbsExplorer";
+import { hasEbsContent, hasFusionContent } from "./ebsTree";
 
 export interface ExplorerMarks {
   modelSeverity: (modelId: string) => Severity | null;
@@ -69,7 +69,7 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
   const openMenu: OpenMenu = (x, y, items) => setMenu({ x, y, items });
   // EBS-aware view (Req 21 §4): offered only when the active model carries EBS/Oracle
   // discovery provenance; falls back to the standard tree otherwise.
-  const [view, setView] = useState<"model" | "ebs">("model");
+  const [view, setView] = useState<"model" | "app">("model");
 
   // Expansion state, persisted per workspace (FR-12.3).
   const storageKey = path ? `damod.explorer.${path}` : "damod.explorer.none";
@@ -257,16 +257,25 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
     else st.deleteRawObject(oid);
   };
 
-  const ebsModel = activeEntry?.model ?? null;
-  const ebsAvailable = !!ebsModel && hasEbsContent(ebsModel);
-  const effectiveView = ebsAvailable ? view : "model";
+  // The active model may carry EBS or Fusion discovery provenance → offer an
+  // application-aware view alongside the standard tree.
+  const appModel = activeEntry?.model ?? null;
+  const appKind: "ebs" | "fusion" | null = appModel
+    ? hasEbsContent(appModel)
+      ? "ebs"
+      : hasFusionContent(appModel)
+        ? "fusion"
+        : null
+    : null;
+  const appLabel = appKind === "fusion" ? "Fusion" : "EBS";
+  const effectiveView = appKind ? view : "model";
 
   return (
     <aside className="explorer" onClick={() => menu && setMenu(null)}>
       <div className="explorer__head">
         <span className="explorer__title">Explorer</span>
         <div className="explorer__head-actions">
-          {ebsAvailable && (
+          {appKind && (
             <div className="explorer__viewseg" role="tablist" aria-label="Explorer view">
               <button
                 role="tab"
@@ -279,12 +288,12 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
               </button>
               <button
                 role="tab"
-                aria-selected={effectiveView === "ebs"}
-                className={`explorer__viewseg-btn ${effectiveView === "ebs" ? "explorer__viewseg-btn--active" : ""}`}
-                title="EBS-aware view (by product / schema)"
-                onClick={() => setView("ebs")}
+                aria-selected={effectiveView === "app"}
+                className={`explorer__viewseg-btn ${effectiveView === "app" ? "explorer__viewseg-btn--active" : ""}`}
+                title={`${appLabel}-aware view`}
+                onClick={() => setView("app")}
               >
-                EBS
+                {appLabel}
               </button>
             </div>
           )}
@@ -302,8 +311,8 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
           </button>
         </div>
       </div>
-      {effectiveView === "ebs" && ebsModel ? (
-        <EbsExplorer model={ebsModel} />
+      {effectiveView === "app" && appModel ? (
+        appKind === "fusion" ? <FusionExplorer model={appModel} /> : <EbsExplorer model={appModel} />
       ) : (
       <>
       <input

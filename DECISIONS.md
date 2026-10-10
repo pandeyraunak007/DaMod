@@ -5,6 +5,24 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Fusion-aware Explorer view (reuses the EBS view machinery)
+
+Req 22 §4 — a Fusion Cloud model can now be browsed by **application family / module**,
+parallel to the EBS product/schema view.
+
+- **Reuse over duplication:** generalized `EbsExplorer` into a shared `AppExplorer`
+  component parameterized by labels; `EbsExplorer` and new `FusionExplorer` are thin
+  wrappers (EBS = Products/Schemas, Fusion = Families/Modules). The grouping helper
+  `ebsGroups` was already source-neutral (reads `source.product`/`schema`) — Fusion sets
+  product=family, schema=module. Existing EBS view + tests unchanged.
+- `ebsTree.hasFusionContent` (system `oracle-fusion` or `fusion:` tag). `ModelExplorer`
+  generalized its Model/EBS toggle → **Model / {EBS|Fusion}**, chosen by the active
+  model's provenance; renders the matching `AppExplorer`.
+- Subject-area shortcuts + click-to-open-diagram work in both views.
+- API resources / extract data stores stay on the snapshot (not the model), so they're
+  not in the Explorer tree — deferred to a snapshot-reading surface (documented).
+- 354 TS tests (+4: `FusionExplorer.render.test.tsx`); tsc/build/cargo clean.
+
 ## 2026-10-11 — Subject-area diagrams (erwin-style scoped canvas views)
 
 Users can now view a subject area as its own diagram, separate from the main model

@@ -33,8 +33,10 @@ See the top DECISIONS entries:
   semantic layer. Create-only for the new types (update/delete deferred).
 - **Req 22 (Fusion Cloud, offline/mock):** `oracle-fusion` mock connector (Financials),
   `mapFusionType`, `fusionSnapshotToModel`, `metadata.fusion` (REST resources + extract
-  data stores), `source.apiVersion`, connector-generic Connections UI ("+ Oracle Fusion
-  (mock)"). Live REST connector + Fusion Explorer/mapping deferred (`docs/ORACLE_FUSION.md`).
+  data stores), `source.apiVersion`, connector-generic Connections UI, and a
+  **Fusion-aware Explorer view** (family/module grouping) sharing the `AppExplorer`
+  component with EBS (Model/EBS|Fusion toggle). Live REST connector + Fusion Properties
+  panels + mapping deferred (`docs/ORACLE_FUSION.md`).
 - **Req 21 Phase 4 (part):** `SubjectArea` model concept + `createSubjectAreaFromProduct`
   + EBS Explorer "+ area" / Subject Areas list. A lens, not a container (delete never
   deletes entities).
