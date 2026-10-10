@@ -5,6 +5,26 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-10 — Req 21 Phase 2 (do-now 2): EBS-aware Explorer view
+
+Read-only EBS view of the ACTIVE model, reusing the Req 18 active-model scoping.
+
+- **`explorer/ebsTree.ts`** (pure, tested): `hasEbsContent`, `ebsEntityProduct`,
+  `ebsGroups(model, "product"|"schema")` — regroups discovered tables using the
+  `entity.source` provenance (+ `ebs:<CODE>` tags) into the two eTRM-style sibling
+  branches (application products / database schemas). Ungrouped objects bucket last.
+- **`explorer/EbsExplorer.tsx`**: product/schema segmented toggle, counts, search,
+  expand/collapse, click-to-reveal (`revealEntity`), columns under each table. Pure
+  navigation — never mutates (creation/editing stay in the standard Explorer/Inspector).
+- **Wired into `ModelExplorer`** as a Model/EBS header toggle shown ONLY when the active
+  model carries EBS/Oracle provenance; falls back to the standard tree otherwise, and
+  reverts automatically when switching to a non-EBS tab.
+- **Inspector**: the entity General tab now shows a read-only discovery-source block
+  (system/product/schema/nativeId/provenance/confidence), labelled verified-vs-inferred
+  (§5).
+- Deferred: wiring the `oracle-ebs` source into the New Model / Connections UI (§2) and
+  the live Oracle adapter (driver sign-off). 300 TS tests (+9); tsc/build/cargo clean.
+
 ## 2026-10-10 — Req 21 Phase 2 (do-now track): source provenance + idempotent re-discovery
 
 Built the driver-independent half of Phase 2 (needs no Oracle instance / no sign-off).

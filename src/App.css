@@ -885,6 +885,44 @@ body,
   color: var(--muted, #8a8a8a);
   font-size: 0.8rem;
 }
+/* Req 21 — Model/EBS view toggle + EBS grouping segmented control. */
+.explorer__viewseg,
+.ebsx__seg {
+  display: inline-flex;
+  border: 1px solid var(--border, #d9d9d9);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.explorer__viewseg-btn,
+.ebsx__seg-btn {
+  padding: 0.05rem 0.4rem;
+  font-size: 0.72rem;
+  border: none;
+  background: transparent;
+  color: var(--muted, #8a8a8a);
+  cursor: pointer;
+}
+.explorer__viewseg-btn--active,
+.ebsx__seg-btn--active {
+  background: var(--accent, #2563eb);
+  color: #fff;
+}
+.ebsx__controls {
+  padding: 0.3rem 0.5rem 0;
+}
+.src-info {
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+.src-info__k {
+  color: var(--muted, #8a8a8a);
+  padding: 0.1rem 0.6rem 0.1rem 0;
+  white-space: nowrap;
+  vertical-align: top;
+}
+.src-info__v {
+  font-family: ui-monospace, monospace;
+}
 .tree-row {
   display: flex;
   align-items: center;

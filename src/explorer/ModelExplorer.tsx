@@ -15,6 +15,8 @@ import {
 } from "../model/levels";
 import { linksTouching } from "../links/links";
 import { validateWorkspace, type Severity } from "../validation/rules";
+import { EbsExplorer } from "./EbsExplorer";
+import { hasEbsContent } from "./ebsTree";
 
 export interface ExplorerMarks {
   modelSeverity: (modelId: string) => Severity | null;
@@ -65,6 +67,9 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
   const [query, setQuery] = useState("");
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
   const openMenu: OpenMenu = (x, y, items) => setMenu({ x, y, items });
+  // EBS-aware view (Req 21 §4): offered only when the active model carries EBS/Oracle
+  // discovery provenance; falls back to the standard tree otherwise.
+  const [view, setView] = useState<"model" | "ebs">("model");
 
   // Expansion state, persisted per workspace (FR-12.3).
   const storageKey = path ? `damod.explorer.${path}` : "damod.explorer.none";
@@ -252,11 +257,37 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
     else st.deleteRawObject(oid);
   };
 
+  const ebsModel = activeEntry?.model ?? null;
+  const ebsAvailable = !!ebsModel && hasEbsContent(ebsModel);
+  const effectiveView = ebsAvailable ? view : "model";
+
   return (
     <aside className="explorer" onClick={() => menu && setMenu(null)}>
       <div className="explorer__head">
         <span className="explorer__title">Explorer</span>
         <div className="explorer__head-actions">
+          {ebsAvailable && (
+            <div className="explorer__viewseg" role="tablist" aria-label="Explorer view">
+              <button
+                role="tab"
+                aria-selected={effectiveView === "model"}
+                className={`explorer__viewseg-btn ${effectiveView === "model" ? "explorer__viewseg-btn--active" : ""}`}
+                title="Standard model tree"
+                onClick={() => setView("model")}
+              >
+                Model
+              </button>
+              <button
+                role="tab"
+                aria-selected={effectiveView === "ebs"}
+                className={`explorer__viewseg-btn ${effectiveView === "ebs" ? "explorer__viewseg-btn--active" : ""}`}
+                title="EBS-aware view (by product / schema)"
+                onClick={() => setView("ebs")}
+              >
+                EBS
+              </button>
+            </div>
+          )}
           <button className="icon-btn" title="New model" aria-label="New model" onClick={onNewModel}>
             <FilePlus2 size={15} strokeWidth={1.8} aria-hidden />
           </button>
@@ -271,6 +302,10 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
           </button>
         </div>
       </div>
+      {effectiveView === "ebs" && ebsModel ? (
+        <EbsExplorer model={ebsModel} />
+      ) : (
+      <>
       <input
         className="explorer__filter"
         placeholder="Filter…"
@@ -334,6 +369,8 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
           </>
         )}
       </div>
+      </>
+      )}
 
       {menu && (
         <div className="ctx" style={{ left: menu.x, top: menu.y }} onClick={(e) => e.stopPropagation()}>

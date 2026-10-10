@@ -9,11 +9,11 @@
 
 ## NEXT SESSION — START HERE
 
-**Current status:** Branch `main`. Pushed: `1769aaa` (Req 21 Phase 1), Reqs 17–20 in
-`36adff3`. **Req 21 Phase 2 "do-now" item 1 (source provenance + idempotent re-discovery)
-just landed — uncommitted in the working tree.** Author commits/pushes explicitly, do
-not commit or push unless asked. **291 TS tests pass · typecheck clean · `npm run build`
-clean · `cargo build` clean.** See the top DECISIONS entries:
+**Current status:** Branch `main`. Pushed: `8c546b6` (Req 21 Phase 2 do-now 1), `1769aaa`
+(Phase 1), Reqs 17–20 in `36adff3`. **Req 21 Phase 2 do-now item 2 (EBS-aware Explorer
+view) just landed — uncommitted in the working tree.** Author commits/pushes explicitly,
+do not commit or push unless asked. **300 TS tests pass · typecheck clean · `npm run
+build` clean · `cargo build` clean.** See the top DECISIONS entries:
 - **Req 21 (Phase 1)** — Oracle **EBS offline/mock** foundation (no live driver, no Rust,
   no deps): mock `oracle-ebs` connector + eTRM-style fixture, `mapOracleType`,
   `ebsSnapshotToModel` (reuses `metadataToModel`), FK provenance/confidence + EBS release
@@ -41,15 +41,15 @@ driver trade-off + roadmap). Phase 2 has a **driver-gated track** and a **do-now
 
 **Do-now track (no driver, testable against the mock snapshot):**
 1. ✅ **DONE** — Source-identifier provenance (`Entity.source`) + idempotent in-place
-   re-discovery (`connectors/reconcile.ts` `reconcileDiscoveredModel`): matches by
-   `source.nativeId`, preserves manual edits, keeps removed objects pending review.
-2. **← NEXT: EBS-aware Model Explorer view** driven by `ebsProducts` + `ebs:<CODE>` tags
-   (and now `entity.source.product`): products → schemas → objects, scoped to the active
-   tab (reuse the Req 18 scoping + the registry-driven approach from `objectRegistry.ts`).
-   Navigate business entity ↔ physical tables. Filter DB-object vs application-metadata.
-   Read-only. Then surface `entity.source` provenance in the Properties Inspector (§5/§7).
-3. **Snapshot compare/refresh UX** for EBS: wire `computeDrift` + `reconcileDiscoveredModel`
-   into the connectors UI (engine is done; this is the review/apply UX).
+   re-discovery (`connectors/reconcile.ts` `reconcileDiscoveredModel`).
+2. ✅ **DONE** — EBS-aware Explorer view (`explorer/EbsExplorer.tsx` + `ebsTree.ts`):
+   Model/EBS toggle, product/schema grouping, counts, search, click-to-reveal, scoped to
+   the active tab; `entity.source` provenance surfaced read-only in the Inspector.
+3. **← NEXT: connection-setup wiring + refresh UX.** Offer the `oracle-ebs` source in the
+   New Model / Connections dialog (§2: source type, EBS release, discovery scope) so a
+   user can actually create an EBS model (today the mock connector is registered + fully
+   tested but has no UI entry point). Then wire `computeDrift` + `reconcileDiscoveredModel`
+   into a review/apply refresh UX (engine done). Both are driver-independent (mock-backed).
 
 **Driver-gated track (needs author sign-off FIRST, then an Oracle instance to verify):**
 4. Pick the Oracle driver approach (the `oracle` crate + Instant Client vs a thin worker

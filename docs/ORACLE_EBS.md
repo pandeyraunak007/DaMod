@@ -36,8 +36,8 @@ snapshot, awaits the live driver · **Live** = needs an accessible Oracle/EBS in
 | DB object discovery (tables/cols/keys/indexes/views) | **Mock → Live** | Canonical shapes support all of these; live catalog-view queries (`ALL_TAB_COLUMNS`, `ALL_CONSTRAINTS`, `ALL_CONS_COLUMNS`, `ALL_INDEXES`, `ALL_VIEWS`) are deferred to the driver. |
 | Packages/procedures/functions/triggers/synonyms/types | **Deferred** | Needs the live driver + new canonical object kinds (Phase 2/3). |
 | EBS application dictionary (products, concurrent programs, lookups) | **Imported / Live** | Modeled via `native.ebs` today; full dictionary discovery (FND_* / eTRM) is Phase 3. |
-| EBS-aware Model Explorer hierarchy | **Deferred** | Phase 2 UI (products → schemas → objects). |
-| EBS-aware Properties Inspector | **Deferred** | Phase 2/3 UI. |
+| EBS-aware Model Explorer view | **Done** | `EbsExplorer` — Model/EBS toggle (shown when the active model has EBS provenance); groups discovered tables by **product** or **schema** with counts, search, expand/collapse, click-to-reveal; scoped to the active tab; read-only. |
+| EBS provenance in Properties Inspector | **Done** | Entity General tab shows a read-only discovery-source block (system/product/schema/nativeId/provenance/confidence), labelled verified-vs-inferred. Full EBS-specific property panels are Phase 3. |
 | Source-identifier provenance on model objects | **Done** | `Entity.source` ({system, schema, nativeId, product, provenance, confidence}); set by `metadataToModel` for all connectors, enriched for EBS; serialize + Zod optional, round-trips. |
 | Idempotent re-discovery (in-place merge) | **Done** | `reconcileDiscoveredModel` matches by `source.nativeId`, preserves stable ids + manual edits (logical names, descriptions, layout, tags, verb phrases); removed objects kept pending review (§11). |
 | Snapshot compare / refresh preserving manual edits | **Done (engine)** | `computeDrift` reports changes; `reconcileDiscoveredModel` merges preserving manual edits. EBS refresh *UX* wiring is Phase 4. |
@@ -69,10 +69,12 @@ Document the final choice here and in `DECISIONS.md` before adding any dependenc
 
 ## Phased roadmap (Req 21 §12) — build later
 
-- **Phase 2** — *source provenance + idempotent re-discovery are DONE* (`Entity.source`
-  + `reconcileDiscoveredModel`). Remaining: the EBS-aware Explorer (products → schemas →
-  objects, scoped to the active tab), reverse-engineer selected tables/schemas, and the
-  live DB discovery via the Oracle adapter (driver-gated).
+- **Phase 2** — *DONE (do-now track):* source provenance + idempotent re-discovery
+  (`Entity.source` + `reconcileDiscoveredModel`), the **EBS-aware Explorer view**
+  (`EbsExplorer`, product/schema grouping, scoped to the active tab), and EBS provenance
+  in the Inspector. *Remaining (driver-gated):* wire the `oracle-ebs` source into the
+  New Model / Connections UI (§2 connection setup), reverse-engineer selected
+  tables/schemas from a live instance, and live DB discovery via the Oracle adapter.
 - **Phase 3** — EBS application awareness: FND dictionary, product↔object association,
   documented relationships, concurrent programs/lookups; new canonical object kinds
   (packages/procedures/functions/triggers/synonyms/types).
