@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ViewMenu } from "./ViewMenu";
 import { useModelStore } from "../store/modelStore";
 import { useWorkspaceStore } from "../store/workspaceStore";
 import { MODEL_LEVELS, type ModelLevel, exportDisabledReason } from "../model/levels";
@@ -126,6 +127,7 @@ export function Toolbar({
         <button className="btn btn--small" onClick={onOpenHistory} disabled={!wsPath}>
           History
         </button>
+        <ViewMenu />
       </div>
 
       <div className="toolbar__group">

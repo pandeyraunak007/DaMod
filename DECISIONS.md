@@ -5,6 +5,42 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-10 — UI: View menu, bottom + floating toolbars (§13)
+
+Professional IDE-style workspace controls, added as an extension (canvas, model
+state, persistence, connector architecture all untouched).
+- **New dep `lucide-react`** (NFR-8 note): the app had no icon library and only
+  unicode-glyph buttons; §13.5 asks for a consistent (preferably Lucide) set.
+  Tree-shaken per-icon imports, negligible bundle impact. One icon package only.
+- **`uiStore` (Zustand, `src/store/uiStore.ts`)** — UI preferences kept **separate
+  from model/connector state** and persisted to **localStorage** (`damod.ui`), NOT
+  into model JSON, so UI changes never diff the data model (§13.6, AC #9). Holds
+  toolbar mode (`bottom`/`floating`/`hidden`), floating position, and
+  explorer/properties/validation/grid/snap visibility. Pure helpers
+  (`defaultUiPrefs`, `mergePrefs`, `pickPersisted`, `clampToBounds`) are unit-tested
+  without a DOM; localStorage access is feature-detected so node tests run clean.
+  Chose localStorage over the Rust `app_state` file to avoid clobbering the
+  workspace pointer and to keep prefs fully isolated (no new DB/cloud).
+- **View menu** (`toolbar/ViewMenu.tsx`): reflects panel/toolbar/grid/snap state
+  (checkmarks + active-mode dot) and runs zoom/fit/reset through React Flow's own
+  controls via a small `canvasControls` bridge (no competing zoom logic, §13.7);
+  Escape/outside-click close; menu items are real buttons (keyboard-accessible).
+- **Bottom toolbar** (`canvas/BottomToolbar.tsx`) and **refactored floating
+  toolbar** (`canvas/FloatingToolbar.tsx`) share one `useCanvasActions` hook and a
+  `ToolbarButton` (lucide icon, `aria-label`+tooltip, hover/active/disabled/focus,
+  `aria-pressed`). Only one primary toolbar shows at a time (driven by mode).
+  Floating toolbar is draggable **only by a grip handle** (buttons keep their
+  click action), `clampToBounds`-constrained, re-clamped on window resize, and
+  marked `nopan nodrag` so it never starts a React Flow pan/selection (§13.3/§13.7).
+- Panels (ModelExplorer / SidePanel / ValidationPanel) are gated by `uiStore`;
+  switching toolbar modes or panel visibility does not touch the active model,
+  layout, zoom, selection, or undo (separate stores — AC #10, unit-tested).
+- **Verified:** 12 new tests (placement, per-panel visibility, grid/snap,
+  model-state-untouched, prefs merge/round-trip, clamp incl. resize/oversize);
+  **173 TS tests**; typecheck + build clean.
+- **Not done:** no per-action global keyboard shortcuts beyond the existing
+  ⌘S/⌘Z/⌘⇧Z/Esc/Enter/Delete (tooltips document those); snap uses a fixed 16px grid.
+
 ## 2026-10-10 — Connector framework & ETL platform (Phase 1 foundation)
 
 New direction: extend the app into a local-first data-modeling **and ETL design**

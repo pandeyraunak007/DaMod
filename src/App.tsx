@@ -23,6 +23,7 @@ import { PipelineDialog } from "./connectors/pipeline/PipelineDialog";
 import { LinkDialog } from "./links/LinkDialog";
 import { useModelStore } from "./store/modelStore";
 import { useWorkspaceStore } from "./store/workspaceStore";
+import { useUiStore } from "./store/uiStore";
 import { linksTouching } from "./links/links";
 
 function isEditableTarget(el: EventTarget | null): boolean {
@@ -59,6 +60,10 @@ export default function App() {
   const activeId = useWorkspaceStore((s) => s.activeId);
   const wsPath = useWorkspaceStore((s) => s.path);
   const activeTab = tabs.find((t) => t.id === activeId);
+
+  const showExplorer = useUiStore((s) => s.showExplorer);
+  const showProperties = useUiStore((s) => s.showProperties);
+  const showValidation = useUiStore((s) => s.showValidation);
 
   // Restore the last workspace on startup (FR-1.1).
   useEffect(() => {
@@ -138,20 +143,24 @@ export default function App() {
         </div>
       ) : semanticOpen ? (
         <div className="app__body">
-          <ModelExplorer
-            onNewModel={() => setNewModelOpen(true)}
-            onDeleteModel={(id, name) => setDeleteModel({ id, name })}
-            onOpenSemantic={() => setSemanticOpen(true)}
-          />
+          {showExplorer && (
+            <ModelExplorer
+              onNewModel={() => setNewModelOpen(true)}
+              onDeleteModel={(id, name) => setDeleteModel({ id, name })}
+              onOpenSemantic={() => setSemanticOpen(true)}
+            />
+          )}
           <SemanticView />
         </div>
       ) : (
         <div className="app__body">
-          <ModelExplorer
-            onNewModel={() => setNewModelOpen(true)}
-            onDeleteModel={(id, name) => setDeleteModel({ id, name })}
-            onOpenSemantic={() => setSemanticOpen(true)}
-          />
+          {showExplorer && (
+            <ModelExplorer
+              onNewModel={() => setNewModelOpen(true)}
+              onDeleteModel={(id, name) => setDeleteModel({ id, name })}
+              onOpenSemantic={() => setSemanticOpen(true)}
+            />
+          )}
           <div className="app__canvas">
             {activeTab?.loadError ? (
               <div className="canvas-error">
@@ -178,10 +187,10 @@ export default function App() {
               </div>
             )}
           </div>
-          <SidePanel />
+          {showProperties && <SidePanel />}
         </div>
       )}
-      {wsPath && <ValidationPanel />}
+      {wsPath && showValidation && <ValidationPanel />}
 
       <NoticeToasts />
 

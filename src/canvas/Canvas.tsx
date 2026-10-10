@@ -26,6 +26,9 @@ import {
   MARKER_IDEF_DOT,
 } from "./EdgeMarkers";
 import { FloatingToolbar } from "./FloatingToolbar";
+import { BottomToolbar } from "./BottomToolbar";
+import { registerCanvasControls } from "./canvasControls";
+import { useUiStore } from "../store/uiStore";
 import type { Model, Relationship } from "../model/model";
 
 const nodeTypes = { entity: EntityNode, view: ViewNode };
@@ -118,6 +121,21 @@ function FocusController() {
   return null;
 }
 
+// Expose React Flow's viewport controls to UI outside the provider (the View menu).
+function CanvasControlsBridge() {
+  const { zoomIn, zoomOut, fitView, zoomTo } = useReactFlow();
+  useEffect(() => {
+    registerCanvasControls({
+      zoomIn: () => zoomIn({ duration: 150 }),
+      zoomOut: () => zoomOut({ duration: 150 }),
+      fitView: () => fitView({ duration: 300 }),
+      resetZoom: () => zoomTo(1, { duration: 200 }),
+    });
+    return () => registerCanvasControls(null);
+  }, [zoomIn, zoomOut, fitView, zoomTo]);
+  return null;
+}
+
 function CanvasInner() {
   const entities = useModelStore((s) => s.model.entities);
   const model = useModelStore((s) => s.model);
@@ -133,6 +151,9 @@ function CanvasInner() {
   const createEntity = useModelStore((s) => s.createEntity);
   const { screenToFlowPosition } = useReactFlow();
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
+  const toolbarMode = useUiStore((s) => s.toolbarMode);
+  const showGrid = useUiStore((s) => s.showGrid);
+  const snapToGrid = useUiStore((s) => s.snapToGrid);
 
   const selectedEntityId = selection?.kind === "entity" ? selection.id : null;
   const selectedRelId = selection?.kind === "relationship" ? selection.id : null;
@@ -253,13 +274,17 @@ function CanvasInner() {
         fitView
         minZoom={0.1}
         maxZoom={2.5}
+        snapToGrid={snapToGrid}
+        snapGrid={[16, 16]}
       >
-        <Background gap={16} />
+        {showGrid && <Background gap={16} />}
         <MiniMap pannable zoomable />
         <Controls />
         <FocusController />
+        <CanvasControlsBridge />
       </ReactFlow>
-      <FloatingToolbar connecting={connectFrom != null} />
+      {toolbarMode === "floating" && <FloatingToolbar />}
+      {toolbarMode === "bottom" && <BottomToolbar />}
     </div>
   );
 }

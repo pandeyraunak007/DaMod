@@ -1,80 +1,89 @@
-import { useReactFlow } from "@xyflow/react";
-import { useModelStore, type CanvasMode } from "../store/modelStore";
+import { useEffect, useRef, useState } from "react";
+import { GripVertical } from "lucide-react";
+import { useUiStore, clampToBounds } from "../store/uiStore";
+import { useCanvasActions } from "./useCanvasActions";
+import { ToolbarButton } from "./ToolbarButton";
 
-// A Figma-style floating toolbar over the canvas with the core modeling actions.
-// Tools (Select / Add entity / Add relationship) are modes; the rest are one-shot
-// actions. Escape returns to Select (handled in App).
-export function FloatingToolbar({ connecting }: { connecting: boolean }) {
-  const { fitView, zoomIn, zoomOut } = useReactFlow();
-  const mode = useModelStore((s) => s.canvasMode);
-  const setMode = useModelStore((s) => s.setCanvasMode);
-  const arrange = useModelStore((s) => s.arrange);
-  const undo = useModelStore((s) => s.undo);
-  const redo = useModelStore((s) => s.redo);
-  const canUndo = useModelStore((s) => s.past.length > 0);
-  const canRedo = useModelStore((s) => s.future.length > 0);
+// Floating toolbar over the canvas (§13.3). Icon-first, draggable ONLY by the
+// grip handle (buttons keep their click action), clamped inside the canvas, and
+// marked `nopan`/`nodrag` so it never initiates React Flow pan/selection.
+export function FloatingToolbar() {
+  const groups = useCanvasActions();
+  const pos = useUiStore((s) => s.floatingPos);
+  const setPos = useUiStore((s) => s.setFloatingPos);
+  const ref = useRef<HTMLDivElement>(null);
+  const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
+  const drag = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
 
-  const toggle = (m: CanvasMode) => setMode(mode === m ? "select" : m);
+  const bounds = (): { w: number; h: number } => {
+    const parent = ref.current?.offsetParent as HTMLElement | null;
+    return { w: parent?.clientWidth ?? window.innerWidth, h: parent?.clientHeight ?? window.innerHeight };
+  };
+  const size = (): { w: number; h: number } => ({
+    w: ref.current?.offsetWidth ?? 320,
+    h: ref.current?.offsetHeight ?? 44,
+  });
+
+  // Re-clamp to stay visible when the window/canvas is resized (§13.3, AC #8).
+  useEffect(() => {
+    const onResize = () => setPos(clampToBounds(useUiStore.getState().floatingPos, size(), bounds()));
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [setPos]);
+
+  const onHandleDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    drag.current = { startX: e.clientX, startY: e.clientY, originX: pos.x, originY: pos.y };
+    setDragPos(pos);
+  };
+  const onHandleMove = (e: React.PointerEvent) => {
+    if (!drag.current) return;
+    const next = clampToBounds(
+      { x: drag.current.originX + (e.clientX - drag.current.startX), y: drag.current.originY + (e.clientY - drag.current.startY) },
+      size(),
+      bounds(),
+    );
+    setDragPos(next);
+  };
+  const onHandleUp = (e: React.PointerEvent) => {
+    if (!drag.current) return;
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    if (dragPos) setPos(dragPos); // commit + persist once, at drop
+    drag.current = null;
+    setDragPos(null);
+  };
+
+  const shown = dragPos ?? pos;
 
   return (
-    <div className="ftoolbar">
-      <ToolButton
-        label="Select"
-        icon="⌖"
-        active={mode === "select"}
-        onClick={() => setMode("select")}
-      />
-      <ToolButton
-        label="Add entity — then click the canvas"
-        icon="▭"
-        active={mode === "add-entity"}
-        onClick={() => toggle("add-entity")}
-      />
-      <ToolButton
-        label={
-          connecting
-            ? "Now click the second entity"
-            : "Add relationship — click two entities"
-        }
-        icon="⇢"
-        active={mode === "add-relationship"}
-        onClick={() => toggle("add-relationship")}
-      />
-      <span className="ftoolbar__sep" />
-      <ToolButton label="Fit to view" icon="⤢" onClick={() => fitView({ duration: 300 })} />
-      <ToolButton label="Auto-arrange" icon="▦" onClick={arrange} />
-      <span className="ftoolbar__sep" />
-      <ToolButton label="Undo (⌘Z)" icon="↶" disabled={!canUndo} onClick={undo} />
-      <ToolButton label="Redo (⇧⌘Z)" icon="↷" disabled={!canRedo} onClick={redo} />
-      <span className="ftoolbar__sep" />
-      <ToolButton label="Zoom out" icon="−" onClick={() => zoomOut()} />
-      <ToolButton label="Zoom in" icon="+" onClick={() => zoomIn()} />
-    </div>
-  );
-}
-
-function ToolButton({
-  label,
-  icon,
-  active,
-  disabled,
-  onClick,
-}: {
-  label: string;
-  icon: string;
-  active?: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      className={`ftool ${active ? "ftool--active" : ""}`}
-      title={label}
-      aria-label={label}
-      disabled={disabled}
-      onClick={onClick}
+    <div
+      ref={ref}
+      className="ftoolbar nopan nodrag"
+      style={{ left: shown.x, top: shown.y }}
+      role="toolbar"
+      aria-label="Floating modeling toolbar"
+      onPointerDown={(e) => e.stopPropagation()}
     >
-      {icon}
-    </button>
+      <button
+        type="button"
+        className="ftoolbar__handle"
+        aria-label="Drag toolbar"
+        title="Drag to move"
+        onPointerDown={onHandleDown}
+        onPointerMove={onHandleMove}
+        onPointerUp={onHandleUp}
+      >
+        <GripVertical size={15} strokeWidth={1.75} aria-hidden />
+      </button>
+      {[groups.tools, groups.canvas, groups.history].map((grp, i) => (
+        <span key={i} className="tbar__group">
+          {grp.map((a) => (
+            <ToolbarButton key={a.id} action={a} />
+          ))}
+          {i < 2 && <span className="tbar__sep" />}
+        </span>
+      ))}
+    </div>
   );
 }
