@@ -126,10 +126,19 @@ independently collapsible, resizable, and persisted, so the canvas can reclaim s
   keys; Physical → full). Object header + tabs are sticky; the panel scrolls
   internally. 4 grid interaction tests (inline edit, checkbox toggle, add/delete,
   detail expand). **234 tests.**
-- **Deferred (reported, not done)**: Phase 3 (Copilot panel visual redesign +
-  suggested-prompt chips), Phase 4 (deeper inspector↔copilot integration). The
-  level-aware inspector, Copilot context scope, privacy status and review/approve/
-  reject flow already exist from earlier work.
+- **Phase 3 (done):** Copilot panel redesign (§3). Clickable privacy status
+  (opens settings), a **Context** block (scope chips + a live summary of what's
+  sent, scoped to the selection or model + level), **suggested-prompt chips** that
+  adapt to the selected object (§3.2), a comfortable composer with **⌘↵ to send**,
+  and a **Conversation history** of past operations (prompt → summary → applied/
+  skipped/failed/rejected). History + draft live in an **in-memory session store**
+  (`copilot/session.ts`) so they **survive collapsing/reopening** the panel
+  (AC #13) — not persisted to disk (privacy: may contain context/responses). The
+  propose→review→approve/reject→execute flow and single-undo are unchanged. 3
+  session tests; **237 tests.**
+- **Deferred (reported):** Phase 4 — deeper inspector↔Copilot integration polish
+  (e.g. click a history entry to select affected objects). The core integration
+  (selection → default context, apply updates inspector/canvas/Explorer) works.
 
 ## 2026-10-10 — AI Modeling Copilot (§14) — Stages 1–4 foundation
 

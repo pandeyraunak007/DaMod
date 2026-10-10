@@ -1,18 +1,38 @@
 import { useState } from "react";
-import { Sparkles, ShieldCheck, ShieldAlert, Settings2, X } from "lucide-react";
+import { Sparkles, ShieldCheck, ShieldAlert, Settings2, X, Send, Trash2 } from "lucide-react";
 import { useModelStore } from "../store/modelStore";
 import { secretStore } from "../lib/secrets";
+import { newId } from "../lib/ids";
 import {
   type CopilotConfig,
   loadCopilotConfig,
   saveCopilotConfig,
 } from "./settings";
-import { noTrainingLabel, sensitiveCategories } from "./privacy";
+import { noTrainingLabel } from "./privacy";
 import { OpenAiCompatProvider, type Provider } from "./provider";
 import { buildContext, type ContextScope } from "./context";
 import { requestPlan } from "./orchestrate";
 import { type CopilotPlan, requiresApproval, hasDestructive } from "./actions";
 import { executePlan, type PlanResult } from "./execute";
+import { useCopilotSession } from "./session";
+
+/** Contextual prompt suggestions (§3.2) — only for supported capabilities. */
+function suggestions(selectedEntity: string | null): { label: string; prompt: string }[] {
+  if (selectedEntity) {
+    return [
+      { label: "Describe this", prompt: `Write a clear business description for the ${selectedEntity} table and each of its columns.` },
+      { label: "Explain", prompt: `Explain the ${selectedEntity} table and its relationships.` },
+      { label: "Add audit cols", prompt: `Add created_at and updated_at timestamp columns to ${selectedEntity}.` },
+      { label: "Review", prompt: `Review the ${selectedEntity} table for data-modeling issues and propose fixes.` },
+    ];
+  }
+  return [
+    { label: "Describe all tables", prompt: "Write clear business descriptions for every table and its columns." },
+    { label: "Propose relationships", prompt: "Propose sensible foreign-key relationships between the existing tables." },
+    { label: "Explain model", prompt: "Explain this data model and how the tables relate." },
+    { label: "Add audit columns", prompt: "Add created_at and updated_at timestamp columns to every table." },
+  ];
+}
 
 // The optional AI Modeling Copilot drawer (§14.7). Proposes a structured plan the
 // user reviews and approves; applying it reuses the existing modeling command
@@ -22,30 +42,41 @@ export function CopilotPanel({ onClose }: { onClose: () => void }) {
   const [config, setConfig] = useState<CopilotConfig>(loadCopilotConfig());
   const [showSettings, setShowSettings] = useState(!config.enabled);
   const [scope, setScope] = useState<ContextScope>("model");
-  const [prompt, setPrompt] = useState("");
   const [plan, setPlan] = useState<CopilotPlan | null>(null);
+  const [planPrompt, setPlanPrompt] = useState("");
   const [planBase, setPlanBase] = useState<string>("");
   const [result, setResult] = useState<PlanResult | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Draft + history live in a session store so they survive collapse/reopen.
+  const draft = useCopilotSession((s) => s.draft);
+  const setDraft = useCopilotSession((s) => s.setDraft);
+  const history = useCopilotSession((s) => s.history);
+  const addEntry = useCopilotSession((s) => s.addEntry);
+  const clearHistory = useCopilotSession((s) => s.clear);
+
   const selection = useModelStore((s) => s.selection);
+  const selectedEntityName = useModelStore((s) =>
+    selection?.kind === "entity" ? s.model.entities.find((e) => e.id === selection.id)?.name ?? null : null,
+  );
+  const level = useModelStore((s) => s.model.level);
   const undo = useModelStore((s) => s.undo);
 
   const provider = (): Provider =>
     new OpenAiCompatProvider({ baseUrl: config.baseUrl, model: config.model, secretRef: config.secretRef });
 
   const send = async () => {
-    if (!prompt.trim()) return;
+    if (!draft.trim()) return;
     setBusy(true);
     setStatus(null);
     setPlan(null);
     setResult(null);
     try {
       const model = useModelStore.getState().model;
-      const selId = selection?.kind === "entity" ? selection.id : null;
+      const selId = scope === "selection" && selection?.kind === "entity" ? selection.id : null;
       const ctx = buildContext(model, scope, selId);
-      const res = await requestPlan(provider(), prompt, ctx, {
+      const res = await requestPlan(provider(), draft, ctx, {
         policy: config.privacyPolicy,
         status: config.noTraining,
       });
@@ -53,8 +84,12 @@ export function CopilotPanel({ onClose }: { onClose: () => void }) {
       else if (res.error) setStatus(res.error);
       else if (res.plan) {
         setPlan(res.plan);
+        setPlanPrompt(draft);
         setPlanBase(model.updatedAt); // conflict check at apply time
-        if (res.plan.actions.length === 0) setStatus("No changes proposed.");
+        if (res.plan.actions.length === 0) {
+          // A read-only answer / explanation — record it, no approval needed.
+          addEntry({ id: newId("field"), prompt: draft, summary: res.plan.summary, applied: 0, skipped: 0, failed: 0 });
+        }
       }
     } finally {
       setBusy(false);
@@ -63,8 +98,6 @@ export function CopilotPanel({ onClose }: { onClose: () => void }) {
 
   const apply = () => {
     if (!plan) return;
-    // Conflict detection (§14.9): don't apply against a model that changed since
-    // the plan was generated.
     if (useModelStore.getState().model.updatedAt !== planBase) {
       setStatus("The model changed since this plan was generated — please re-send.");
       setPlan(null);
@@ -72,33 +105,40 @@ export function CopilotPanel({ onClose }: { onClose: () => void }) {
     }
     const res = executePlan(plan);
     setResult(res);
+    addEntry({ id: newId("field"), prompt: planPrompt, summary: plan.summary, applied: res.applied, skipped: res.skipped, failed: res.failed });
     setPlan(null);
     setStatus(null);
   };
 
-  const sensitive = sensitiveCategories().map((c) => c.label).join(", ");
+  const reject = () => {
+    if (plan) addEntry({ id: newId("field"), prompt: planPrompt, summary: plan.summary, applied: 0, skipped: 0, failed: 0, rejected: true });
+    setPlan(null);
+  };
+
   const verified = config.noTraining === "verified";
+  const contextLabel =
+    scope === "selection" && selectedEntityName ? `selected: ${selectedEntityName}` : "whole model";
 
   return (
     <aside className="copilot">
       <div className="copilot__head">
         <span className="copilot__title">
-          <Sparkles size={15} strokeWidth={1.8} /> Copilot
+          <Sparkles size={15} strokeWidth={1.8} aria-hidden /> Copilot
         </span>
         <div className="copilot__head-actions">
-          <button className="icon-btn" title="Settings" onClick={() => setShowSettings((v) => !v)}>
+          <button className="icon-btn" title="Settings" aria-label="Copilot settings" onClick={() => setShowSettings((v) => !v)}>
             <Settings2 size={15} />
           </button>
-          <button className="icon-btn" title="Close" onClick={onClose}>
+          <button className="icon-btn" title="Close" aria-label="Close Copilot" onClick={onClose}>
             <X size={15} />
           </button>
         </div>
       </div>
 
-      <div className="copilot__status">
+      <button className="copilot__privacy" onClick={() => setShowSettings(true)} title="Open Copilot settings">
         {verified ? <ShieldCheck size={13} className="copilot__shield--ok" /> : <ShieldAlert size={13} className="copilot__shield--warn" />}
         <span className="field__hint">{noTrainingLabel(config.noTraining)}</span>
-      </div>
+      </button>
 
       {showSettings && <CopilotSettings config={config} onChange={(c) => { setConfig(c); saveCopilotConfig(c); }} />}
 
@@ -108,26 +148,46 @@ export function CopilotPanel({ onClose }: { onClose: () => void }) {
         </p>
       ) : (
         <div className="copilot__body">
-          <div className="copilot__scope">
-            <label className="checkbox">
-              <input type="radio" checked={scope === "model"} onChange={() => setScope("model")} /> Whole model
-            </label>
-            <label className="checkbox">
-              <input type="radio" checked={scope === "selection"} onChange={() => setScope("selection")} /> Selected
-            </label>
+          <div className="copilot__context">
+            <span className="copilot__context-label">Context</span>
+            <div className="copilot__scope">
+              <label className="chip-radio">
+                <input type="radio" checked={scope === "model"} onChange={() => setScope("model")} /> Whole model
+              </label>
+              <label className="chip-radio">
+                <input type="radio" checked={scope === "selection"} onChange={() => setScope("selection")} disabled={!selectedEntityName} /> Selected
+              </label>
+            </div>
+            <p className="field__hint">
+              Sends {contextLabel} ({level}): names, types, relationships{" "}
+              {scope === "model" ? "for the whole model" : "for the selected object"} — never credentials or data rows.
+            </p>
           </div>
-          <p className="field__hint">Sends: {sensitive} + types & relationships for the chosen scope.</p>
+
+          <div className="copilot__suggest">
+            {suggestions(scope === "selection" ? selectedEntityName : null).map((sug) => (
+              <button key={sug.label} className="chip" onClick={() => setDraft(sug.prompt)} title={sug.prompt}>
+                {sug.label}
+              </button>
+            ))}
+          </div>
 
           <textarea
             className="editor__input copilot__prompt"
             rows={3}
-            placeholder="e.g. Write clear business descriptions for every entity"
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="Describe what you want — e.g. “Write business descriptions for every table”.  ⌘↵ to send."
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                e.preventDefault();
+                void send();
+              }
+            }}
           />
-          <div className="modal__actions">
-            <button className="btn btn--primary btn--small" onClick={send} disabled={busy || !prompt.trim()}>
-              {busy ? "Thinking…" : "Propose"}
+          <div className="copilot__composer-actions">
+            <button className="btn btn--primary btn--small" onClick={send} disabled={busy || !draft.trim()}>
+              <Send size={13} strokeWidth={1.8} aria-hidden /> {busy ? "Thinking…" : "Propose"}
             </button>
           </div>
 
@@ -150,11 +210,11 @@ export function CopilotPanel({ onClose }: { onClose: () => void }) {
                 {plan.actions.map((a, i) => (
                   <li key={i}>{describeAction(a)}</li>
                 ))}
-                {plan.actions.length === 0 && <li className="field__hint">No mutating actions.</li>}
+                {plan.actions.length === 0 && <li className="field__hint">Read-only answer — no model changes.</li>}
               </ul>
               {plan.actions.length > 0 && (
                 <div className="modal__actions">
-                  <button className="btn btn--ghost btn--small" onClick={() => setPlan(null)}>Reject</button>
+                  <button className="btn btn--ghost btn--small" onClick={reject}>Reject</button>
                   <button className="btn btn--primary btn--small" onClick={apply}>
                     {requiresApproval(plan) ? "Approve & apply" : "Apply"}
                   </button>
@@ -179,6 +239,31 @@ export function CopilotPanel({ onClose }: { onClose: () => void }) {
               <div className="modal__actions">
                 <button className="btn btn--small" onClick={() => { undo(); setResult(null); }}>Undo</button>
               </div>
+            </div>
+          )}
+
+          {history.length > 0 && (
+            <div className="copilot__history">
+              <div className="copilot__history-head">
+                <span className="copilot__context-label">Conversation</span>
+                <button className="icon-btn" title="Clear history" aria-label="Clear history" onClick={clearHistory}>
+                  <Trash2 size={13} />
+                </button>
+              </div>
+              <ul className="copilot__history-list">
+                {history.map((h) => (
+                  <li key={h.id} className="copilot__history-item">
+                    <div className="copilot__history-prompt">{h.prompt}</div>
+                    <div className="field__hint">
+                      {h.summary}
+                      {" · "}
+                      {h.rejected
+                        ? "rejected"
+                        : `applied ${h.applied}${h.skipped ? `, skipped ${h.skipped}` : ""}${h.failed ? `, failed ${h.failed}` : ""}`}
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </div>
