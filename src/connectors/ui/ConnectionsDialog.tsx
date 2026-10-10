@@ -131,6 +131,21 @@ function ConnectionEditor({
   const nameError = validateIdentifier(name);
   const setParam = (k: string, v: string) => setParams((p) => ({ ...p, [k]: v }));
 
+  // Discovery uses the SAVED profile + the keychain secret, so the connection
+  // must be fully filled in AND saved (no unsaved edits) before reverse-engineer
+  // or refresh. Guard the buttons and explain why they are disabled.
+  const configured = !!(params.host?.trim() && params.database?.trim() && params.user?.trim());
+  const dirty =
+    password.length > 0 ||
+    name !== profile.name ||
+    JSON.stringify(params) !== JSON.stringify(profile.params);
+  const ready = configured && !dirty;
+  const readyReason = !configured
+    ? "Fill in host, database and user."
+    : dirty
+      ? "Save your changes first (stores the password in the OS keychain)."
+      : null;
+
   const save = async () => {
     if (nameError) return;
     setBusy(true);
@@ -199,16 +214,30 @@ function ConnectionEditor({
       {status && <p className="field__hint">{status}</p>}
       <div className="modal__actions">
         <button className="btn btn--danger btn--small" onClick={onDelete} disabled={busy}>Delete</button>
-        <button className="btn btn--small" onClick={test} disabled={busy}>Test</button>
-        <button className="btn btn--small" onClick={save} disabled={busy || !!nameError}>Save</button>
-        <button className="btn btn--small" onClick={onRefresh} disabled={busy}>
+        <button className="btn btn--small" onClick={test} disabled={busy || !configured}>Test</button>
+        <button className="btn btn--small" onClick={save} disabled={busy || !!nameError || !configured}>Save</button>
+        <button
+          className="btn btn--small"
+          onClick={onRefresh}
+          disabled={busy || !ready}
+          title={readyReason ?? "Compare the source against the saved snapshot"}
+        >
           Refresh &amp; compare →
         </button>
-        <button className="btn btn--primary btn--small" onClick={onReverse} disabled={busy}>
+        <button
+          className="btn btn--primary btn--small"
+          onClick={onReverse}
+          disabled={busy || !ready}
+          title={readyReason ?? "Discover the source schema into a new model"}
+        >
           Reverse-engineer →
         </button>
       </div>
-      <p className="field__hint">Save the connection (stores the password in your OS keychain) before reverse-engineering.</p>
+      <p className="field__hint">
+        {readyReason
+          ? readyReason
+          : "Ready — Reverse-engineer to discover the schema into a new model."}
+      </p>
     </div>
   );
 }
