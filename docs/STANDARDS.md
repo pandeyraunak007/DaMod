@@ -32,8 +32,12 @@ logicalType?, default?, description? }`.
   **detach** (keep current type) or **reassign** to another domain — never a silent
   conversion. `deleteDomainResolved(id, mode, replacementId?)`, one undo.
 - Validation: `domainIssues` (dup names, invalid identifier, dangling binding).
-- **Not yet:** Postgres `CREATE DOMAIN` DDL emit + reverse-eng of domains (opt-in,
-  deferred — would change DDL output).
+- **Postgres `CREATE DOMAIN`** (opt-in, `DdlOptions.useDomains`, ExportDialog checkbox):
+  emits `CREATE DOMAIN name AS basetype [DEFAULT …]` and renders domain-bound columns as
+  the domain name. **Off by default** → existing DDL byte-identical. Reverse-engineering
+  parses `CREATE DOMAIN` into `model.domains` and binds columns typed as a domain (quoted
+  or not); export→re-parse round-trips the binding. Non-Postgres dialects inline the base
+  type (no native domain).
 
 ## Naming Standards (`model.namingStandards`) — `src/model/naming.ts`
 
@@ -51,6 +55,11 @@ suffix?, maxLength? }`. Cases: `snake_case | screaming_snake | pascal | camel | 
   `{applied, skipped, collisions}`.
 - UI: `NamingStandardsDialog` (ribbon **Naming**) — rules editor, mirror toggle, live
   read-only preview with collision warnings, explicit **Apply**.
+- **Per-dialect identifier rules** (`src/model/dialectIdentifiers.ts`, validation rule
+  `dialectIdentifierIssues`): reserved-word detection (ANSI + per-dialect extras) and
+  identifier-length limits (Oracle 30, PG 63, MySQL 64, SQL Server 128, Snowflake/
+  Databricks 255, BigQuery 300). Physical levels only, scoped to the model's dialect;
+  **warnings** (reserved words are quoted on export; over-length is the DB's hard limit).
 
 ## Data Type Standards (`model.typeStandards`) — `src/model/typeStandards.ts`
 
@@ -85,8 +94,10 @@ approved, one undo group, idempotent — never direct JSON/Zustand mutation):
 
 ## Deferred backlog (gated / lower priority)
 
-- Postgres `CREATE DOMAIN` DDL + reverse-eng of domains (opt-in; changes DDL output).
 - Naming auto-apply to newly created objects (opt-in, off by default).
-- Reserved-word lists + per-dialect identifier length limits (today: Postgres 63-char).
 - Editable per-dialect **type mapping profiles** (override canonical→physical rendering).
 - Explorer nodes for Naming/Type standards; Copilot domain/standard update+delete actions.
+- A real before/after diff in the Copilot plan card (currently a textual action list).
+
+**Done since the audit:** Postgres `CREATE DOMAIN` DDL + domain reverse-eng (opt-in);
+reserved-word + per-dialect identifier-length validation.

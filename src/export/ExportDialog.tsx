@@ -30,6 +30,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   const [scope, setScope] = useState<Scope>("model");
   const [dropFirst, setDropFirst] = useState(false);
   const [ifNotExists, setIfNotExists] = useState(false);
+  const [useDomains, setUseDomains] = useState(false);
   const [baselineSel, setBaselineSel] = useState<string>(""); // model id, or "" / "sql"
   const [sqlBaseline, setSqlBaseline] = useState<Model | null>(null);
   const [sqlBaselineName, setSqlBaselineName] = useState<string | null>(null);
@@ -68,7 +69,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     return found?.model ?? null;
   }, [scope, baselineSel, sqlBaseline, otherModels]);
 
-  const opts = { dropFirst, ifNotExists };
+  const opts = { dropFirst, ifNotExists, useDomains };
 
   const text = useMemo(() => {
     try {
@@ -86,7 +87,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     } catch (e) {
       return `-- export error: ${(e as Error).message}`;
     }
-  }, [scope, dialect, activeModel, models, links, semantic, dropFirst, ifNotExists, baselineModel]);
+  }, [scope, dialect, activeModel, models, links, semantic, dropFirst, ifNotExists, useDomains, baselineModel]);
 
   const fileName =
     scope === "semantic"
@@ -150,6 +151,12 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
               <input type="checkbox" checked={ifNotExists} onChange={(e) => setIfNotExists(e.target.checked)} />
               CREATE TABLE IF NOT EXISTS
             </label>
+            {dialect === "postgres" && (activeModel.domains?.length ?? 0) > 0 && (
+              <label className="checkbox">
+                <input type="checkbox" checked={useDomains} onChange={(e) => setUseDomains(e.target.checked)} />
+                Emit CREATE DOMAIN &amp; use domain types (Postgres)
+              </label>
+            )}
           </div>
         )}
 

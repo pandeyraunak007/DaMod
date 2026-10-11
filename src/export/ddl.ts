@@ -32,6 +32,18 @@ export interface DdlOptions {
   dropFirst?: boolean;
   /** Emit `CREATE TABLE IF NOT EXISTS` instead of `CREATE TABLE`. */
   ifNotExists?: boolean;
+  /** Postgres only (opt-in): emit `CREATE DOMAIN` for the model's domains and render
+   *  domain-bound columns as the domain name instead of the inline base type. Off by
+   *  default — leaving DDL output byte-identical for existing exports. */
+  useDomains?: boolean;
+}
+
+/** `CREATE DOMAIN` for a reusable domain (Postgres). The base type reuses the dialect's
+ *  type renderer so parameters (length/precision/scale) match column rendering. */
+function domainDDL(d: Dialect, dom: NonNullable<Model["domains"]>[number]): string {
+  const base = d.type({ type: dom.type, length: dom.length, precision: dom.precision, scale: dom.scale } as unknown as Parameters<Dialect["type"]>[0]);
+  const def = dom.default ? ` DEFAULT ${dom.default}` : "";
+  return `CREATE DOMAIN ${d.quote(dom.name)} AS ${base}${def};`;
 }
 
 /** Referential-integrity clause for a foreign key (Postgres only; other engines
@@ -146,6 +158,7 @@ export function tableDDL(
   inlineFks: Fk[],
   schema: string | undefined,
   opts: DdlOptions = {},
+  domainOf?: (id: string) => string | undefined,
 ): string {
   const q = d.quote;
   const ref = tableRef(d, entity.name, schema);
@@ -157,7 +170,9 @@ export function tableDDL(
   const notEnforced = d.id === "snowflake" && entity.tableKind !== "hybrid" ? " NOT ENFORCED" : "";
   const lines: string[] = [];
   for (const f of entity.fields) {
-    let line = `  ${q(f.name)} ${d.type(f)}`;
+    // Opt-in: a domain-bound column references the domain name (Postgres CREATE DOMAIN).
+    const dom = opts.useDomains && d.id === "postgres" && f.domainId ? domainOf?.(f.domainId) : undefined;
+    let line = `  ${q(f.name)} ${dom ? q(dom) : d.type(f)}`;
     if (!f.nullable) line += " NOT NULL";
     if (f.default) line += ` DEFAULT ${f.default}`;
     if (d.commentStyle === "inline" && f.description) line += ` COMMENT ${sqlString(f.description)}`;
@@ -358,11 +373,15 @@ function rawObjectDDL(d: Dialect, o: NonNullable<Model["rawObjects"]>[number]): 
 }
 
 /** Schemas, sequences, indexes, views and raw objects for a model, as DDL blocks. */
-function objectBlocks(model: Model, d: Dialect, schema?: string): { pre: string[]; post: string[] } {
+function objectBlocks(model: Model, d: Dialect, schema?: string, opts: DdlOptions = {}): { pre: string[]; post: string[] } {
   const pre: string[] = [];
   const post: string[] = [];
   const schemas = (model.schemas ?? []).map((s) => schemaDDL(d, s));
   if (schemas.length) pre.push(schemas.join("\n")); // schemas must exist before their objects
+  // Opt-in Postgres domains — emitted before tables (columns reference them by name).
+  if (opts.useDomains && d.id === "postgres" && (model.domains ?? []).length) {
+    pre.push(model.domains!.map((dom) => domainDDL(d, dom)).join("\n"));
+  }
   const seqs = (model.sequences ?? []).map((s) => sequenceDDL(d, s, schema));
   if (seqs.length) pre.push(seqs.join("\n"));
   const idxs = (model.indexes ?? [])
@@ -396,7 +415,8 @@ export function exportModelDDL(model: Model, d: Dialect, opts: DdlOptions = {}):
   const { order, deferred } = orderTables(model.entities, fks);
   const deferredSet = new Set(deferred);
   const inlineFks = fks.filter((fk) => !deferredSet.has(fk));
-  const { pre, post } = objectBlocks(model, d);
+  const { pre, post } = objectBlocks(model, d, undefined, opts);
+  const domainOf = (id: string) => (model.domains ?? []).find((dm) => dm.id === id)?.name;
 
   const blocks: string[] = [`-- DaMod DDL export: ${model.name} (${d.label})`];
   if (opts.dropFirst) {
@@ -404,7 +424,7 @@ export function exportModelDDL(model: Model, d: Dialect, opts: DdlOptions = {}):
     blocks.push([...order].reverse().map((e) => dropTableSql(d, e.name)).join("\n"));
   }
   blocks.push(...pre); // sequences first (defaults may reference them)
-  const tables = order.map((e) => tableDDL(d, e, inlineFks, undefined, opts));
+  const tables = order.map((e) => tableDDL(d, e, inlineFks, undefined, opts, domainOf));
   blocks.push(tables.join("\n\n"));
 
   const comments = order.flatMap((e) => commentStatements(d, e));

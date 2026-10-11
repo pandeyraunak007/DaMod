@@ -5,6 +5,32 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Backlog: opt-in Postgres CREATE DOMAIN + per-dialect identifier rules
+
+Two deferred items delivered.
+
+**#2 — Per-dialect identifier rules (gap G8):** `model/dialectIdentifiers.ts` adds
+reserved-word sets (ANSI + per-dialect extras) and length limits (Oracle 30, PG 63,
+MySQL 64, SQL Server 128, Snowflake/Databricks 255, BigQuery 300). New validation rule
+`dialectIdentifierIssues` — physical levels only, scoped to the model's dialect, **warnings**
+(reserved → quoted on export; over-length → the DB's hard limit). Non-blocking; no fixture
+broke (warnings only).
+
+**#1 — Opt-in Postgres CREATE DOMAIN DDL + reverse-eng (Q1 = opt-in):**
+- `DdlOptions.useDomains` (default **false** → existing DDL byte-identical; `ddl.test.ts`
+  unchanged). When on + Postgres: emit `CREATE DOMAIN name AS basetype [DEFAULT …]` before
+  tables and render domain-bound columns as the quoted domain name. ExportDialog shows the
+  checkbox only for Postgres models that have domains. Non-Postgres ignores it (inline base
+  type — no native domain).
+- Reverse (`import/reverse.ts`): a domain pre-scan parses `CREATE DOMAIN` into
+  `model.domains` (order-independent); columns typed as a domain name — **quoted or
+  unquoted** — bind to it and inherit its base type. The column type-token parser now also
+  accepts a quoted identifier (a domain/type reference), so export(useDomains)→re-parse
+  round-trips the binding.
+
+- Tests +13 (G8 module ×4 + rule ×4; domain DDL/reverse ×5). **490 TS tests pass; tsc +
+  build clean.** `docs/STANDARDS.md` updated (both moved out of the deferred backlog).
+
 ## 2026-10-11 — Standards hardening: invariant suites + idempotence fix (Phase 5+)
 
 Applied industry-standard hardening to the standards engine — property/invariant tests

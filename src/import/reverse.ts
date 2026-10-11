@@ -6,9 +6,11 @@
 // a warning. The result is always a Physical model.
 
 import {
+  type Domain,
   type Field,
   type Model,
   type Relationship,
+  newDomain,
   newEntity,
   newField,
   newModel,
@@ -229,6 +231,7 @@ function parseCreateTable(
   stmt: string,
   fks: ParsedFk[],
   warnings: string[],
+  domains?: Map<string, Domain>,
 ): ParsedTable | null {
   const head = stmt.match(/create\s+(?:global\s+|local\s+|temporary\s+|temp\s+)*table\s+(?:if\s+not\s+exists\s+)?([\s\S]+?)\s*\(/i);
   if (!head) return null;
@@ -282,12 +285,31 @@ function parseCreateTable(
     const colName = unquote(colMatch[1]);
     let rest = colMatch[2].trim();
 
-    // Leading type: a word (possibly multi-word) with an optional (...) parameter.
-    const typeMatch = rest.match(/^([A-Za-z_][\w]*(?:\s+(?:precision|varying|with(?:out)?\s+time\s+zone|time\s+zone))*)\s*(\([^)]*\))?/i);
-    const typeRaw = typeMatch ? `${typeMatch[1]}${typeMatch[2] ?? ""}` : rest;
-    const { spec, warning } = mapSqlType(typeRaw);
+    // Leading type token: a quoted identifier (a domain/type reference) OR a word
+    // (possibly multi-word) with an optional (...) parameter.
+    let bareType: string | null = null;
+    let typeRaw = rest;
+    let consumed = rest.length;
+    const quotedType = rest.match(/^("(?:[^"]|"")*"|`[^`]*`|\[[^\]]*\])/);
+    if (quotedType) {
+      bareType = quotedType[0];
+      typeRaw = quotedType[0];
+      consumed = quotedType[0].length;
+    } else {
+      const tm = rest.match(/^([A-Za-z_][\w]*(?:\s+(?:precision|varying|with(?:out)?\s+time\s+zone|time\s+zone))*)\s*(\([^)]*\))?/i);
+      if (tm) {
+        bareType = tm[1];
+        typeRaw = `${tm[1]}${tm[2] ?? ""}`;
+        consumed = tm[0].length;
+      }
+    }
+    // A column typed as a known domain name binds to that domain and inherits its type.
+    const dom = domains && bareType ? domains.get(unquote(bareType).toLowerCase()) : undefined;
+    const { spec, warning } = dom
+      ? { spec: { type: dom.type, length: dom.length, precision: dom.precision, scale: dom.scale }, warning: undefined as string | undefined }
+      : mapSqlType(typeRaw);
     if (warning) warnings.push(`${name}.${colName}: ${warning}`);
-    rest = typeMatch ? rest.slice(typeMatch[0].length) : "";
+    rest = rest.slice(consumed);
 
     const field = newField(colName, spec.type, {
       nullable: true,
@@ -295,6 +317,7 @@ function parseCreateTable(
       precision: spec.precision,
       scale: spec.scale,
     });
+    if (dom) field.domainId = dom.id;
     if (/\bnot\s+null\b/i.test(rest)) field.nullable = false;
     if (/\bprimary\s+key\b/i.test(rest)) { pkCols.push(colName); }
     if (/\bunique\b/i.test(rest)) uniqueCols.add(colName);
@@ -344,16 +367,48 @@ function parseAlterFk(stmt: string): ParsedFk | null {
  * Parse SQL DDL into a Physical model. `modelName` names the result. Tables that
  * cannot be resolved as FK endpoints are reported in `warnings`.
  */
+/** Parse `CREATE DOMAIN name AS basetype [DEFAULT expr] [NOT NULL] [CHECK ...]`. The
+ *  base type is mapped to the canonical set; CHECK/NOT NULL are not modeled on a Domain,
+ *  so they are ignored (the column still works). */
+function parseCreateDomain(stmt: string): Domain | null {
+  const m = /^\s*create\s+domain\s+(.+?)\s+as\s+([\s\S]+)$/i.exec(stmt);
+  if (!m) return null;
+  const name = unquote(m[1].trim());
+  const rest = m[2].trim().replace(/;\s*$/, "").trim();
+  const typeStr = rest.split(/\s+(?:default|not\s+null|check|constraint|collate)\b/i)[0].trim();
+  const { spec } = mapSqlType(typeStr);
+  const dom = newDomain(name, spec.type);
+  dom.length = spec.length;
+  dom.precision = spec.precision;
+  dom.scale = spec.scale;
+  const def = /\bdefault\s+(.+?)(?=\s+(?:not\s+null|check|constraint|collate)\b|;?\s*$)/i.exec(rest);
+  if (def) dom.default = def[1].trim();
+  return dom;
+}
+
 export function parseDdl(sql: string, modelName: string, now: string): ReverseResult {
   const warnings: string[] = [];
   const clean = stripComments(sql);
   const statements = splitStatements(clean);
 
+  // Pre-scan domains so columns typed as a domain name (in any statement order) bind.
+  const domainList: Domain[] = [];
+  const domainByName = new Map<string, Domain>();
+  for (const stmt of statements) {
+    if (/^\s*create\s+domain\b/i.test(stmt)) {
+      const dom = parseCreateDomain(stmt);
+      if (dom && !domainByName.has(dom.name.toLowerCase())) {
+        domainList.push(dom);
+        domainByName.set(dom.name.toLowerCase(), dom);
+      }
+    }
+  }
+
   const fks: ParsedFk[] = [];
   const tables: ParsedTable[] = [];
   for (const stmt of statements) {
     if (/^\s*create\s+(?:global\s+|local\s+|temporary\s+|temp\s+)*table\b/i.test(stmt)) {
-      const t = parseCreateTable(stmt, fks, warnings);
+      const t = parseCreateTable(stmt, fks, warnings, domainByName);
       if (t) tables.push(t);
     } else if (/^\s*alter\s+table\b/i.test(stmt)) {
       const fk = parseAlterFk(stmt);
@@ -363,6 +418,7 @@ export function parseDdl(sql: string, modelName: string, now: string): ReverseRe
   }
 
   const model = newModel(modelName, now, "Physical");
+  if (domainList.length) model.domains = domainList;
 
   // Lay entities out on a grid; map name -> entity for FK wiring.
   const byName = new Map<string, { id: string; fields: Field[] }>();
