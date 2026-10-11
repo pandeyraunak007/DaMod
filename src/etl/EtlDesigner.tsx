@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useWorkspaceStore } from "../store/workspaceStore";
 import { useUiStore } from "../store/uiStore";
 import { PipelineCanvas } from "./PipelineCanvas";
@@ -21,6 +21,9 @@ export function EtlDesigner() {
   const pipelines = useWorkspaceStore((s) => s.pipelines);
   const allModels = useWorkspaceStore((s) => s.allModels);
   const upsertPipeline = useWorkspaceStore((s) => s.upsertPipeline);
+  const undoPipeline = useWorkspaceStore((s) => s.undoPipeline);
+  const redoPipeline = useWorkspaceStore((s) => s.redoPipeline);
+  const pipelineHistory = useWorkspaceStore((s) => s.pipelineHistory);
   const close = useUiStore((s) => s.setEtlDesignerOpen);
 
   const [pipelineId, setPipelineId] = useState<string | null>(pipelines[0]?.id ?? null);
@@ -37,6 +40,27 @@ export function EtlDesigner() {
   const selectedNode = spec?.nodes?.find((n) => n.id === nodeId) ?? null;
 
   const save = (next: PipelineSpec) => { setError(null); void upsertPipeline(next); };
+
+  const hist = pipelineId ? pipelineHistory[pipelineId] : undefined;
+  const canUndo = !!hist?.past.length;
+  const canRedo = !!hist?.future.length;
+
+  // ⌘Z / ⌘⇧Z undo-redo, scoped to the open pipeline (App yields these keys while the
+  // Designer is open). Ignore while typing in an input (node inspector fields).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!pipelineId) return;
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod || e.key.toLowerCase() !== "z") return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT")) return;
+      e.preventDefault();
+      if (e.shiftKey) void redoPipeline(pipelineId);
+      else void undoPipeline(pipelineId);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pipelineId, undoPipeline, redoPipeline]);
 
   const createStarter = () => {
     if (!spec) return;
@@ -61,6 +85,12 @@ export function EtlDesigner() {
     <div className="etl">
       <div className="panel-head">
         <span className="panel-head__title">ETL Designer</span>
+        {spec && (
+          <>
+            <button className="btn btn--small" disabled={!canUndo} title="Undo (⌘Z)" onClick={() => pipelineId && void undoPipeline(pipelineId)}>↶ Undo</button>
+            <button className="btn btn--small" disabled={!canRedo} title="Redo (⌘⇧Z)" onClick={() => pipelineId && void redoPipeline(pipelineId)}>↷ Redo</button>
+          </>
+        )}
         {hasGraph && (
           <button className={`btn btn--small ${sqlOpen ? "btn--primary" : ""}`} onClick={() => setSqlOpen((v) => !v)}>
             {sqlOpen ? "Canvas" : "SQL"}

@@ -114,6 +114,9 @@ export default function App() {
         useWorkspaceStore.getState().saveActive(true);
         return;
       }
+      // While the ETL Designer is open it owns undo/redo + delete (its own pipeline
+      // history / canvas); don't let the model-canvas shortcuts below fire underneath it.
+      if (etlDesignerOpen) return;
       if (mod && e.key.toLowerCase() === "z") {
         if (isEditableTarget(e.target)) return;
         e.preventDefault();
@@ -141,7 +144,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [undo, redo]);
+  }, [undo, redo, etlDesignerOpen]);
 
   // Reusable, independently collapsible + resizable workspace panels (Req 16 §1).
   const explorerPanel = showExplorer ? (

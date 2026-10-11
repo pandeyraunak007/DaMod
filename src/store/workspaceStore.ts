@@ -78,6 +78,7 @@ import {
 import { serializeSemantic, parseSemanticFile } from "../semantic/semanticPersist";
 
 const AUTOSAVE_MS = 2000; // FR-5.4
+const PIPELINE_HISTORY_CAP = 50; // per-pipeline undo depth (parity with model undo)
 
 export interface Tab {
   /** model.id for valid models, or `err:<file>` for a file that failed to load. */
@@ -146,6 +147,12 @@ interface WorkspaceState {
   // ETL pipeline specs (connector framework Phase 5).
   upsertPipeline: (spec: PipelineSpec) => Promise<void>;
   deletePipeline: (id: string) => Promise<void>;
+  /** Per-pipeline edit history for undo/redo in the ETL Designer (G-UNDO). Transient
+   *  (session-only, never written to pipelines.json), keyed by pipeline id. Each
+   *  `upsertPipeline` pushes the prior version onto `past` and clears `future`. */
+  pipelineHistory: Record<string, { past: PipelineSpec[]; future: PipelineSpec[] }>;
+  undoPipeline: (id: string) => Promise<void>;
+  redoPipeline: (id: string) => Promise<void>;
 
   // semantic layer (FR-7)
   addTerm: (term: Term) => void;
@@ -254,6 +261,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     semantic: emptySemanticDoc(),
     connections: [],
     pipelines: [],
+    pipelineHistory: {},
 
     openWorkspacePicker: async () => {
       const dir = await pickWorkspaceFolder();
@@ -804,12 +812,64 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
 
     upsertPipeline: async (spec) => {
       const current = get().pipelines;
-      const exists = current.some((p) => p.id === spec.id);
-      const next = exists ? current.map((p) => (p.id === spec.id ? spec : p)) : [...current, spec];
+      const prev = current.find((p) => p.id === spec.id);
+      const next = prev ? current.map((p) => (p.id === spec.id ? spec : p)) : [...current, spec];
+      // Record the prior version for undo (new pipelines have no prior; graph edits return
+      // fresh specs so `prev !== spec` whenever there's a real change — skip no-op saves).
+      if (prev && prev !== spec) {
+        set((s) => {
+          const h = s.pipelineHistory[spec.id] ?? { past: [], future: [] };
+          return {
+            pipelineHistory: {
+              ...s.pipelineHistory,
+              [spec.id]: { past: [...h.past, prev].slice(-PIPELINE_HISTORY_CAP), future: [] },
+            },
+          };
+        });
+      }
       await commitPipelines({ ...emptyPipelinesDoc(), pipelines: next });
     },
 
+    undoPipeline: async (id) => {
+      const h = get().pipelineHistory[id];
+      const cur = get().pipelines.find((p) => p.id === id);
+      if (!h || !h.past.length || !cur) return;
+      const prev = h.past[h.past.length - 1];
+      set((s) => ({
+        pipelineHistory: {
+          ...s.pipelineHistory,
+          [id]: { past: h.past.slice(0, -1), future: [...h.future, cur] },
+        },
+      }));
+      await commitPipelines({
+        ...emptyPipelinesDoc(),
+        pipelines: get().pipelines.map((p) => (p.id === id ? prev : p)),
+      });
+    },
+
+    redoPipeline: async (id) => {
+      const h = get().pipelineHistory[id];
+      const cur = get().pipelines.find((p) => p.id === id);
+      if (!h || !h.future.length || !cur) return;
+      const nextSpec = h.future[h.future.length - 1];
+      set((s) => ({
+        pipelineHistory: {
+          ...s.pipelineHistory,
+          [id]: { past: [...h.past, cur], future: h.future.slice(0, -1) },
+        },
+      }));
+      await commitPipelines({
+        ...emptyPipelinesDoc(),
+        pipelines: get().pipelines.map((p) => (p.id === id ? nextSpec : p)),
+      });
+    },
+
     deletePipeline: async (id) => {
+      // Drop the pipeline and its (transient) undo history together.
+      set((s) => {
+        const { [id]: _removed, ...rest } = s.pipelineHistory;
+        return { pipelineHistory: rest };
+      });
       await commitPipelines({
         ...emptyPipelinesDoc(),
         pipelines: get().pipelines.filter((p) => p.id !== id),

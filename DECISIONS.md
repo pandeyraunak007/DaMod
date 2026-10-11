@@ -5,6 +5,30 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — ETL G-UNDO: per-pipeline undo/redo in the Designer
+
+Pipeline edits persisted via `upsertPipeline` with no history (model undo is a separate
+stack). Added per-pipeline undo/redo:
+
+- **Store** (`workspaceStore`): transient `pipelineHistory: Record<id, {past, future}>`
+  (session-only, never written to pipelines.json). `upsertPipeline` pushes the prior
+  version onto `past` and clears `future` (skips no-op saves via `prev !== spec`; graph
+  edits return fresh specs so real edits always differ); capped at 50 (`PIPELINE_HISTORY_CAP`,
+  model-undo parity). `undoPipeline`/`redoPipeline` swap the active pipeline and move it
+  between past/future. `deletePipeline` drops the pipeline's history too.
+- **Designer** (`EtlDesigner`): ↶ Undo / ↷ Redo buttons (disabled on empty stacks) + a
+  ⌘Z/⌘⇧Z handler scoped to the open pipeline, ignored while typing in inspector fields.
+- **Keyboard arbitration** (`App`): while `etlDesignerOpen`, the global model-canvas
+  shortcuts (⌘Z undo, Delete, Enter→Properties) are suppressed so they don't fire under the
+  Designer; ⌘S stays global. The Designer owns ⌘Z there.
+
+Chose the single `upsertPipeline` choke point (every Designer edit — addNode, canvas
+move/connect/delete, inspector change — routes through `save → upsertPipeline`) rather than
+wrapping each graph op, so one hook covers all edit paths. History is per-pipeline (not one
+global ETL stack) so switching pipelines keeps each one's history. 4 tests in
+`pipelineUndo.test.ts` (order, redo-clear-on-diverge, no-op/delete, independence); 551
+green, tsc/build clean. Remaining ETL gaps: G-AI (Copilot ETL actions), G-INC, G-EXEC.
+
 ## 2026-10-11 — Reverse-engineering: browse schemas/tables before importing (§6.B)
 
 The reverse-engineer panel auto-discovered the WHOLE source on open (all schemas) and only
