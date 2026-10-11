@@ -55,6 +55,9 @@ export interface Field {
   role?: FieldRole;
   note?: string;
   udps?: Udp[];
+  /** Discovery provenance (Req 22 §7) — chiefly the source-native type; absent for
+   *  hand-authored fields. */
+  source?: ObjectSource;
 }
 
 /**
@@ -89,6 +92,9 @@ export interface ObjectSource {
   schema?: string;
   /** Stable source identifier (e.g. "AP.AP_INVOICES_ALL"); the match key. */
   nativeId?: string;
+  /** The source's own type spelling, verbatim (columns only), e.g. "NUMBER(15)",
+   *  "VARCHAR2(240)", "timestamptz" — preserved even when the normalized type loses it. */
+  nativeType?: string;
   /** EBS product/module short code (e.g. "AP"). */
   product?: string;
   /** How this object's mapping was established (see RELATIONSHIP_PROVENANCE kin). */

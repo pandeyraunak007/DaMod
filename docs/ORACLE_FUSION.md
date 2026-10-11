@@ -33,7 +33,8 @@ OAuth · **Deferred** = not yet built.
 | Connection setup + test + reverse (UI) | **Done (mock)** | Connections dialog: "+ Oracle Fusion (mock)" (instance URL only, no credentials); Test reports API version; Reverse-engineer imports a Fusion-enriched model; offline "Import metadata file…" works too. |
 | Offline metadata-file import | **Done** | Any canonical JSON (incl. a Fusion package) imports via "Import metadata file…" (`parseMetadataFile`, rejects credential leaks). |
 | Fusion-aware Model Explorer view | **Done** | `FusionExplorer` — a Model/Fusion toggle (shown when the active model has Fusion provenance); groups business objects by **family** or **module** with counts, search, expand/collapse, click-to-reveal; subject-area shortcuts; scoped to the active tab; read-only. Shares the `AppExplorer` component with the EBS view. |
-| Fusion-specific Properties Inspector panel (business object) | **Done** | The entity General tab shows a **Fusion Cloud source** block — Application family / Module / Business object / **API path** / **API version** / provenance (`entity.source` now carries apiPath+apiVersion). Attribute source-native-type + standalone API-resource / extract-data-store panels (snapshot-only) are later. |
+| Fusion-specific Properties Inspector panel (business object) | **Done** | The entity General tab shows a **Fusion Cloud source** block — Application family / Module / Business object / **API path** / **API version** / provenance. |
+| Attribute source-native type | **Done** | `Field.source.nativeType` carries the source's verbatim type (`NUMBER(15)`, `VARCHAR2`, `number`, …) for EVERY connector; the column detail editor shows a read-only "Source-native type" row. Standalone API-resource / extract-data-store panels (snapshot-only) are later. |
 | Source-to-target mapping | **Done** | Pipeline designer gains an editable **Mapping** tab (`MappingEditor`): per object, rename the target column, convert its type, add a transform expression, toggle NOT NULL, drop columns, add back un-mapped source columns — live-validated (type-conversion / required / drift), saved through the existing store. Works for any source model (EBS/Fusion/relational) → Postgres/Snowflake/Databricks target. Cross-object joins/filters deferred. |
 | Live data extraction / pipeline execution | **Deferred** | Out of scope by design — discovery, planning and execution stay separate (§8/§11). |
 | Live REST connector (tenant + OAuth) | **Deferred** | Same contract; add when a tenant is available to verify. |
@@ -53,7 +54,7 @@ OAuth · **Deferred** = not yet built.
 
 - **Phase 2/3 (more):** *DONE:* the Fusion-aware Explorer view (family / module grouping,
   `FusionExplorer`) + the **business-object Properties panel** (family/module/API path/
-  version). *Remaining:* attribute source-native-type (needs a field-level `source`);
+  version) + **attribute source-native type** (`Field.source.nativeType`). *Remaining:*
   standalone API-resource / extract-data-store panels + tree nodes (they live on the
   snapshot, so they need a snapshot-reading surface); more families (Procurement, SCM,
   HCM, Sales) via fixtures.

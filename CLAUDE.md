@@ -37,7 +37,10 @@ See the top DECISIONS entries:
   **Fusion-aware Explorer view** (family/module grouping) sharing the `AppExplorer`
   component with EBS (Model/EBS|Fusion toggle), and a **Fusion business-object Properties
   panel** (Inspector General tab shows family/module/API path/version). Live REST connector
-  + attribute/API-resource/extract panels deferred (`docs/ORACLE_FUSION.md`).
+  + API-resource/extract panels deferred (`docs/ORACLE_FUSION.md`).
+- **Field-level source provenance:** `Field.source` (reuses `ObjectSource`) carries the
+  **source-native type** (`col.nativeType`) for every connector; the column detail editor
+  shows a read-only "Source-native type" row. Shared `sourceToPlain` serializer.
 - **Source-to-target mapping (Req 22 §8):** the pipeline designer has an editable
   **Mapping** tab (`connectors/pipeline/MappingEditor.tsx`) — rename target columns,
   convert types, add transforms, drop/add columns, live-validated, saved via

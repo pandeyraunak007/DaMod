@@ -13,6 +13,18 @@ export const CURRENT_FORMAT_VERSION = 1;
 const zUdp = z.object({ name: z.string(), value: z.string() });
 const zRiAction = z.enum(["no action", "cascade", "restrict", "set null", "set default"]);
 
+const zObjectSource = z.object({
+  system: z.string().optional(),
+  schema: z.string().optional(),
+  nativeId: z.string().optional(),
+  nativeType: z.string().optional(),
+  product: z.string().optional(),
+  provenance: z.string().optional(),
+  confidence: z.number().min(0).max(1).optional(),
+  apiPath: z.string().optional(),
+  apiVersion: z.string().optional(),
+});
+
 const zField = z.object({
   id: z.string(),
   name: z.string(),
@@ -33,23 +45,13 @@ const zField = z.object({
   description: z.string().optional(),
   note: z.string().optional(),
   udps: z.array(zUdp).optional(),
+  source: zObjectSource.optional(),
 });
 
 const zCheck = z.object({
   id: z.string(),
   name: z.string(),
   expression: z.string(),
-});
-
-const zObjectSource = z.object({
-  system: z.string().optional(),
-  schema: z.string().optional(),
-  nativeId: z.string().optional(),
-  product: z.string().optional(),
-  provenance: z.string().optional(),
-  confidence: z.number().min(0).max(1).optional(),
-  apiPath: z.string().optional(),
-  apiVersion: z.string().optional(),
 });
 
 const zEntity = z.object({

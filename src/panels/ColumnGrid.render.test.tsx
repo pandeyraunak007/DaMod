@@ -80,4 +80,14 @@ describe("ColumnGrid interactions", () => {
     expect(container.textContent).toContain("Logical / business name");
     expect(container.textContent).toContain("Definition");
   });
+
+  it("shows the source-native type in the detail when a field has discovery provenance", () => {
+    // Stamp a native type on the field (as reverse-engineering would).
+    const e = entity();
+    s().updateField(e.id, e.fields[0].id, { source: { system: "oracle-fusion", nativeType: "NUMBER(15)" } });
+    const details = [...container.querySelectorAll(".colgrid__act")].find((b) => b.textContent === "⋯") as HTMLButtonElement;
+    act(() => details.click());
+    expect(container.textContent).toContain("Source-native type");
+    expect((container.querySelector(".src-native") as HTMLInputElement)?.value).toBe("NUMBER(15)");
+  });
 });

@@ -5,6 +5,22 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Field-level source provenance (source-native type) (Req 22 §7)
+
+Reverse-engineering dropped each column's source-native type (`NUMBER(15)`, `VARCHAR2`,
+`number`, `timestamptz`) — only the normalized modeling type survived. Now preserved.
+
+- `ObjectSource` += `nativeType`; `Field.source?: ObjectSource` added (reuses the one
+  provenance type for entities + fields). `metadataToModel` stamps every discovered field
+  with `source = { system, nativeType, nativeId? }` — benefits ALL connectors (Postgres/
+  EBS/Fusion), not just Fusion.
+- Serialize: extracted a shared `sourceToPlain` helper (entity + field), deterministic +
+  omit-empty; Zod `source` on `zField`. Byte-identical round-trip (tested). Reconcile
+  keeps the fresh native type (structure) while preserving manual field edits.
+- Inspector: the column detail (`FieldDetail`) shows a read-only **Source-native type**
+  row when present — the §7 attribute source-native-type.
+- 363 TS tests (+1 render + data/round-trip assertions); tsc/build/cargo clean.
+
 ## 2026-10-11 — Fusion-specific Properties panel (business object) (Req 22 §7)
 
 The Fusion REST specifics (API path/version) lived only in the snapshot's `native.fusion`;

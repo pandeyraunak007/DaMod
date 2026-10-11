@@ -74,12 +74,17 @@ describe("Fusion reverse-engineering → model (Req 22 §6)", () => {
     // Unmappable binary attribute → text fallback with a warning.
     expect(inv.fields.find((f) => f.name === "Attachment")?.type).toBe("text");
     expect(warnings.some((w) => w.includes("Attachment"))).toBe(true);
+    // Field-level source-native type preserved (Req 22 §7), even for the normalized
+    // (number→decimal) and the unmappable (binary→text) columns.
+    expect(inv.fields.find((f) => f.name === "InvoiceAmount")?.source?.nativeType).toBe("number");
+    expect(inv.fields.find((f) => f.name === "Attachment")?.source?.nativeType).toBe("binary");
     expect(families.map((f) => f.name)).toEqual(["Financials"]);
   });
 
   it("round-trips the produced model and the snapshot metadata byte-identically", () => {
     const { model } = fusionSnapshotToModel(fusionMockMetadata(), "F", NOW);
     const once = serializeModel(model);
+    expect(once).toContain('"nativeType": "number"'); // field-level source persists
     const p = parseModelFile(once);
     expect(p.ok).toBe(true);
     if (p.ok) expect(serializeModel(p.value)).toBe(once);

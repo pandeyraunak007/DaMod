@@ -81,6 +81,8 @@ export function metadataToModel(
           unique: uniqueSingle.has(col.name) && !pk.has(col.name),
           default: col.default,
           description: col.comment,
+          // Preserve the source-native type (Req 22 §7) even when it normalized away.
+          source: { system: md.source.systemType, nativeType: col.nativeType, ...(col.nativeId ? { nativeId: col.nativeId } : {}) },
         });
       });
     entity.fields = fields;

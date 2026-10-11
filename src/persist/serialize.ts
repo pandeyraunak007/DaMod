@@ -31,6 +31,22 @@ function udpsOut(out: Record<string, unknown>, note: string | undefined, udps: U
 // the model's level. This preserves the reversibility of level changes (FR-11.6)
 // across save/reload: a physical type hidden by lowering to Logical is kept on
 // disk, so raising the level back restores it.
+// Discovery provenance (ObjectSource), fixed key order, omit-empty. Shared by
+// entity + field serialization.
+function sourceToPlain(s: NonNullable<Field["source"]>): Record<string, unknown> | null {
+  const src: Record<string, unknown> = {};
+  if (s.system) src.system = s.system;
+  if (s.schema) src.schema = s.schema;
+  if (s.nativeId) src.nativeId = s.nativeId;
+  if (s.nativeType) src.nativeType = s.nativeType;
+  if (s.product) src.product = s.product;
+  if (s.provenance) src.provenance = s.provenance;
+  if (s.confidence !== undefined) src.confidence = s.confidence;
+  if (s.apiPath) src.apiPath = s.apiPath;
+  if (s.apiVersion) src.apiVersion = s.apiVersion;
+  return Object.keys(src).length ? src : null;
+}
+
 function serializeField(f: Field): Record<string, unknown> {
   const out: Record<string, unknown> = { id: f.id, name: f.name };
   if (f.type) {
@@ -51,6 +67,10 @@ function serializeField(f: Field): Record<string, unknown> {
   if (f.domainId) out.domainId = f.domainId;
   if (f.role) out.role = f.role;
   if (f.description) out.description = f.description;
+  if (f.source) {
+    const src = sourceToPlain(f.source);
+    if (src) out.source = src;
+  }
   udpsOut(out, f.note, f.udps);
   return out;
 }
@@ -82,17 +102,8 @@ function serializeEntity(e: Entity): Record<string, unknown> {
     out.checks = e.checks.map((c) => ({ id: c.id, name: c.name, expression: c.expression }));
   }
   if (e.source) {
-    const s = e.source;
-    const src: Record<string, unknown> = {};
-    if (s.system) src.system = s.system;
-    if (s.schema) src.schema = s.schema;
-    if (s.nativeId) src.nativeId = s.nativeId;
-    if (s.product) src.product = s.product;
-    if (s.provenance) src.provenance = s.provenance;
-    if (s.confidence !== undefined) src.confidence = s.confidence;
-    if (s.apiPath) src.apiPath = s.apiPath;
-    if (s.apiVersion) src.apiVersion = s.apiVersion;
-    if (Object.keys(src).length) out.source = src;
+    const src = sourceToPlain(e.source);
+    if (src) out.source = src;
   }
   udpsOut(out, e.note, e.udps);
   return out;

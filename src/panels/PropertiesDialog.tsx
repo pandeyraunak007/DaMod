@@ -489,6 +489,13 @@ function FieldDetail({ entityId, field, caps }: { entityId: string; field: Field
           onChange={(e) => patch({ logicalName: e.target.value || undefined })}
         />
       </div>
+      {field.source?.nativeType && (
+        <div className="field">
+          <label>Source-native type (read-only)</label>
+          <input value={field.source.nativeType} readOnly className="src-native" title={field.source.system ? `from ${field.source.system}` : undefined} />
+          <p className="field__hint">Verbatim type from discovery, preserved alongside the modeled type.</p>
+        </div>
+      )}
       {caps.physicalProps && domains.length > 0 && (
         <div className="field">
           <label>Domain</label>
