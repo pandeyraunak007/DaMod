@@ -28,6 +28,12 @@ function typeOfField(f: { type?: string; length?: number; precision?: number; sc
   return f.type ? { type: f.type, length: f.length, precision: f.precision, scale: f.scale } : undefined;
 }
 
+/** The default 1:1 column mapping for a source field (identity copy). */
+export function columnFromField(f: { name: string; type?: string; length?: number; precision?: number; scale?: number; nullable?: boolean }): ColumnMapping {
+  const t = typeOfField(f);
+  return { source: f.name, target: f.name, sourceType: t, targetType: t ?? { type: "text" }, required: !f.nullable };
+}
+
 function sameType(a?: SpecType, b?: SpecType): boolean {
   if (!a || !b) return false;
   return (
@@ -51,16 +57,7 @@ export function planFullLoad(
     .map((e) => ({
       sourceObject: e.name,
       targetObject: e.name,
-      columns: e.fields.map((f): ColumnMapping => {
-        const t = typeOfField(f);
-        return {
-          source: f.name,
-          target: f.name,
-          sourceType: t,
-          targetType: t ?? { type: "text" },
-          required: !f.nullable,
-        };
-      }),
+      columns: e.fields.map(columnFromField),
     }));
 
   return {

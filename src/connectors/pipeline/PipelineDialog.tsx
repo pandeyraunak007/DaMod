@@ -5,6 +5,7 @@ import { joinPath, writeFile } from "../../persist/fs";
 import { validateIdentifier } from "../../model/identifiers";
 import type { Model } from "../../model/model";
 import { planFullLoad, validatePipeline, pipelineReport, targetDdl } from "./planner";
+import { MappingEditor } from "./MappingEditor";
 import type { PipelineSpec } from "./spec";
 
 // Pipeline designer (§6.D). Pick a saved model, choose objects + a target, plan a
@@ -131,8 +132,9 @@ function PipelineView({ id, onDeleted }: { id: string; onDeleted: () => void }) 
   const spec = useWorkspaceStore((s) => s.pipelines.find((p) => p.id === id)) as PipelineSpec | undefined;
   const allModels = useWorkspaceStore((s) => s.allModels);
   const deletePipeline = useWorkspaceStore((s) => s.deletePipeline);
+  const upsertPipeline = useWorkspaceStore((s) => s.upsertPipeline);
   const path = useWorkspaceStore((s) => s.path);
-  const [tab, setTab] = useState<"report" | "ddl">("report");
+  const [tab, setTab] = useState<"mapping" | "report" | "ddl">("mapping");
   const [saved, setSaved] = useState<string | null>(null);
 
   const model: Model | undefined = spec ? allModels().find((m) => m.id === spec.source.modelId)?.model : undefined;
@@ -170,10 +172,15 @@ function PipelineView({ id, onDeleted }: { id: string; onDeleted: () => void }) 
       </p>
 
       <div className="tabs">
-        <button className={`tab-btn ${tab === "report" ? "tab-btn--active" : ""}`} onClick={() => setTab("report")}>Mapping report</button>
+        <button className={`tab-btn ${tab === "mapping" ? "tab-btn--active" : ""}`} onClick={() => setTab("mapping")}>Mapping</button>
+        <button className={`tab-btn ${tab === "report" ? "tab-btn--active" : ""}`} onClick={() => setTab("report")}>Report</button>
         <button className={`tab-btn ${tab === "ddl" ? "tab-btn--active" : ""}`} onClick={() => setTab("ddl")}>Target DDL</button>
       </div>
-      <pre className="export-preview">{tab === "report" ? report : ddl}</pre>
+      {tab === "mapping" ? (
+        <MappingEditor spec={spec} model={model} onSave={(s) => void upsertPipeline(s)} />
+      ) : (
+        <pre className="export-preview">{tab === "report" ? report : ddl}</pre>
+      )}
 
       {saved && <p className="field__hint">Saved {saved}</p>}
       <div className="modal__actions">

@@ -5,6 +5,24 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Source-to-target mapping editor (Req 22 §8)
+
+The pipeline *spec/planner* already modeled column mappings (source/target/transform/
+type, type-compat + required validation, report, target DDL) — but the UI only did a
+read-only full load. Added the editing surface, so it's a real source-to-target mapper.
+
+- **`MappingEditor`** (new): an editable **Mapping** tab in the pipeline designer. Per
+  object: rename the target column, convert its type (any canonical type), add a
+  transform expression, toggle NOT NULL, drop a column, or add back an un-mapped source
+  column. Edits a local draft, **re-validates live** (reusing `validatePipeline`:
+  type-conversion-needs-transform, required-without-source, drift), and "Save mappings"
+  persists via the existing `upsertPipeline`.
+- Extracted `columnFromField` in the planner (shared by `planFullLoad` + add-back).
+- **General, not Fusion-specific:** works for any source model (relational / EBS / Fusion)
+  → Postgres/Snowflake/Databricks target. Cross-object joins/filters deferred.
+- No new deps, no Rust. 358 TS tests (+4: mapping edit/validation/round-trip in
+  `pipeline.test.ts`); tsc/build/cargo clean.
+
 ## 2026-10-11 — Fusion-aware Explorer view (reuses the EBS view machinery)
 
 Req 22 §4 — a Fusion Cloud model can now be browsed by **application family / module**,

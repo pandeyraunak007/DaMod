@@ -36,7 +36,12 @@ See the top DECISIONS entries:
   data stores), `source.apiVersion`, connector-generic Connections UI, and a
   **Fusion-aware Explorer view** (family/module grouping) sharing the `AppExplorer`
   component with EBS (Model/EBS|Fusion toggle). Live REST connector + Fusion Properties
-  panels + mapping deferred (`docs/ORACLE_FUSION.md`).
+  panels deferred (`docs/ORACLE_FUSION.md`).
+- **Source-to-target mapping (Req 22 §8):** the pipeline designer has an editable
+  **Mapping** tab (`connectors/pipeline/MappingEditor.tsx`) — rename target columns,
+  convert types, add transforms, drop/add columns, live-validated, saved via
+  `upsertPipeline`. General (any source model → PG/Snowflake/Databricks). Joins/filters
+  across objects deferred.
 - **Req 21 Phase 4 (part):** `SubjectArea` model concept + `createSubjectAreaFromProduct`
   + EBS Explorer "+ area" / Subject Areas list. A lens, not a container (delete never
   deletes entities).

@@ -34,7 +34,7 @@ OAuth · **Deferred** = not yet built.
 | Offline metadata-file import | **Done** | Any canonical JSON (incl. a Fusion package) imports via "Import metadata file…" (`parseMetadataFile`, rejects credential leaks). |
 | Fusion-aware Model Explorer view | **Done** | `FusionExplorer` — a Model/Fusion toggle (shown when the active model has Fusion provenance); groups business objects by **family** or **module** with counts, search, expand/collapse, click-to-reveal; subject-area shortcuts; scoped to the active tab; read-only. Shares the `AppExplorer` component with the EBS view. |
 | Fusion-specific Properties Inspector panels | **Deferred** | `entity.source` provenance shows in the General tab today; API-resource / extract-data-store panels are later. |
-| Source-to-target mapping | **Deferred** | The pipeline planner already consumes canonical metadata; Fusion→target mapping UI is Phase 5. |
+| Source-to-target mapping | **Done** | Pipeline designer gains an editable **Mapping** tab (`MappingEditor`): per object, rename the target column, convert its type, add a transform expression, toggle NOT NULL, drop columns, add back un-mapped source columns — live-validated (type-conversion / required / drift), saved through the existing store. Works for any source model (EBS/Fusion/relational) → Postgres/Snowflake/Databricks target. Cross-object joins/filters deferred. |
 | Live data extraction / pipeline execution | **Deferred** | Out of scope by design — discovery, planning and execution stay separate (§8/§11). |
 | Live REST connector (tenant + OAuth) | **Deferred** | Same contract; add when a tenant is available to verify. |
 
@@ -58,8 +58,9 @@ OAuth · **Deferred** = not yet built.
   (Procurement, SCM, HCM, Sales) via fixtures.
 - **Phase 4:** live BICC / Data Extraction metadata (offerings, data stores, extract
   fields, full/incremental indicators) — kept separate from model discovery.
-- **Phase 5:** source-to-target mapping UI + type conversions; Copilot Fusion context +
-  reviewed actions (subject areas, entities, mappings, descriptions, semantic models).
+- **Phase 5:** *DONE:* source-to-target mapping UI + type conversions (`MappingEditor` —
+  general, works for any source). *Remaining:* cross-object joins/filters; Copilot Fusion
+  context + reviewed mapping actions.
 - **Phase 6:** metadata refresh/compare UX on `reconcileDiscoveredModel`; permission /
   rate-limit / partial-discovery handling; the live REST connector.
 

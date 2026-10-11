@@ -109,3 +109,69 @@ describe("pipeline persistence", () => {
     expect(serializePipelines(parsed.value)).toBe(text);
   });
 });
+
+import { columnFromField } from "./planner";
+import type { PipelineSpec } from "./spec";
+
+// Deep-clone a spec so edits don't mutate the plan under test.
+function edit(spec: PipelineSpec, fn: (s: PipelineSpec) => void): PipelineSpec {
+  const copy: PipelineSpec = JSON.parse(JSON.stringify(spec));
+  fn(copy);
+  return copy;
+}
+
+describe("source-to-target mapping edits (Req 22 §8)", () => {
+  it("columnFromField builds an identity mapping", () => {
+    const c = columnFromField({ name: "total", type: "decimal", precision: 12, scale: 2, nullable: false });
+    expect(c).toEqual({ source: "total", target: "total", sourceType: { type: "decimal", precision: 12, scale: 2 }, targetType: { type: "decimal", precision: 12, scale: 2 }, required: true });
+  });
+
+  it("flags a type conversion without a transform, and clears it with one", () => {
+    const model = sourceModel();
+    const base = planFullLoad(model, ["Order"], "postgres", { name: "load_orders" });
+    // Change target type of `total` decimal -> string with NO transform.
+    const converted = edit(base, (s) => {
+      const col = s.objects[0].columns.find((c) => c.target === "total")!;
+      col.targetType = { type: "string", length: 20 };
+    });
+    expect(validatePipeline(converted, model).some((i) => i.severity === "warning" && /type conversion/.test(i.message))).toBe(true);
+    // Add an explicit transform -> the conversion warning is resolved.
+    const withXform = edit(converted, (s) => {
+      s.objects[0].columns.find((c) => c.target === "total")!.transform = "CAST(total AS VARCHAR)";
+    });
+    expect(validatePipeline(withXform, model).some((i) => /type conversion/.test(i.message))).toBe(false);
+  });
+
+  it("errors on a required target column with no source mapping", () => {
+    const model = sourceModel();
+    const base = planFullLoad(model, ["Order"], "postgres", { name: "p" });
+    const added = edit(base, (s) => {
+      s.objects[0].columns.push({ source: "", target: "loaded_at", targetType: { type: "timestamp" }, required: true });
+    });
+    const issues = validatePipeline(added, model);
+    expect(issues.some((i) => i.severity === "error" && /no source mapping/.test(i.message))).toBe(true);
+  });
+
+  it("renaming/dropping columns flows into the report, target DDL and round-trips", () => {
+    const model = sourceModel();
+    const base = planFullLoad(model, ["Customer"], "postgres", { name: "load_customers" });
+    const mapped = edit(base, (s) => {
+      const o = s.objects[0];
+      o.targetObject = "dim_customer";
+      o.columns = o.columns.filter((c) => c.target !== "id"); // drop id
+      o.columns.find((c) => c.target === "email")!.target = "email_address"; // rename
+    });
+    const report = pipelineReport(mapped, validatePipeline(mapped, model));
+    expect(report).toContain("Customer → dim_customer");
+    expect(report).toContain("email_address");
+    expect(report).not.toContain(" id ("); // dropped
+    const ddl = targetDdl(mapped);
+    expect(ddl).toContain('"dim_customer"');
+    expect(ddl).toContain('"email_address"');
+    // Deterministic round-trip of the edited spec.
+    const once = serializePipeline(mapped);
+    const parsed = parsePipeline(JSON.parse(once));
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) expect(serializePipeline(parsed.value)).toBe(once);
+  });
+});

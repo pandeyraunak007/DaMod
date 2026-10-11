@@ -944,6 +944,49 @@ body,
 .ebsx__controls {
   padding: 0.3rem 0.5rem 0;
 }
+/* Source-to-target mapping grid (pipeline designer, Req 22 §8). */
+.map-obj {
+  border-top: 1px solid var(--border, #e2e2e2);
+  padding-top: 0.4rem;
+}
+.map-arrow {
+  color: var(--muted, #8a8a8a);
+}
+.map-target-name {
+  width: 160px;
+}
+.map-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+.map-grid th {
+  text-align: left;
+  color: var(--muted, #8a8a8a);
+  font-weight: 500;
+  padding: 0.1rem 0.3rem;
+}
+.map-grid td {
+  padding: 0.1rem 0.3rem;
+  vertical-align: middle;
+}
+.map-grid input[type="text"],
+.map-grid input:not([type]),
+.map-grid select {
+  width: 100%;
+  min-width: 70px;
+}
+.map-grid .map-src {
+  color: var(--muted, #6a6a6a);
+  white-space: nowrap;
+}
+.map-grid .map-nn {
+  text-align: center;
+}
+.map-add {
+  margin-top: 0.2rem;
+  font-size: 0.76rem;
+}
 .src-info {
   border-collapse: collapse;
   font-size: 0.78rem;
