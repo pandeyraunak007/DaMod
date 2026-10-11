@@ -1,0 +1,323 @@
+{
+  "formatVersion": 1,
+  "id": "m_8yjmzzdw",
+  "name": "damod_test",
+  "level": "Physical",
+  "createdAt": "2026-10-11T16:25:49.320Z",
+  "updatedAt": "2026-10-11T16:25:49.320Z",
+  "entities": [
+    {
+      "id": "e_krpqrzmv",
+      "name": "Order",
+      "position": {
+        "x": 80,
+        "y": 80
+      },
+      "fields": [
+        {
+          "id": "f_ep48t4be",
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "source": {
+            "system": "postgres",
+            "nativeType": "uuid"
+          }
+        },
+        {
+          "id": "f_nyq6d1mw",
+          "name": "customer_id",
+          "type": "uuid",
+          "nullable": false,
+          "source": {
+            "system": "postgres",
+            "nativeType": "uuid"
+          }
+        },
+        {
+          "id": "f_cp6ggvxp",
+          "name": "placed_at",
+          "type": "timestamp",
+          "nullable": false,
+          "default": "now()",
+          "source": {
+            "system": "postgres",
+            "nativeType": "timestamp with time zone"
+          }
+        },
+        {
+          "id": "f_qvtyya3r",
+          "name": "total",
+          "type": "decimal",
+          "precision": 12,
+          "scale": 2,
+          "nullable": true,
+          "source": {
+            "system": "postgres",
+            "nativeType": "numeric(12,2)"
+          }
+        }
+      ],
+      "source": {
+        "system": "postgres",
+        "schema": "shop",
+        "nativeId": "shop.Order"
+      }
+    },
+    {
+      "id": "e_0rt58bgd",
+      "name": "active_customers",
+      "tags": [
+        "view"
+      ],
+      "position": {
+        "x": 380,
+        "y": 80
+      },
+      "fields": [
+        {
+          "id": "f_fqz4avwi",
+          "name": "id",
+          "type": "uuid",
+          "nullable": true,
+          "source": {
+            "system": "postgres",
+            "nativeType": "uuid"
+          }
+        },
+        {
+          "id": "f_di7rdiqh",
+          "name": "email",
+          "type": "string",
+          "length": 320,
+          "nullable": true,
+          "source": {
+            "system": "postgres",
+            "nativeType": "character varying(320)"
+          }
+        }
+      ],
+      "source": {
+        "system": "postgres",
+        "schema": "shop",
+        "nativeId": "shop.active_customers"
+      }
+    },
+    {
+      "id": "e_3xxy2kl2",
+      "name": "customer",
+      "position": {
+        "x": 680,
+        "y": 80
+      },
+      "fields": [
+        {
+          "id": "f_e8dab3bl",
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "source": {
+            "system": "postgres",
+            "nativeType": "uuid"
+          }
+        },
+        {
+          "id": "f_ul5eott1",
+          "name": "email",
+          "type": "string",
+          "length": 320,
+          "nullable": false,
+          "unique": true,
+          "source": {
+            "system": "postgres",
+            "nativeType": "character varying(320)"
+          }
+        },
+        {
+          "id": "f_9ntn1niu",
+          "name": "full_name",
+          "type": "string",
+          "length": 200,
+          "nullable": true,
+          "source": {
+            "system": "postgres",
+            "nativeType": "character varying(200)"
+          }
+        },
+        {
+          "id": "f_0u29rns5",
+          "name": "manager_id",
+          "type": "uuid",
+          "nullable": true,
+          "source": {
+            "system": "postgres",
+            "nativeType": "uuid"
+          }
+        }
+      ],
+      "source": {
+        "system": "postgres",
+        "schema": "shop",
+        "nativeId": "shop.customer"
+      }
+    },
+    {
+      "id": "e_j1vcavao",
+      "name": "order_line",
+      "position": {
+        "x": 980,
+        "y": 80
+      },
+      "fields": [
+        {
+          "id": "f_oi3egahk",
+          "name": "order_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "source": {
+            "system": "postgres",
+            "nativeType": "uuid"
+          }
+        },
+        {
+          "id": "f_rh5tz66k",
+          "name": "product_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "source": {
+            "system": "postgres",
+            "nativeType": "uuid"
+          }
+        },
+        {
+          "id": "f_xpk10gr6",
+          "name": "qty",
+          "type": "integer",
+          "nullable": false,
+          "default": "1",
+          "source": {
+            "system": "postgres",
+            "nativeType": "integer"
+          }
+        }
+      ],
+      "source": {
+        "system": "postgres",
+        "schema": "shop",
+        "nativeId": "shop.order_line"
+      }
+    },
+    {
+      "id": "e_7a2h6rxr",
+      "name": "product",
+      "position": {
+        "x": 80,
+        "y": 320
+      },
+      "fields": [
+        {
+          "id": "f_sb1ojsde",
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "source": {
+            "system": "postgres",
+            "nativeType": "uuid"
+          }
+        },
+        {
+          "id": "f_3ufibpgm",
+          "name": "sku",
+          "type": "string",
+          "length": 64,
+          "nullable": false,
+          "unique": true,
+          "source": {
+            "system": "postgres",
+            "nativeType": "character varying(64)"
+          }
+        },
+        {
+          "id": "f_pwyua5bi",
+          "name": "price",
+          "type": "decimal",
+          "precision": 12,
+          "scale": 2,
+          "nullable": false,
+          "default": "0",
+          "source": {
+            "system": "postgres",
+            "nativeType": "numeric(12,2)"
+          }
+        }
+      ],
+      "source": {
+        "system": "postgres",
+        "schema": "shop",
+        "nativeId": "shop.product"
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "id": "r_jwjfp6jg",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_3xxy2kl2",
+      "childEntity": "e_krpqrzmv",
+      "parentOptional": false,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_nyq6d1mw"
+      ],
+      "onDelete": "cascade"
+    },
+    {
+      "id": "r_udjxyp3y",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_3xxy2kl2",
+      "childEntity": "e_3xxy2kl2",
+      "parentOptional": true,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_0u29rns5"
+      ]
+    },
+    {
+      "id": "r_nxijokvm",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_krpqrzmv",
+      "childEntity": "e_j1vcavao",
+      "parentOptional": false,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_oi3egahk"
+      ]
+    },
+    {
+      "id": "r_xmfm5ugb",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_7a2h6rxr",
+      "childEntity": "e_j1vcavao",
+      "parentOptional": false,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_rh5tz66k"
+      ]
+    }
+  ],
+  "indexes": [
+    {
+      "id": "x_qnj32mpd",
+      "name": "order_customer_idx",
+      "entity": "e_krpqrzmv",
+      "fields": [
+        "f_nyq6d1mw"
+      ]
+    }
+  ]
+}

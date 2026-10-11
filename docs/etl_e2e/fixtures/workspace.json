@@ -1,0 +1,12 @@
+{
+  "formatVersion": 1,
+  "name": "fixtures",
+  "createdAt": "2026-10-11T15:39:14.087Z",
+  "updatedAt": "2026-10-11T16:25:49.328Z",
+  "openModels": [
+    "enterprise.model.json",
+    "enterprise_copy.model.json",
+    "damod_test.model.json"
+  ],
+  "activeModel": "damod_test.model.json"
+}

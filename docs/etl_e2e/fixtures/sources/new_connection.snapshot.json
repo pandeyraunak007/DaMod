@@ -1,0 +1,329 @@
+{
+  "snapshotVersion": 1,
+  "id": "s_jt615ggj",
+  "connectionRef": "g_i9rq2g22",
+  "provenance": {
+    "connectorId": "postgres",
+    "connectorVersion": "1.0.0",
+    "discoveredAt": "2026-10-11T16:25:44.633Z",
+    "schemasDiscovered": [
+      "shop"
+    ],
+    "capabilitiesUsed": [
+      "listSchemas",
+      "discoverTables",
+      "discoverColumns",
+      "discoverForeignKeys"
+    ]
+  },
+  "metadata": {
+    "metadataVersion": 1,
+    "source": {
+      "systemType": "postgres",
+      "name": "localhost:5432/damod_test",
+      "productVersion": "16.13 (Homebrew)"
+    },
+    "capabilities": [
+      "discoverColumns",
+      "discoverForeignKeys",
+      "discoverIndexes",
+      "discoverPrimaryKeys",
+      "discoverTables",
+      "discoverViews",
+      "listSchemas",
+      "testConnection"
+    ],
+    "catalogs": [
+      {
+        "name": "damod_test",
+        "schemas": [
+          {
+            "name": "shop",
+            "objects": [
+              {
+                "name": "active_customers",
+                "kind": "view",
+                "columns": [
+                  {
+                    "name": "id",
+                    "ordinal": 1,
+                    "nativeType": "uuid",
+                    "normalizedType": {
+                      "type": "uuid"
+                    },
+                    "nullable": true
+                  },
+                  {
+                    "name": "email",
+                    "ordinal": 2,
+                    "nativeType": "character varying(320)",
+                    "normalizedType": {
+                      "type": "string",
+                      "length": 320
+                    },
+                    "nullable": true
+                  }
+                ],
+                "foreignKeys": [],
+                "indexes": []
+              },
+              {
+                "name": "customer",
+                "kind": "table",
+                "columns": [
+                  {
+                    "name": "id",
+                    "ordinal": 1,
+                    "nativeType": "uuid",
+                    "normalizedType": {
+                      "type": "uuid"
+                    },
+                    "nullable": false
+                  },
+                  {
+                    "name": "email",
+                    "ordinal": 2,
+                    "nativeType": "character varying(320)",
+                    "normalizedType": {
+                      "type": "string",
+                      "length": 320
+                    },
+                    "nullable": false
+                  },
+                  {
+                    "name": "full_name",
+                    "ordinal": 3,
+                    "nativeType": "character varying(200)",
+                    "normalizedType": {
+                      "type": "string",
+                      "length": 200
+                    },
+                    "nullable": true
+                  },
+                  {
+                    "name": "manager_id",
+                    "ordinal": 4,
+                    "nativeType": "uuid",
+                    "normalizedType": {
+                      "type": "uuid"
+                    },
+                    "nullable": true
+                  }
+                ],
+                "primaryKey": [
+                  "id"
+                ],
+                "foreignKeys": [
+                  {
+                    "name": "customer_manager_id_fkey",
+                    "columns": [
+                      "manager_id"
+                    ],
+                    "refSchema": "shop",
+                    "refObject": "customer",
+                    "refColumns": [
+                      "id"
+                    ]
+                  }
+                ],
+                "indexes": [
+                  {
+                    "name": "customer_email_key",
+                    "columns": [
+                      "email"
+                    ],
+                    "unique": true
+                  }
+                ]
+              },
+              {
+                "name": "Order",
+                "kind": "table",
+                "columns": [
+                  {
+                    "name": "id",
+                    "ordinal": 1,
+                    "nativeType": "uuid",
+                    "normalizedType": {
+                      "type": "uuid"
+                    },
+                    "nullable": false
+                  },
+                  {
+                    "name": "customer_id",
+                    "ordinal": 2,
+                    "nativeType": "uuid",
+                    "normalizedType": {
+                      "type": "uuid"
+                    },
+                    "nullable": false
+                  },
+                  {
+                    "name": "placed_at",
+                    "ordinal": 3,
+                    "nativeType": "timestamp with time zone",
+                    "normalizedType": {
+                      "type": "timestamp"
+                    },
+                    "nullable": false,
+                    "default": "now()"
+                  },
+                  {
+                    "name": "total",
+                    "ordinal": 4,
+                    "nativeType": "numeric(12,2)",
+                    "normalizedType": {
+                      "type": "decimal",
+                      "precision": 12,
+                      "scale": 2
+                    },
+                    "nullable": true
+                  }
+                ],
+                "primaryKey": [
+                  "id"
+                ],
+                "foreignKeys": [
+                  {
+                    "name": "Order_customer_id_fkey",
+                    "columns": [
+                      "customer_id"
+                    ],
+                    "refSchema": "shop",
+                    "refObject": "customer",
+                    "refColumns": [
+                      "id"
+                    ],
+                    "onDelete": "cascade"
+                  }
+                ],
+                "indexes": [
+                  {
+                    "name": "order_customer_idx",
+                    "columns": [
+                      "customer_id"
+                    ],
+                    "unique": false
+                  }
+                ]
+              },
+              {
+                "name": "order_line",
+                "kind": "table",
+                "columns": [
+                  {
+                    "name": "order_id",
+                    "ordinal": 1,
+                    "nativeType": "uuid",
+                    "normalizedType": {
+                      "type": "uuid"
+                    },
+                    "nullable": false
+                  },
+                  {
+                    "name": "product_id",
+                    "ordinal": 2,
+                    "nativeType": "uuid",
+                    "normalizedType": {
+                      "type": "uuid"
+                    },
+                    "nullable": false
+                  },
+                  {
+                    "name": "qty",
+                    "ordinal": 3,
+                    "nativeType": "integer",
+                    "normalizedType": {
+                      "type": "integer"
+                    },
+                    "nullable": false,
+                    "default": "1"
+                  }
+                ],
+                "primaryKey": [
+                  "order_id",
+                  "product_id"
+                ],
+                "foreignKeys": [
+                  {
+                    "name": "order_line_order_id_fkey",
+                    "columns": [
+                      "order_id"
+                    ],
+                    "refSchema": "shop",
+                    "refObject": "Order",
+                    "refColumns": [
+                      "id"
+                    ]
+                  },
+                  {
+                    "name": "order_line_product_id_fkey",
+                    "columns": [
+                      "product_id"
+                    ],
+                    "refSchema": "shop",
+                    "refObject": "product",
+                    "refColumns": [
+                      "id"
+                    ]
+                  }
+                ],
+                "indexes": []
+              },
+              {
+                "name": "product",
+                "kind": "table",
+                "columns": [
+                  {
+                    "name": "id",
+                    "ordinal": 1,
+                    "nativeType": "uuid",
+                    "normalizedType": {
+                      "type": "uuid"
+                    },
+                    "nullable": false
+                  },
+                  {
+                    "name": "sku",
+                    "ordinal": 2,
+                    "nativeType": "character varying(64)",
+                    "normalizedType": {
+                      "type": "string",
+                      "length": 64
+                    },
+                    "nullable": false
+                  },
+                  {
+                    "name": "price",
+                    "ordinal": 3,
+                    "nativeType": "numeric(12,2)",
+                    "normalizedType": {
+                      "type": "decimal",
+                      "precision": 12,
+                      "scale": 2
+                    },
+                    "nullable": false,
+                    "default": "0"
+                  }
+                ],
+                "primaryKey": [
+                  "id"
+                ],
+                "foreignKeys": [],
+                "indexes": [
+                  {
+                    "name": "product_sku_key",
+                    "columns": [
+                      "sku"
+                    ],
+                    "unique": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

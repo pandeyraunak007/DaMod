@@ -1,0 +1,1511 @@
+{
+  "formatVersion": 1,
+  "id": "m_tihwpgvy",
+  "name": "enterprise",
+  "level": "Physical",
+  "createdAt": "2026-10-11T15:39:38.684Z",
+  "updatedAt": "2026-10-11T15:39:38.684Z",
+  "entities": [
+    {
+      "id": "e_j4cdel2z",
+      "name": "customers",
+      "position": {
+        "x": 80,
+        "y": 80
+      },
+      "fields": [
+        {
+          "id": "f_4z5uy1hg",
+          "name": "customer_id",
+          "type": "bigint",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "id": "f_6k7nvgo8",
+          "name": "customer_number",
+          "type": "string",
+          "length": 30,
+          "nullable": false,
+          "unique": true
+        },
+        {
+          "id": "f_0arn66m6",
+          "name": "first_name",
+          "type": "string",
+          "length": 100,
+          "nullable": false
+        },
+        {
+          "id": "f_0azps7ej",
+          "name": "last_name",
+          "type": "string",
+          "length": 100,
+          "nullable": false
+        },
+        {
+          "id": "f_twogikit",
+          "name": "email",
+          "type": "string",
+          "length": 255,
+          "nullable": true
+        },
+        {
+          "id": "f_28018qdf",
+          "name": "phone",
+          "type": "string",
+          "length": 30,
+          "nullable": true
+        },
+        {
+          "id": "f_79apjs5o",
+          "name": "customer_type",
+          "type": "string",
+          "length": 20,
+          "nullable": false,
+          "default": "'INDIVIDUAL'"
+        },
+        {
+          "id": "f_xzuxlrtr",
+          "name": "date_of_birth",
+          "type": "date",
+          "nullable": true
+        },
+        {
+          "id": "f_2ikxdylm",
+          "name": "status",
+          "type": "string",
+          "length": 20,
+          "nullable": false,
+          "default": "'ACTIVE'"
+        },
+        {
+          "id": "f_lja3mjow",
+          "name": "created_at",
+          "type": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        {
+          "id": "f_xs7k6c00",
+          "name": "updated_at",
+          "type": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      ]
+    },
+    {
+      "id": "e_q02oy61o",
+      "name": "customer_addresses",
+      "position": {
+        "x": 380,
+        "y": 80
+      },
+      "fields": [
+        {
+          "id": "f_kmrym3zw",
+          "name": "address_id",
+          "type": "bigint",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "id": "f_oz3f2uhe",
+          "name": "customer_id",
+          "type": "bigint",
+          "nullable": false
+        },
+        {
+          "id": "f_ec6nv50g",
+          "name": "address_type",
+          "type": "string",
+          "length": 20,
+          "nullable": false
+        },
+        {
+          "id": "f_9nl9tuba",
+          "name": "address_line1",
+          "type": "string",
+          "length": 200,
+          "nullable": false
+        },
+        {
+          "id": "f_fxlxs8m3",
+          "name": "address_line2",
+          "type": "string",
+          "length": 200,
+          "nullable": true
+        },
+        {
+          "id": "f_rsy2416l",
+          "name": "city",
+          "type": "string",
+          "length": 100,
+          "nullable": false
+        },
+        {
+          "id": "f_h1pwhgir",
+          "name": "state_province",
+          "type": "string",
+          "length": 100,
+          "nullable": true
+        },
+        {
+          "id": "f_m5uz7uy3",
+          "name": "postal_code",
+          "type": "string",
+          "length": 20,
+          "nullable": true
+        },
+        {
+          "id": "f_3r42sa2o",
+          "name": "country_code",
+          "type": "string",
+          "length": 2,
+          "nullable": false
+        },
+        {
+          "id": "f_f738pif3",
+          "name": "is_default",
+          "type": "boolean",
+          "nullable": false,
+          "default": "FALSE"
+        },
+        {
+          "id": "f_n4xn1fok",
+          "name": "created_at",
+          "type": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      ]
+    },
+    {
+      "id": "e_6d1n6gso",
+      "name": "customer_segments",
+      "position": {
+        "x": 680,
+        "y": 80
+      },
+      "fields": [
+        {
+          "id": "f_ngdq7xa3",
+          "name": "segment_id",
+          "type": "bigint",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "id": "f_m3mt7woy",
+          "name": "segment_code",
+          "type": "string",
+          "length": 30,
+          "nullable": false,
+          "unique": true
+        },
+        {
+          "id": "f_923lt8xi",
+          "name": "segment_name",
+          "type": "string",
+          "length": 100,
+          "nullable": false
+        },
+        {
+          "id": "f_x49usbdr",
+          "name": "description",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "id": "f_n1sjg77s",
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "TRUE"
+        }
+      ]
+    },
+    {
+      "id": "e_r1mqaimw",
+      "name": "customer_segment_memberships",
+      "position": {
+        "x": 980,
+        "y": 80
+      },
+      "fields": [
+        {
+          "id": "f_8hdcj1a9",
+          "name": "customer_id",
+          "type": "bigint",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "id": "f_q16s5alz",
+          "name": "segment_id",
+          "type": "bigint",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "id": "f_0hnhe0wr",
+          "name": "assigned_at",
+          "type": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        {
+          "id": "f_feqp4ouv",
+          "name": "expires_at",
+          "type": "timestamp",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "e_gtxo5llu",
+      "name": "product_categories",
+      "position": {
+        "x": 80,
+        "y": 320
+      },
+      "fields": [
+        {
+          "id": "f_jng2mi50",
+          "name": "category_id",
+          "type": "bigint",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "id": "f_qio7vvxo",
+          "name": "parent_category_id",
+          "type": "bigint",
+          "nullable": true
+        },
+        {
+          "id": "f_mpl0bxhl",
+          "name": "category_code",
+          "type": "string",
+          "length": 30,
+          "nullable": false,
+          "unique": true
+        },
+        {
+          "id": "f_nyx0kvd4",
+          "name": "category_name",
+          "type": "string",
+          "length": 100,
+          "nullable": false
+        },
+        {
+          "id": "f_xjet115c",
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "TRUE"
+        }
+      ]
+    },
+    {
+      "id": "e_r98zom3u",
+      "name": "products",
+      "position": {
+        "x": 380,
+        "y": 320
+      },
+      "fields": [
+        {
+          "id": "f_xa2sgyo4",
+          "name": "product_id",
+          "type": "bigint",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "id": "f_b1ale3l9",
+          "name": "sku",
+          "type": "string",
+          "length": 40,
+          "nullable": false,
+          "unique": true
+        },
+        {
+          "id": "f_uf7cuvuf",
+          "name": "product_name",
+          "type": "string",
+          "length": 200,
+          "nullable": false
+        },
+        {
+          "id": "f_dqvwksgb",
+          "name": "description",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "id": "f_xauo7pug",
+          "name": "category_id",
+          "type": "bigint",
+          "nullable": true
+        },
+        {
+          "id": "f_9wzy3zey",
+          "name": "brand",
+          "type": "string",
+          "length": 100,
+          "nullable": true
+        },
+        {
+          "id": "f_op5wb6t1",
+          "name": "product_type",
+          "type": "string",
+          "length": 20,
+          "nullable": false,
+          "default": "'PHYSICAL'"
+        },
+        {
+          "id": "f_tfw8af47",
+          "name": "unit_price",
+          "type": "decimal",
+          "precision": 14,
+          "scale": 2,
+          "nullable": false
+        },
+        {
+          "id": "f_9ois1sv9",
+          "name": "currency_code",
+          "type": "string",
+          "length": 3,
+          "nullable": false,
+          "default": "'USD'"
+        },
+        {
+          "id": "f_54ju2it1",
+          "name": "tax_rate",
+          "type": "decimal",
+          "precision": 7,
+          "scale": 4,
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "id": "f_1na226z2",
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "TRUE"
+        },
+        {
+          "id": "f_ron17zu2",
+          "name": "created_at",
+          "type": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        {
+          "id": "f_8u3s51u3",
+          "name": "updated_at",
+          "type": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      ]
+    },
+    {
+      "id": "e_2dradz6q",
+      "name": "product_attributes",
+      "position": {
+        "x": 680,
+        "y": 320
+      },
+      "fields": [
+        {
+          "id": "f_puv3doe1",
+          "name": "product_id",
+          "type": "bigint",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "id": "f_jnmevc8e",
+          "name": "attribute_name",
+          "type": "string",
+          "length": 100,
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "id": "f_1hwwthqy",
+          "name": "attribute_value",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "id": "f_t1mt5et1",
+          "name": "updated_at",
+          "type": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      ]
+    },
+    {
+      "id": "e_i79u8fjy",
+      "name": "suppliers",
+      "position": {
+        "x": 980,
+        "y": 320
+      },
+      "fields": [
+        {
+          "id": "f_ccuu762i",
+          "name": "supplier_id",
+          "type": "bigint",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "id": "f_1vgarobg",
+          "name": "supplier_code",
+          "type": "string",
+          "length": 30,
+          "nullable": false,
+          "unique": true
+        },
+        {
+          "id": "f_mpxfp8kp",
+          "name": "supplier_name",
+          "type": "string",
+          "length": 200,
+          "nullable": false
+        },
+        {
+          "id": "f_hu92g85x",
+          "name": "email",
+          "type": "string",
+          "length": 255,
+          "nullable": true
+        },
+        {
+          "id": "f_9tk0n3t5",
+          "name": "country_code",
+          "type": "string",
+          "length": 2,
+          "nullable": false
+        },
+        {
+          "id": "f_xyy6v9nn",
+          "name": "status",
+          "type": "string",
+          "length": 20,
+          "nullable": false,
+          "default": "'ACTIVE'"
+        },
+        {
+          "id": "f_x7xd6o7q",
+          "name": "created_at",
+          "type": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      ]
+    },
+    {
+      "id": "e_dfxmi3ze",
+      "name": "product_suppliers",
+      "position": {
+        "x": 80,
+        "y": 560
+      },
+      "fields": [
+        {
+          "id": "f_arq9qim6",
+          "name": "product_id",
+          "type": "bigint",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "id": "f_aiwu843x",
+          "name": "supplier_id",
+          "type": "bigint",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "id": "f_7ecctn4g",
+          "name": "supplier_sku",
+          "type": "string",
+          "length": 50,
+          "nullable": true
+        },
+        {
+          "id": "f_e3bl8160",
+          "name": "cost_price",
+          "type": "decimal",
+          "precision": 14,
+          "scale": 2,
+          "nullable": false
+        },
+        {
+          "id": "f_zedh6kso",
+          "name": "lead_time_days",
+          "type": "integer",
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "id": "f_n2273ero",
+          "name": "is_preferred",
+          "type": "boolean",
+          "nullable": false,
+          "default": "FALSE"
+        }
+      ]
+    },
+    {
+      "id": "e_3xdw2ew4",
+      "name": "orders",
+      "position": {
+        "x": 380,
+        "y": 560
+      },
+      "fields": [
+        {
+          "id": "f_9vbvfoak",
+          "name": "order_id",
+          "type": "bigint",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "id": "f_4pfrg9wu",
+          "name": "order_number",
+          "type": "string",
+          "length": 40,
+          "nullable": false,
+          "unique": true
+        },
+        {
+          "id": "f_yanawdgo",
+          "name": "customer_id",
+          "type": "bigint",
+          "nullable": false
+        },
+        {
+          "id": "f_3o9vb784",
+          "name": "billing_address_id",
+          "type": "bigint",
+          "nullable": true
+        },
+        {
+          "id": "f_cbagn9d7",
+          "name": "shipping_address_id",
+          "type": "bigint",
+          "nullable": true
+        },
+        {
+          "id": "f_co5vdo5g",
+          "name": "order_date",
+          "type": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        {
+          "id": "f_dph3rlh7",
+          "name": "order_status",
+          "type": "string",
+          "length": 20,
+          "nullable": false,
+          "default": "'PENDING'"
+        },
+        {
+          "id": "f_obfdjdsz",
+          "name": "currency_code",
+          "type": "string",
+          "length": 3,
+          "nullable": false,
+          "default": "'USD'"
+        },
+        {
+          "id": "f_paz9hdx4",
+          "name": "subtotal",
+          "type": "decimal",
+          "precision": 14,
+          "scale": 2,
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "id": "f_v5r3950q",
+          "name": "discount_amount",
+          "type": "decimal",
+          "precision": 14,
+          "scale": 2,
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "id": "f_4vva3ya2",
+          "name": "tax_amount",
+          "type": "decimal",
+          "precision": 14,
+          "scale": 2,
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "id": "f_3kxz01oi",
+          "name": "shipping_amount",
+          "type": "decimal",
+          "precision": 14,
+          "scale": 2,
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "id": "f_lc1cugt3",
+          "name": "total_amount",
+          "type": "decimal",
+          "precision": 14,
+          "scale": 2,
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "id": "f_u5rg7t88",
+          "name": "created_at",
+          "type": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        {
+          "id": "f_4lu0tw65",
+          "name": "updated_at",
+          "type": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      ]
+    },
+    {
+      "id": "e_qbrpk9la",
+      "name": "order_items",
+      "position": {
+        "x": 680,
+        "y": 560
+      },
+      "fields": [
+        {
+          "id": "f_eeaxgcgl",
+          "name": "order_item_id",
+          "type": "bigint",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "id": "f_awn9lfqn",
+          "name": "order_id",
+          "type": "bigint",
+          "nullable": false,
+          "unique": true
+        },
+        {
+          "id": "f_6078jsq4",
+          "name": "product_id",
+          "type": "bigint",
+          "nullable": false
+        },
+        {
+          "id": "f_lziy8ygo",
+          "name": "line_number",
+          "type": "integer",
+          "nullable": false,
+          "unique": true
+        },
+        {
+          "id": "f_4h21wehj",
+          "name": "quantity",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "id": "f_0f3v46p2",
+          "name": "unit_price",
+          "type": "decimal",
+          "precision": 14,
+          "scale": 2,
+          "nullable": false
+        },
+        {
+          "id": "f_tir2ll6m",
+          "name": "discount_amount",
+          "type": "decimal",
+          "precision": 14,
+          "scale": 2,
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "id": "f_0uicp5pe",
+          "name": "tax_amount",
+          "type": "decimal",
+          "precision": 14,
+          "scale": 2,
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "id": "f_qhh7h3hk",
+          "name": "line_total",
+          "type": "decimal",
+          "precision": 14,
+          "scale": 2,
+          "nullable": false
+        },
+        {
+          "id": "f_bo4trqpi",
+          "name": "created_at",
+          "type": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      ]
+    },
+    {
+      "id": "e_mmfw898w",
+      "name": "order_status_history",
+      "position": {
+        "x": 980,
+        "y": 560
+      },
+      "fields": [
+        {
+          "id": "f_k7x43uw4",
+          "name": "status_history_id",
+          "type": "bigint",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "id": "f_xs8sp8iy",
+          "name": "order_id",
+          "type": "bigint",
+          "nullable": false
+        },
+        {
+          "id": "f_gvzn6gyt",
+          "name": "previous_status",
+          "type": "string",
+          "length": 20,
+          "nullable": true
+        },
+        {
+          "id": "f_1r1jazo8",
+          "name": "new_status",
+          "type": "string",
+          "length": 20,
+          "nullable": false
+        },
+        {
+          "id": "f_sywa706l",
+          "name": "changed_at",
+          "type": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        {
+          "id": "f_yezbxk51",
+          "name": "changed_by",
+          "type": "string",
+          "length": 100,
+          "nullable": true
+        },
+        {
+          "id": "f_cj46x9gd",
+          "name": "change_reason",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "e_cphge3p4",
+      "name": "warehouses",
+      "position": {
+        "x": 80,
+        "y": 800
+      },
+      "fields": [
+        {
+          "id": "f_jtqioeci",
+          "name": "warehouse_id",
+          "type": "bigint",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "id": "f_l0k0muk3",
+          "name": "warehouse_code",
+          "type": "string",
+          "length": 30,
+          "nullable": false,
+          "unique": true
+        },
+        {
+          "id": "f_hiriq54d",
+          "name": "warehouse_name",
+          "type": "string",
+          "length": 150,
+          "nullable": false
+        },
+        {
+          "id": "f_a2cbi0s1",
+          "name": "country_code",
+          "type": "string",
+          "length": 2,
+          "nullable": false
+        },
+        {
+          "id": "f_wotbwzfr",
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "TRUE"
+        }
+      ]
+    },
+    {
+      "id": "e_bmglj0x1",
+      "name": "stock_levels",
+      "position": {
+        "x": 380,
+        "y": 800
+      },
+      "fields": [
+        {
+          "id": "f_r1f5t5no",
+          "name": "warehouse_id",
+          "type": "bigint",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "id": "f_fn29sbhm",
+          "name": "product_id",
+          "type": "bigint",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "id": "f_1jn7gcs8",
+          "name": "quantity_on_hand",
+          "type": "integer",
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "id": "f_0bwqjli8",
+          "name": "quantity_reserved",
+          "type": "integer",
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "id": "f_pywe0wzy",
+          "name": "reorder_level",
+          "type": "integer",
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "id": "f_sqs99y8f",
+          "name": "updated_at",
+          "type": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      ]
+    },
+    {
+      "id": "e_z0asj4vp",
+      "name": "shipments",
+      "position": {
+        "x": 680,
+        "y": 800
+      },
+      "fields": [
+        {
+          "id": "f_bgp0hv2z",
+          "name": "shipment_id",
+          "type": "bigint",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "id": "f_0q29dfyq",
+          "name": "order_id",
+          "type": "bigint",
+          "nullable": false
+        },
+        {
+          "id": "f_9nup4iwj",
+          "name": "warehouse_id",
+          "type": "bigint",
+          "nullable": true
+        },
+        {
+          "id": "f_r8kojk7k",
+          "name": "tracking_number",
+          "type": "string",
+          "length": 100,
+          "nullable": true,
+          "unique": true
+        },
+        {
+          "id": "f_vi7rqxxr",
+          "name": "carrier",
+          "type": "string",
+          "length": 100,
+          "nullable": true
+        },
+        {
+          "id": "f_nqf3advb",
+          "name": "shipment_status",
+          "type": "string",
+          "length": 20,
+          "nullable": false,
+          "default": "'CREATED'"
+        },
+        {
+          "id": "f_1pev7j65",
+          "name": "shipped_at",
+          "type": "timestamp",
+          "nullable": true
+        },
+        {
+          "id": "f_1xtjc3t9",
+          "name": "delivered_at",
+          "type": "timestamp",
+          "nullable": true
+        },
+        {
+          "id": "f_8lp378xs",
+          "name": "created_at",
+          "type": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      ]
+    },
+    {
+      "id": "e_2i6ivrcl",
+      "name": "shipment_items",
+      "position": {
+        "x": 980,
+        "y": 800
+      },
+      "fields": [
+        {
+          "id": "f_7do1o004",
+          "name": "shipment_id",
+          "type": "bigint",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "id": "f_wxwup6ll",
+          "name": "order_item_id",
+          "type": "bigint",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "id": "f_igwtfuuw",
+          "name": "quantity_shipped",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "id": "e_fbvwpayk",
+      "name": "payments",
+      "position": {
+        "x": 80,
+        "y": 1040
+      },
+      "fields": [
+        {
+          "id": "f_jhf2ajpj",
+          "name": "payment_id",
+          "type": "bigint",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "id": "f_pw35qaa4",
+          "name": "order_id",
+          "type": "bigint",
+          "nullable": false
+        },
+        {
+          "id": "f_21acxroh",
+          "name": "payment_reference",
+          "type": "string",
+          "length": 100,
+          "nullable": false,
+          "unique": true
+        },
+        {
+          "id": "f_mria5g09",
+          "name": "payment_method",
+          "type": "string",
+          "length": 30,
+          "nullable": false
+        },
+        {
+          "id": "f_ft4g7ted",
+          "name": "payment_status",
+          "type": "string",
+          "length": 20,
+          "nullable": false,
+          "default": "'INITIATED'"
+        },
+        {
+          "id": "f_rgm1v9fv",
+          "name": "amount",
+          "type": "decimal",
+          "precision": 14,
+          "scale": 2,
+          "nullable": false
+        },
+        {
+          "id": "f_3blapsic",
+          "name": "currency_code",
+          "type": "string",
+          "length": 3,
+          "nullable": false
+        },
+        {
+          "id": "f_gcu8bih9",
+          "name": "paid_at",
+          "type": "timestamp",
+          "nullable": true
+        },
+        {
+          "id": "f_8skrtp0k",
+          "name": "created_at",
+          "type": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      ]
+    },
+    {
+      "id": "e_pr4n5bbu",
+      "name": "refunds",
+      "position": {
+        "x": 380,
+        "y": 1040
+      },
+      "fields": [
+        {
+          "id": "f_cmk63xp6",
+          "name": "refund_id",
+          "type": "bigint",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "id": "f_9fi4ylyb",
+          "name": "payment_id",
+          "type": "bigint",
+          "nullable": false
+        },
+        {
+          "id": "f_ia38id3d",
+          "name": "refund_reference",
+          "type": "string",
+          "length": 100,
+          "nullable": false,
+          "unique": true
+        },
+        {
+          "id": "f_mxtry8x9",
+          "name": "amount",
+          "type": "decimal",
+          "precision": 14,
+          "scale": 2,
+          "nullable": false
+        },
+        {
+          "id": "f_pt3gmvhb",
+          "name": "refund_status",
+          "type": "string",
+          "length": 20,
+          "nullable": false,
+          "default": "'PENDING'"
+        },
+        {
+          "id": "f_fhxyhs9f",
+          "name": "requested_at",
+          "type": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        {
+          "id": "f_50xeaj5s",
+          "name": "completed_at",
+          "type": "timestamp",
+          "nullable": true
+        },
+        {
+          "id": "f_81l0tloz",
+          "name": "reason",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "e_6em007mn",
+      "name": "etl_batch_audit",
+      "position": {
+        "x": 680,
+        "y": 1040
+      },
+      "fields": [
+        {
+          "id": "f_rcd9jtib",
+          "name": "batch_id",
+          "type": "bigint",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "id": "f_p43sd27w",
+          "name": "pipeline_name",
+          "type": "string",
+          "length": 150,
+          "nullable": false
+        },
+        {
+          "id": "f_8xf6nd0p",
+          "name": "source_system",
+          "type": "string",
+          "length": 100,
+          "nullable": false
+        },
+        {
+          "id": "f_zz3m0alv",
+          "name": "target_system",
+          "type": "string",
+          "length": 100,
+          "nullable": false
+        },
+        {
+          "id": "f_54si348a",
+          "name": "started_at",
+          "type": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        {
+          "id": "f_blqs1vaa",
+          "name": "completed_at",
+          "type": "timestamp",
+          "nullable": true
+        },
+        {
+          "id": "f_v9yy7hsy",
+          "name": "batch_status",
+          "type": "string",
+          "length": 20,
+          "nullable": false,
+          "default": "'RUNNING'"
+        },
+        {
+          "id": "f_ucfy807s",
+          "name": "rows_read",
+          "type": "bigint",
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "id": "f_y5ndt62m",
+          "name": "rows_inserted",
+          "type": "bigint",
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "id": "f_0x6fbjjq",
+          "name": "rows_updated",
+          "type": "bigint",
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "id": "f_5itbvql0",
+          "name": "rows_rejected",
+          "type": "bigint",
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "id": "f_9sz6yq4e",
+          "name": "error_message",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "id": "r_5avb2mol",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_j4cdel2z",
+      "childEntity": "e_q02oy61o",
+      "parentOptional": false,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_oz3f2uhe"
+      ]
+    },
+    {
+      "id": "r_cr3i9bi7",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_j4cdel2z",
+      "childEntity": "e_r1mqaimw",
+      "parentOptional": false,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_8hdcj1a9"
+      ]
+    },
+    {
+      "id": "r_7neivj3p",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_6d1n6gso",
+      "childEntity": "e_r1mqaimw",
+      "parentOptional": false,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_q16s5alz"
+      ]
+    },
+    {
+      "id": "r_tt3tg1cb",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_gtxo5llu",
+      "childEntity": "e_gtxo5llu",
+      "parentOptional": true,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_qio7vvxo"
+      ]
+    },
+    {
+      "id": "r_edjj4tpz",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_gtxo5llu",
+      "childEntity": "e_r98zom3u",
+      "parentOptional": true,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_xauo7pug"
+      ]
+    },
+    {
+      "id": "r_scxvfrfx",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_r98zom3u",
+      "childEntity": "e_2dradz6q",
+      "parentOptional": false,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_puv3doe1"
+      ]
+    },
+    {
+      "id": "r_hycxz5um",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_r98zom3u",
+      "childEntity": "e_dfxmi3ze",
+      "parentOptional": false,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_arq9qim6"
+      ]
+    },
+    {
+      "id": "r_fc6f8anj",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_i79u8fjy",
+      "childEntity": "e_dfxmi3ze",
+      "parentOptional": false,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_aiwu843x"
+      ]
+    },
+    {
+      "id": "r_6bdg2uso",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_j4cdel2z",
+      "childEntity": "e_3xdw2ew4",
+      "parentOptional": false,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_yanawdgo"
+      ]
+    },
+    {
+      "id": "r_9p0tpr8s",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_q02oy61o",
+      "childEntity": "e_3xdw2ew4",
+      "parentOptional": true,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_3o9vb784"
+      ]
+    },
+    {
+      "id": "r_7vqb8mxa",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_q02oy61o",
+      "childEntity": "e_3xdw2ew4",
+      "parentOptional": true,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_cbagn9d7"
+      ]
+    },
+    {
+      "id": "r_ecvvpxpv",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_3xdw2ew4",
+      "childEntity": "e_qbrpk9la",
+      "parentOptional": false,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_awn9lfqn"
+      ]
+    },
+    {
+      "id": "r_7hf7xbjw",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_r98zom3u",
+      "childEntity": "e_qbrpk9la",
+      "parentOptional": false,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_6078jsq4"
+      ]
+    },
+    {
+      "id": "r_r6yofq3t",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_3xdw2ew4",
+      "childEntity": "e_mmfw898w",
+      "parentOptional": false,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_xs8sp8iy"
+      ]
+    },
+    {
+      "id": "r_892ab0zs",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_cphge3p4",
+      "childEntity": "e_bmglj0x1",
+      "parentOptional": false,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_r1f5t5no"
+      ]
+    },
+    {
+      "id": "r_u7rma5ap",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_r98zom3u",
+      "childEntity": "e_bmglj0x1",
+      "parentOptional": false,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_fn29sbhm"
+      ]
+    },
+    {
+      "id": "r_j658l0tl",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_3xdw2ew4",
+      "childEntity": "e_z0asj4vp",
+      "parentOptional": false,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_0q29dfyq"
+      ]
+    },
+    {
+      "id": "r_v6v4e9l6",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_cphge3p4",
+      "childEntity": "e_z0asj4vp",
+      "parentOptional": true,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_9nup4iwj"
+      ]
+    },
+    {
+      "id": "r_j6ez5r06",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_z0asj4vp",
+      "childEntity": "e_2i6ivrcl",
+      "parentOptional": false,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_7do1o004"
+      ]
+    },
+    {
+      "id": "r_6cpomg3k",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_qbrpk9la",
+      "childEntity": "e_2i6ivrcl",
+      "parentOptional": false,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_wxwup6ll"
+      ]
+    },
+    {
+      "id": "r_thaji6yo",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_3xdw2ew4",
+      "childEntity": "e_fbvwpayk",
+      "parentOptional": false,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_pw35qaa4"
+      ]
+    },
+    {
+      "id": "r_h529pvwg",
+      "cardinality": "one-to-many",
+      "parentEntity": "e_fbvwpayk",
+      "childEntity": "e_pr4n5bbu",
+      "parentOptional": false,
+      "childOptional": true,
+      "foreignKeyFields": [
+        "f_9fi4ylyb"
+      ]
+    }
+  ]
+}

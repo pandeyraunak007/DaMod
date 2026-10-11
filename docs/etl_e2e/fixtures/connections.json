@@ -1,0 +1,17 @@
+{
+  "formatVersion": 1,
+  "connections": [
+    {
+      "id": "g_i9rq2g22",
+      "name": "new_connection",
+      "systemType": "postgres",
+      "params": {
+        "database": "damod_test",
+        "host": "localhost",
+        "port": "5432",
+        "user": "raunakpandey"
+      },
+      "secretRef": "g_i9rq2g22"
+    }
+  ]
+}
