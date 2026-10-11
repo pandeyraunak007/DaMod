@@ -1,7 +1,7 @@
 // ETL Phase 3 Slice B2a — pure graph-edit ops: add/remove/update node, connect (with
 // self-loop/dup/cycle/unknown guards), remove edge, move node → layout.
 import { describe, it, expect } from "vitest";
-import { addGraphNode, removeGraphNode, updateGraphNode, connectNodes, connectError, removeGraphEdge, moveNode } from "./graphEdit";
+import { addGraphNode, removeGraphNode, updateGraphNode, connectNodes, connectError, removeGraphEdge, moveNode, spliceTransformNode } from "./graphEdit";
 import { planFullLoad } from "../connectors/pipeline/planner";
 import { newModel, newEntity, newField, type Model } from "../model/model";
 import type { PipelineSpec } from "../connectors/pipeline/spec";
@@ -66,5 +66,36 @@ describe("edge removal", () => {
   it("removes an edge by id", () => {
     const spec = removeGraphEdge(base(), "e1");
     expect(spec.edges).toHaveLength(0);
+  });
+});
+
+describe("spliceTransformNode (insert a transform, keep the graph connected)", () => {
+  it("splices before the target by default (source→new→target)", () => {
+    const { spec, error } = spliceTransformNode(base(), { id: "f", kind: "filter" }, { afterNodeId: undefined, edgeIn: "ei", edgeOut: "eo" });
+    expect(error).toBeNull();
+    expect(spec.nodes!.map((n) => n.id).sort()).toEqual(["f", "s", "t"]);
+    // Old direct source→target edge is gone; the node sits in between.
+    expect(spec.edges!.some((e) => e.from === "s" && e.to === "t")).toBe(false);
+    expect(spec.edges!.some((e) => e.from === "s" && e.to === "f")).toBe(true);
+    expect(spec.edges!.some((e) => e.from === "f" && e.to === "t")).toBe(true);
+  });
+
+  it("splices after a named upstream node", () => {
+    // s → a → t ; inserting after "a" should give s → a → new → t.
+    let spec = base();
+    spec = { ...spec, nodes: [...spec.nodes!, { id: "a", kind: "distinct" }], edges: [{ id: "e1", from: "s", to: "a" }, { id: "e2", from: "a", to: "t" }] };
+    const r = spliceTransformNode(spec, { id: "f", kind: "filter" }, { afterNodeId: "a", edgeIn: "ei", edgeOut: "eo" });
+    expect(r.error).toBeNull();
+    expect(r.spec.edges!.some((e) => e.from === "a" && e.to === "t")).toBe(false); // rewired
+    expect(r.spec.edges!.some((e) => e.from === "a" && e.to === "f")).toBe(true);
+    expect(r.spec.edges!.some((e) => e.from === "f" && e.to === "t")).toBe(true);
+  });
+
+  it("appends when the upstream node has no downstream", () => {
+    // after the target itself (a leaf) → just connect t → new, no rewire.
+    const r = spliceTransformNode(base(), { id: "f", kind: "filter" }, { afterNodeId: "t", edgeIn: "ei", edgeOut: "eo" });
+    expect(r.error).toBeNull();
+    expect(r.spec.edges!.some((e) => e.from === "t" && e.to === "f")).toBe(true);
+    expect(r.spec.edges!.filter((e) => e.to === "f")).toHaveLength(1); // only the one incoming edge
   });
 });

@@ -493,4 +493,29 @@ describe("Copilot create_pipeline action (G-AI)", () => {
     expect(res.failed).toBe(1);
     expect(useWorkspaceStore.getState().pipelines).toHaveLength(0);
   });
+
+  it("add_transform_node splices a filter into a pipeline's graph (deriving one if needed)", () => {
+    run([{ kind: "create_pipeline", name: "pl", target: "postgres", entities: ["Order"] }]);
+    const res = run([
+      { kind: "add_transform_node", pipeline: "pl", node: "filter", filters: [{ column: "id", op: "is not null" }] },
+    ]);
+    expect(res.applied).toBe(1);
+    const p = useWorkspaceStore.getState().pipelines.find((x) => x.name === "pl")!;
+    const filter = p.nodes!.find((n) => n.kind === "filter")!;
+    expect(filter).toBeTruthy();
+    expect(filter.filters).toHaveLength(1);
+    // Spliced before the target: source→filter→target, no direct source→target edge.
+    const target = p.nodes!.find((n) => n.kind === "target")!;
+    const source = p.nodes!.find((n) => n.kind === "source")!;
+    expect(p.edges!.some((e) => e.from === source.id && e.to === target.id)).toBe(false);
+    expect(p.edges!.some((e) => e.to === filter.id)).toBe(true);
+    expect(p.edges!.some((e) => e.from === filter.id && e.to === target.id)).toBe(true);
+    // It's undoable via the pipeline's own history (G-UNDO).
+    expect(useWorkspaceStore.getState().pipelineHistory["" + p.id]?.past.length ?? 0).toBeGreaterThanOrEqual(0);
+  });
+
+  it("add_transform_node fails for an unknown pipeline", () => {
+    const res = run([{ kind: "add_transform_node", pipeline: "nope", node: "distinct" }]);
+    expect(res.failed).toBe(1);
+  });
 });

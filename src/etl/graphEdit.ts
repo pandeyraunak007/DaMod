@@ -76,3 +76,53 @@ export function moveNode(spec: PipelineSpec, nodeId: string, x: number, y: numbe
   const without = existing.filter((n) => n.id !== nodeId);
   return { ...spec, layout: { nodes: [...without, { id: nodeId, x, y }] } };
 }
+
+/**
+ * Insert a transform node into the flow, keeping the graph connected. Splices the node
+ * between an upstream node and one of its downstream nodes:
+ *  - `afterNodeId` given → upstream is that node; downstream is an edge it feeds (a
+ *    target preferred). With no downstream, the node is simply connected after it.
+ *  - `afterNodeId` omitted → splice right before the (first) target: `upstream→target`
+ *    becomes `upstream→new→target`. If nothing feeds the target yet, connect the source.
+ * Edge ids are caller-supplied (deterministic/testable). Returns an error string if the
+ * resulting connection would be invalid (unknown node / cycle / duplicate).
+ */
+export function spliceTransformNode(
+  spec: PipelineSpec,
+  node: PipelineNode,
+  opts: { afterNodeId?: string; edgeIn: string; edgeOut: string },
+): { spec: PipelineSpec; error: string | null } {
+  const ns = nodes(spec);
+  const es = edges(spec);
+  const target = ns.find((n) => n.kind === "target");
+  let upstreamId: string | undefined;
+  let downstreamId: string | undefined;
+
+  if (opts.afterNodeId) {
+    upstreamId = opts.afterNodeId;
+    const outs = es.filter((e) => e.from === opts.afterNodeId);
+    downstreamId = (outs.find((e) => e.to === target?.id) ?? outs[0])?.to;
+  } else if (target) {
+    const intoTarget = es.find((e) => e.to === target.id);
+    upstreamId = intoTarget ? intoTarget.from : ns.find((n) => n.kind === "source")?.id;
+    downstreamId = target.id;
+  } else {
+    upstreamId = ns.find((n) => n.kind === "source")?.id;
+  }
+  if (!upstreamId) return { spec, error: "no upstream node to attach the transform to" };
+
+  let next = addGraphNode(spec, node);
+  if (downstreamId) {
+    const existing = edges(next).find((e) => e.from === upstreamId && e.to === downstreamId);
+    if (existing) next = removeGraphEdge(next, existing.id);
+  }
+  const r1 = connectNodes(next, { id: opts.edgeIn, from: upstreamId, to: node.id });
+  if (r1.error) return { spec, error: r1.error };
+  next = r1.spec;
+  if (downstreamId) {
+    const r2 = connectNodes(next, { id: opts.edgeOut, from: node.id, to: downstreamId });
+    if (r2.error) return { spec, error: r2.error };
+    next = r2.spec;
+  }
+  return { spec: next, error: null };
+}

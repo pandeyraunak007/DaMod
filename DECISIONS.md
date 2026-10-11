@@ -5,6 +5,31 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — ETL G-AI Phase 2: Copilot can add transform nodes to a pipeline
+
+Second ETL action, building on Phase 1:
+
+- **Action** `add_transform_node { pipeline, node, after?, label?, + config }` — inserts a
+  transform step into an existing pipeline's DAG. Supported kinds: **filter** (`filters[]`),
+  **select** (`keep[]`), **aggregate** (`groupBy[]` + `aggregates[]`), **distinct**.
+  `derive`/`cast` are excluded — they need a type spec the NL action can't cleanly supply.
+- **Wiring** — a pure, testable `spliceTransformNode(spec, node, {afterNodeId, edgeIn,
+  edgeOut})` in `graphEdit.ts`: splices the node **before the target** by default
+  (`upstream→target` ⇒ `upstream→new→target`), or **after a named node** (resolved from the
+  action's `after` by label then kind). If the pipeline has no graph yet, the executor
+  derives a source→target starter (`deriveStarterGraph`) first, so the Copilot can scaffold
+  a flow from scratch. Reuses the existing cycle/dup/unknown guards in `connectNodes`.
+- **Executor** routes through `workspaceStore.upsertPipeline`, so the Copilot's node insert
+  lands in that pipeline's own undo history (G-UNDO) and is reversible in the Designer.
+- Node/edge ids use a local random uid (pipelines.json ids, not model-domain `newId` ids —
+  adding `node`/`edge` to `ID_PREFIXES` broke `isId`, which expects single-letter prefixes).
+- Prompt catalog + `describeAction` + 5 tests (3 splice in `graphEdit.test.ts`, 2 executor
+  in `execute.test.ts`). 559 green, tsc/build clean.
+
+With Phase 1 (`create_pipeline`) + Phase 2, **G-AI is complete**. Remaining ETL gaps:
+G-INC (incremental/CDC), G-EXEC (execution — intentionally external). A `suggest_mapping`
+advisory action and derive/cast nodes are optional future niceties.
+
 ## 2026-10-11 — ETL G-AI Phase 1: Copilot can create pipelines + is pipeline-aware
 
 First Copilot ETL action, through the existing action→execute→approve path:

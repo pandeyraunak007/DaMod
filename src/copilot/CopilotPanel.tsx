@@ -346,6 +346,8 @@ function describeAction(a: CopilotPlan["actions"][number]): string {
       return `+ metric ${a.name}${a.aggregate ? ` (${a.aggregate}${a.field ? ` ${a.entity}.${a.field}` : ""})` : ""}`;
     case "create_pipeline":
       return `+ pipeline ${a.name} (${a.sourceModel ?? "active model"} → ${a.target}${a.entities?.length ? `, ${a.entities.length} table(s)` : ""})`;
+    case "add_transform_node":
+      return `+ ${a.node} node → pipeline ${a.pipeline}${a.after ? ` (after ${a.after})` : ""}`;
     case "create_snowflake_object":
       return `+ ${a.objectKind} ${a.name}`;
     case "create_governance_object":

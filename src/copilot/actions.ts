@@ -7,6 +7,7 @@
 import { z } from "zod";
 import { DATA_TYPE_KINDS } from "../model/dataTypes";
 import { DIALECT_IDS } from "../export/dialects";
+import { FILTER_OPS, AGG_FNS } from "../connectors/pipeline/spec";
 
 const zNewField = z.object({
   name: z.string(),
@@ -166,6 +167,29 @@ const zCreatePipeline = z.object({
   entities: z.array(z.string()).optional(),
 });
 
+// Add a transform node to an existing pipeline's DAG (G-AI Phase 2). The node is spliced
+// into the flow (before the target by default, or after a named node). Supported kinds
+// carry clean, structured config; derive/cast (which need a type spec) are out of scope.
+const zAddTransformNode = z.object({
+  kind: z.literal("add_transform_node"),
+  pipeline: z.string(),
+  node: z.enum(["filter", "select", "aggregate", "distinct"]),
+  label: z.string().optional(),
+  /** Upstream node to insert after (by label or kind); default = before the target. */
+  after: z.string().optional(),
+  // filter: keep rows matching these predicates
+  filters: z
+    .array(z.object({ column: z.string(), op: z.enum(FILTER_OPS as unknown as [string, ...string[]]), value: z.string().optional() }))
+    .optional(),
+  // select: columns to keep (empty/omitted = all)
+  keep: z.array(z.string()).optional(),
+  // aggregate: group keys + measures
+  groupBy: z.array(z.string()).optional(),
+  aggregates: z
+    .array(z.object({ fn: z.enum(AGG_FNS as unknown as [string, ...string[]]), column: z.string().optional(), as: z.string() }))
+    .optional(),
+});
+
 // ---- Snowflake data-engineering + governance objects (Req 23 Phase 4/5) ------
 // Create-only, like the other object actions. A credential/secret is never a
 // field here, so the Copilot can never set one.
@@ -283,6 +307,7 @@ export const zAction = z.discriminatedUnion("kind", [
   zCreateDimension,
   zCreateMetric,
   zCreatePipeline,
+  zAddTransformNode,
   zCreateSnowflakeObject,
   zCreateGovernanceObject,
   zCreateNamingStandard,
@@ -343,6 +368,7 @@ const STRUCTURAL = new Set([
   "create_dimension",
   "create_metric",
   "create_pipeline",
+  "add_transform_node",
   "create_snowflake_object",
   "create_governance_object",
   "create_naming_standard",

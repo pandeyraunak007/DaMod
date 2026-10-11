@@ -15,6 +15,12 @@ import { type DataTypeKind, withTypeDefaults } from "../model/dataTypes";
 import { newTerm, newDimension, newMetric } from "../semantic/semantic";
 import { planFullLoad } from "../connectors/pipeline/planner";
 import type { DialectId } from "../export/dialects";
+import { spliceTransformNode } from "../etl/graphEdit";
+import { deriveStarterGraph } from "../etl/graphBuild";
+import type { PipelineNode } from "../connectors/pipeline/spec";
+
+// Pipeline DAG node/edge ids (pipelines.json, not model JSON) — random, like the Designer.
+const pipeUid = (p: string): string => p + Math.random().toString(36).slice(2, 10);
 
 export interface ActionResult {
   action: CopilotAction;
@@ -351,6 +357,47 @@ function applyAction(action: CopilotAction): ActionResult {
       // semantic-action pattern; this is a workspace op, outside the model undo group.
       void ws.upsertPipeline(spec);
       return ok(`Created pipeline “${action.name}” (${entityNames.length} table(s) → ${action.target})`);
+    }
+
+    case "add_transform_node": {
+      const ws = useWorkspaceStore.getState();
+      const pipe = ws.pipelines.find((p) => p.name.toLowerCase() === action.pipeline.toLowerCase());
+      if (!pipe) return fail(`Pipeline “${action.pipeline}” not found`);
+      // Ensure the pipeline has a DAG to splice into (derive a source→target starter if not).
+      let spec = pipe.nodes && pipe.nodes.length ? pipe : (() => {
+        const { nodes, edges } = deriveStarterGraph(pipe);
+        return { ...pipe, nodes, edges };
+      })();
+
+      // Build the transform node with its (optional) structured config.
+      const node: PipelineNode = { id: pipeUid("nd_"), kind: action.node, label: action.label ?? action.node };
+      if (action.node === "filter" && action.filters?.length) {
+        node.filters = action.filters as PipelineNode["filters"];
+      } else if (action.node === "select" && action.keep?.length) {
+        node.keep = action.keep;
+      } else if (action.node === "aggregate") {
+        if (action.groupBy?.length) node.groupBy = action.groupBy;
+        if (action.aggregates?.length) node.aggregates = action.aggregates as PipelineNode["aggregates"];
+      }
+
+      // Resolve `after` (by node label, else kind) to an id; omitted = before the target.
+      let afterNodeId: string | undefined;
+      if (action.after) {
+        const match =
+          spec.nodes!.find((n) => (n.label ?? "").toLowerCase() === action.after!.toLowerCase()) ??
+          spec.nodes!.find((n) => n.kind === action.after!.toLowerCase());
+        if (!match) return fail(`Node “${action.after}” not found in pipeline “${action.pipeline}”`);
+        afterNodeId = match.id;
+      }
+
+      const { spec: nextSpec, error } = spliceTransformNode(spec, node, {
+        afterNodeId,
+        edgeIn: pipeUid("ed_"),
+        edgeOut: pipeUid("ed_"),
+      });
+      if (error) return fail(error);
+      void ws.upsertPipeline(nextSpec);
+      return ok(`Added ${action.node} node to pipeline “${action.pipeline}”`);
     }
 
     case "create_snowflake_object": {
