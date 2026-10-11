@@ -1011,6 +1011,32 @@ body,
   border-collapse: collapse;
   font-size: 0.78rem;
 }
+/* Source-snapshot browser (Req 21/22). */
+.snap__section {
+  margin-top: 0.8rem;
+}
+.snap__h {
+  margin: 0.3rem 0;
+  font-size: 0.85rem;
+}
+.snap__list {
+  margin: 0.1rem 0 0.4rem;
+  padding-left: 1.1rem;
+  font-size: 0.78rem;
+}
+.snap__list li {
+  margin: 0.1rem 0;
+}
+.snap__list code {
+  font-family: ui-monospace, monospace;
+}
+.snap__tag {
+  font-size: 0.68rem;
+  color: var(--muted, #6a6a6a);
+  background: var(--panel, #eee);
+  border-radius: 3px;
+  padding: 0 0.25rem;
+}
 .src-info__k {
   color: var(--muted, #8a8a8a);
   padding: 0.1rem 0.6rem 0.1rem 0;

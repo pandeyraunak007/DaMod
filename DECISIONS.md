@@ -5,6 +5,25 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Source-snapshot browser (Req 21/22 §11)
+
+Surfaces the snapshot-only metadata that §11 keeps OFF the model — EBS application
+dictionary (concurrent programs / lookups / program units) and Fusion API resources +
+extract data stores — closing the last Explorer/Properties gaps for both.
+
+- **`SnapshotView`** (pure, tested): renders a `SourceSnapshot` — source identity (EBS
+  release / DB version / Fusion API version), discovery provenance, object counts, the
+  EBS app dictionary, and the Fusion REST resources + extract data stores. Sections show
+  only when present (works for EBS, Fusion, or plain).
+- **`SnapshotBrowser`** dialog loads the active model's snapshot **by model name** and
+  renders it (or a clear "no snapshot" message). Opened from Data → **Source snapshot**.
+- **Linking:** import already saved the snapshot keyed by model name; reverse-engineering
+  now ALSO saves a model-name-keyed copy (keeping the connection-name copy for refresh/
+  compare). No model-schema change, no Rust, no snapshot-dir listing needed.
+- Limitation (documented): keyed by model name, so renaming the model loses the link;
+  a durable `model→snapshot` reference is a future nicety.
+- 365 TS tests (+2: `SnapshotBrowser.render.test.tsx`); tsc/build/cargo clean.
+
 ## 2026-10-11 — Field-level source provenance (source-native type) (Req 22 §7)
 
 Reverse-engineering dropped each column's source-native type (`NUMBER(15)`, `VARCHAR2`,

@@ -20,6 +20,7 @@ import { DomainsDialog } from "./panels/DomainsDialog";
 import { ImportDialog } from "./import/ImportDialog";
 import { ConnectionsDialog } from "./connectors/ui/ConnectionsDialog";
 import { PipelineDialog } from "./connectors/pipeline/PipelineDialog";
+import { SnapshotBrowser } from "./connectors/ui/SnapshotBrowser";
 import { CopilotPanel } from "./copilot/CopilotPanel";
 import { ResizeHandle, PanelRail } from "./workspace/PanelChrome";
 import { LinkDialog } from "./links/LinkDialog";
@@ -46,6 +47,7 @@ export default function App() {
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [connectionsReverse, setConnectionsReverse] = useState(false);
   const [pipelinesOpen, setPipelinesOpen] = useState(false);
+  const [snapshotOpen, setSnapshotOpen] = useState(false);
   const [semanticOpen, setSemanticOpen] = useState(false);
   const [deleteModel, setDeleteModel] = useState<{ id: string; name: string } | null>(null);
 
@@ -184,6 +186,7 @@ export default function App() {
           setConnectionsOpen(true);
         }}
         onOpenPipelines={() => setPipelinesOpen(true)}
+        onOpenSnapshot={() => setSnapshotOpen(true)}
         onOpenHistory={() => setHistoryOpen(true)}
         onOpenMap={() => setMapOpen(true)}
         onOpenExport={() => setExportOpen(true)}
@@ -258,6 +261,7 @@ export default function App() {
         />
       )}
       {pipelinesOpen && <PipelineDialog onClose={() => setPipelinesOpen(false)} />}
+      {snapshotOpen && <SnapshotBrowser onClose={() => setSnapshotOpen(false)} />}
       {confirmDelete && selection && <DeleteConfirm onClose={() => setConfirmDelete(false)} />}
       {deleteModel && (
         <DeleteModelConfirm

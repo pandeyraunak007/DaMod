@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   type LucideIcon,
   Copy,
+  Camera,
   Database,
   DatabaseZap,
   Download,
@@ -41,6 +42,7 @@ interface Props {
   onOpenConnections: () => void;
   onReverseEngineer: () => void;
   onOpenPipelines: () => void;
+  onOpenSnapshot: () => void;
   onOpenHistory: () => void;
   onOpenMap: () => void;
   onOpenExport: () => void;
@@ -113,6 +115,7 @@ export function Toolbar(props: Props) {
             onOpenConnections={props.onOpenConnections}
             onReverseEngineer={props.onReverseEngineer}
             onOpenPipelines={props.onOpenPipelines}
+            onOpenSnapshot={props.onOpenSnapshot}
           />
         )}
       </div>
@@ -300,10 +303,12 @@ function DataTab({
   onOpenConnections,
   onReverseEngineer,
   onOpenPipelines,
+  onOpenSnapshot,
 }: {
   onOpenConnections: () => void;
   onReverseEngineer: () => void;
   onOpenPipelines: () => void;
+  onOpenSnapshot: () => void;
 }) {
   const wsPath = useWorkspaceStore((s) => s.path);
   return (
@@ -311,6 +316,7 @@ function DataTab({
       <RGroup title="Reverse-engineer">
         <RibbonButton Icon={Database} label="Connect" title="Manage database connections" onClick={onOpenConnections} disabled={!wsPath} />
         <RibbonButton Icon={DatabaseZap} label="Reverse-engineer" title="Discover a database schema into a new model" onClick={onReverseEngineer} disabled={!wsPath} />
+        <RibbonButton Icon={Camera} label="Source snapshot" title="Browse this model's discovery snapshot (API resources, extract stores, EBS dictionary)" onClick={onOpenSnapshot} disabled={!wsPath} />
       </RGroup>
       <RGroup title="ETL">
         <RibbonButton Icon={Workflow} label="Pipelines" title="Design an ETL pipeline" onClick={onOpenPipelines} disabled={!wsPath} />

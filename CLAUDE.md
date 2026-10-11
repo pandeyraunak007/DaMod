@@ -41,6 +41,10 @@ See the top DECISIONS entries:
 - **Field-level source provenance:** `Field.source` (reuses `ObjectSource`) carries the
   **source-native type** (`col.nativeType`) for every connector; the column detail editor
   shows a read-only "Source-native type" row. Shared `sourceToPlain` serializer.
+- **Source-snapshot browser** (`connectors/ui/SnapshotBrowser.tsx`, Data → Source
+  snapshot): shows a model's snapshot-only metadata — EBS app dictionary (concurrent
+  programs/lookups/program units) + Fusion API resources/extract data stores + source
+  identity. Loads the active model's snapshot by name (reverse-eng + import both save it).
 - **Source-to-target mapping (Req 22 §8):** the pipeline designer has an editable
   **Mapping** tab (`connectors/pipeline/MappingEditor.tsx`) — rename target columns,
   convert types, add transforms, drop/add columns, live-validated, saved via

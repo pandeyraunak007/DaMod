@@ -462,7 +462,11 @@ function ReversePanel({
     if (!preview || !discovery) return;
     setBusy(true);
     const err = await importModel(preview.model, modelName);
-    if (!err) await saveSnapshot(profile.name, buildSnapshot(profile.id, discovery));
+    if (!err) {
+      const snap = buildSnapshot(profile.id, discovery);
+      await saveSnapshot(profile.name, snap); // for refresh/compare (keyed by connection)
+      await saveSnapshot(modelName, snap); // for the Source-snapshot browser (keyed by model)
+    }
     setBusy(false);
     if (err) setError(err);
     else onClose();

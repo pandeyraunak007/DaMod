@@ -85,9 +85,10 @@ eTRM/FND/DBA export → canonical JSON lives outside DaMod.
 - **Phase 3** — EBS application awareness: *DONE (mock/offline):* `metadata.application`
   (concurrent programs, lookups, program units) discovered by the mock, surfaced in the
   reverse preview, persisted in the snapshot; snapshot serialization fixed to keep EBS
-  release + FK provenance. *Remaining:* live FND/eTRM discovery (driver-gated), and a
-  snapshot browser showing app metadata for an already-imported model (per §11 app
-  metadata is shown at discovery time, not grafted into the model).
+  release + FK provenance. The **Source-snapshot browser** (Data → Source snapshot) now
+  shows this app dictionary for an already-imported model (read-only, per §11 — it stays
+  on the snapshot, not grafted into the model). *Remaining:* live FND/eTRM discovery
+  (driver-gated).
 - **Phase 4** — *partly DONE:* **subject areas by EBS product** (model concept + store
   ops + EBS Explorer UI). *Remaining:* logical/conceptual generation (business entities
   from documented metadata); an EBS refresh/compare review UX wired on `reconcileDiscoveredModel`.
