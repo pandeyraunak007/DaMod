@@ -5,6 +5,39 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — ETL Designer audit + Phase 1: pipeline source-SQL generation
+
+Audited the existing ETL/pipeline surface for an ETL-Designer roadmap (assessment-only;
+full A–K deliverable in the conversation). Key finding: a validated, persisted,
+NON-visual pipeline engine already exists (`connectors/pipeline/{spec,planner,
+pipelinesPersist,MappingEditor,PipelineDialog}` + 16 tests) — ~70% of the requested MVP.
+Genuine gaps: a visual node canvas, and source/transform/join SQL generation (the planner
+emitted only target `CREATE TABLE` DDL). Connectors are metadata-discovery-only (no data
+movement); execution stays deferred. Decision: build additively, no rewrite.
+
+**Phase 1 slice (first implementation) — `pipelineSql(spec, model)` in `planner.ts`:**
+- Pure, deterministic, DESIGN-TIME text (never executed). One `SELECT … FROM <source>
+  [JOIN …] [WHERE …]` per target object, quoted in the **source model's dialect**
+  (`modelDialect(model)`), not the target platform.
+- Column mappings render `source AS target`; a transform renders `<transform> AS target`
+  verbatim (covers rename/cast/expression — raw passthrough, Q3 default); an unmapped
+  column renders `NULL AS target` and is reported in `unsupported`. Joins whose left
+  object is this object's source are attached; filters become a WHERE (string literals
+  escaped/quoted, bare numbers unquoted, IS [NOT] NULL, IN raw list).
+- Surfaced as a new **SQL tab** in `PipelineView` (next to Report/Target DDL), blank with
+  a hint until the source model is open; Copy includes it.
+- **Additive & reversible:** no change to `spec.ts`, `pipelines.json`, stores, or the
+  model; existing `targetDdl`/`pipelineReport` output unchanged.
+
+**Deferred (per plan):** visual `PipelineCanvas`/`EtlDesigner` workspace (Phase 3, via the
+`semanticOpen` pattern + own ReactFlowProvider); migration shim before any spec change;
+expression validation; execution + new connector capabilities (sourceRead/targetWrite/
+sqlPushdown) — all separately approved.
+
+- Tests +8 (`pipeline/pipelineSql.test.ts`: SELECT/AS/FROM, transform verbatim, WHERE
+  literals, escaping, JOIN attach, NULL+unsupported, source-dialect quoting, determinism).
+  **498 TS tests pass; tsc + build clean.**
+
 ## 2026-10-11 — Backlog: opt-in Postgres CREATE DOMAIN + per-dialect identifier rules
 
 Two deferred items delivered.

@@ -5,7 +5,7 @@
 // infers a transformation that could change business meaning — mismatches are
 // flagged for review.
 
-import { type Model, newEntity, newField, newModel } from "../../model/model";
+import { type Model, modelDialect, newEntity, newField, newModel } from "../../model/model";
 import { type DataTypeKind, formatType } from "../../model/dataTypes";
 import { validateIdentifier } from "../../model/identifiers";
 import { DIALECTS, type DialectId } from "../../export/dialects";
@@ -13,6 +13,7 @@ import { exportModelDDL } from "../../export/ddl";
 import { newId } from "../../lib/ids";
 import {
   type ColumnMapping,
+  type PipelineFilter,
   type PipelineSpec,
   type SpecType,
   filterNeedsValue,
@@ -186,6 +187,59 @@ export function pipelineReport(spec: PipelineSpec, issues: PipelineIssue[]): str
   lines.push(`## Validation: ${errors.length} error(s), ${warnings.length} warning(s)`);
   for (const i of issues) lines.push(`  [${i.severity}] ${i.message}`);
   return lines.join("\n") + "\n";
+}
+
+// ---- source-extraction SQL generation (§5 code-gen; design-time text, NOT run) ----
+
+/** A SQL literal for a filter value: a bare number stays unquoted; anything else is
+ *  a single-quoted string literal (quotes doubled). */
+function sqlValue(value: string | undefined): string {
+  const v = (value ?? "").trim();
+  if (/^-?\d+(?:\.\d+)?$/.test(v)) return v;
+  return `'${v.replace(/'/g, "''")}'`;
+}
+
+function filterSql(q: (s: string) => string, sourceObject: string, f: PipelineFilter): string {
+  const col = `${q(sourceObject)}.${q(f.column)}`;
+  if (f.op === "is null") return `${col} IS NULL`;
+  if (f.op === "is not null") return `${col} IS NOT NULL`;
+  // `in` takes a raw comma list the user supplies (e.g. 1, 2, 3 or 'a','b').
+  if (f.op === "in") return `${col} IN (${(f.value ?? "").trim()})`;
+  return `${col} ${f.op} ${sqlValue(f.value)}`;
+}
+
+/**
+ * Generate the source-extraction SQL for a spec: one `SELECT … FROM <sourceObject>
+ * [JOIN …] [WHERE …]` per target object, in the SOURCE model's dialect. This is
+ * design-time text for review/preview — it is never executed (§5.2). Column mappings
+ * render as `source AS target`; a transform renders as `<transform> AS target`
+ * verbatim (covers rename/cast/expression); an unmapped column renders as `NULL AS
+ * target` and is reported in `unsupported`. Joins whose left object is this object's
+ * source are attached. Returns the SQL plus notes on anything not fully generated.
+ */
+export function pipelineSql(spec: PipelineSpec, model: Model): { sql: string; unsupported: string[] } {
+  const d = DIALECTS[modelDialect(model) as DialectId];
+  const q = d.quote;
+  const unsupported: string[] = [];
+  const blocks: string[] = [`-- Pipeline extraction SQL: ${spec.name} (source dialect: ${d.label}) — design-time preview, not executed`];
+
+  for (const obj of [...spec.objects].sort((a, b) => a.targetObject.localeCompare(b.targetObject))) {
+    const cols = obj.columns.map((c) => {
+      if (c.transform && c.transform.trim()) return `  ${c.transform.trim()} AS ${q(c.target)}`;
+      if (c.source) return `  ${q(obj.sourceObject)}.${q(c.source)} AS ${q(c.target)}`;
+      unsupported.push(`${obj.targetObject}.${c.target}: no source or transform — emitted as NULL`);
+      return `  NULL AS ${q(c.target)}`;
+    });
+    let from = q(obj.sourceObject);
+    for (const j of spec.joins.filter((x) => x.leftObject.toLowerCase() === obj.sourceObject.toLowerCase())) {
+      from += `\n  ${j.kind.toUpperCase()} JOIN ${q(j.rightObject)} ON ${q(j.leftObject)}.${q(j.leftColumn)} = ${q(j.rightObject)}.${q(j.rightColumn)}`;
+    }
+    const where = obj.filters.map((f) => filterSql(q, obj.sourceObject, f));
+    let sql = `-- ${obj.sourceObject} → ${obj.targetObject}\nSELECT\n${cols.join(",\n")}\nFROM ${from}`;
+    if (where.length) sql += `\nWHERE ${where.join("\n  AND ")}`;
+    blocks.push(sql + ";");
+  }
+  return { sql: blocks.join("\n\n") + "\n", unsupported };
 }
 
 /** Target schema DDL for the spec, reusing the existing DDL generator (§5.3). */

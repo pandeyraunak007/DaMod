@@ -4,7 +4,7 @@ import { DIALECT_IDS, DIALECTS, type DialectId } from "../../export/dialects";
 import { joinPath, writeFile } from "../../persist/fs";
 import { validateIdentifier } from "../../model/identifiers";
 import type { Model } from "../../model/model";
-import { planFullLoad, validatePipeline, pipelineReport, targetDdl } from "./planner";
+import { planFullLoad, validatePipeline, pipelineReport, targetDdl, pipelineSql } from "./planner";
 import { MappingEditor } from "./MappingEditor";
 import type { PipelineSpec } from "./spec";
 
@@ -134,7 +134,7 @@ function PipelineView({ id, onDeleted }: { id: string; onDeleted: () => void }) 
   const deletePipeline = useWorkspaceStore((s) => s.deletePipeline);
   const upsertPipeline = useWorkspaceStore((s) => s.upsertPipeline);
   const path = useWorkspaceStore((s) => s.path);
-  const [tab, setTab] = useState<"mapping" | "report" | "ddl">("mapping");
+  const [tab, setTab] = useState<"mapping" | "report" | "sql" | "ddl">("mapping");
   const [saved, setSaved] = useState<string | null>(null);
 
   const model: Model | undefined = spec ? allModels().find((m) => m.id === spec.source.modelId)?.model : undefined;
@@ -142,6 +142,12 @@ function PipelineView({ id, onDeleted }: { id: string; onDeleted: () => void }) 
   const issues = useMemo(() => (spec && model ? validatePipeline(spec, model) : []), [spec, model]);
   const report = useMemo(() => (spec ? pipelineReport(spec, issues) : ""), [spec, issues]);
   const ddl = useMemo(() => (spec ? targetDdl(spec) : ""), [spec]);
+  // Source-extraction SQL needs the source model's dialect; blank until it's open.
+  const sql = useMemo(() => {
+    if (!spec || !model) return "";
+    const r = pipelineSql(spec, model);
+    return r.unsupported.length ? `${r.sql}\n-- Notes:\n${r.unsupported.map((u) => `-- ${u}`).join("\n")}\n` : r.sql;
+  }, [spec, model]);
 
   if (!spec) return null;
   const errors = issues.filter((i) => i.severity === "error").length;
@@ -174,12 +180,15 @@ function PipelineView({ id, onDeleted }: { id: string; onDeleted: () => void }) 
       <div className="tabs">
         <button className={`tab-btn ${tab === "mapping" ? "tab-btn--active" : ""}`} onClick={() => setTab("mapping")}>Mapping</button>
         <button className={`tab-btn ${tab === "report" ? "tab-btn--active" : ""}`} onClick={() => setTab("report")}>Report</button>
+        <button className={`tab-btn ${tab === "sql" ? "tab-btn--active" : ""}`} onClick={() => setTab("sql")}>SQL</button>
         <button className={`tab-btn ${tab === "ddl" ? "tab-btn--active" : ""}`} onClick={() => setTab("ddl")}>Target DDL</button>
       </div>
       {tab === "mapping" ? (
         <MappingEditor spec={spec} model={model} onSave={(s) => void upsertPipeline(s)} />
+      ) : tab === "sql" && !model ? (
+        <p className="field__hint field__hint--warn">Open the source model to generate extraction SQL.</p>
       ) : (
-        <pre className="export-preview">{tab === "report" ? report : ddl}</pre>
+        <pre className="export-preview">{tab === "report" ? report : tab === "sql" ? sql : ddl}</pre>
       )}
 
       {saved && <p className="field__hint">Saved {saved}</p>}
@@ -187,7 +196,7 @@ function PipelineView({ id, onDeleted }: { id: string; onDeleted: () => void }) 
         <button className="btn btn--danger btn--small" onClick={async () => { await deletePipeline(spec.id); onDeleted(); }}>
           Delete
         </button>
-        <button className="btn btn--small" onClick={() => navigator.clipboard?.writeText(tab === "report" ? report : ddl)}>Copy</button>
+        <button className="btn btn--small" onClick={() => navigator.clipboard?.writeText(tab === "report" ? report : tab === "sql" ? sql : ddl)}>Copy</button>
         <button className="btn btn--primary btn--small" onClick={exportFiles} disabled={!path}>Export report + DDL</button>
       </div>
     </div>
