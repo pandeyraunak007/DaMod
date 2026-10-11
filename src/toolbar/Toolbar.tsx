@@ -23,6 +23,7 @@ import {
   Sparkles,
   Star,
   Table,
+  Tags,
   Undo2,
   Workflow,
   ZoomIn,
@@ -47,6 +48,7 @@ interface Props {
   onOpenMap: () => void;
   onOpenExport: () => void;
   onOpenDomains: () => void;
+  onOpenNaming: () => void;
   onToggleSemantic: () => void;
   onToggleCopilot: () => void;
   copilotActive: boolean;
@@ -108,7 +110,7 @@ export function Toolbar(props: Props) {
 
       <div className="ribbon__content" role="tabpanel">
         {tab === "File" && <FileTab {...props} />}
-        {tab === "Home" && <HomeTab onOpenDomains={props.onOpenDomains} />}
+        {tab === "Home" && <HomeTab onOpenDomains={props.onOpenDomains} onOpenNaming={props.onOpenNaming} />}
         {tab === "Diagram" && <DiagramTab onOpenMap={props.onOpenMap} onToggleSemantic={onToggleSemantic} semanticActive={semanticActive} />}
         {tab === "Data" && (
           <DataTab
@@ -194,7 +196,7 @@ function FileTab(props: Props) {
   );
 }
 
-function HomeTab({ onOpenDomains }: { onOpenDomains: () => void }) {
+function HomeTab({ onOpenDomains, onOpenNaming }: { onOpenDomains: () => void; onOpenNaming: () => void }) {
   const modelName = useModelStore((s) => s.model.name);
   const level = useModelStore((s) => s.model.level);
   const notation = useModelStore((s) => s.model.notation ?? "IE");
@@ -254,6 +256,7 @@ function HomeTab({ onOpenDomains }: { onOpenDomains: () => void }) {
       <RGroup title="Add">
         <RibbonButton Icon={Table} label={terms.entity} title={`Add ${terms.entity.toLowerCase()}`} onClick={() => createEntity()} />
         <RibbonButton Icon={Shapes} label="Domains" title="Reusable named types" onClick={onOpenDomains} />
+        <RibbonButton Icon={Tags} label="Naming" title="Naming standards — check & apply conventions" onClick={onOpenNaming} />
       </RGroup>
       <RGroup title="Layout">
         <RibbonButton Icon={LayoutGrid} label="Arrange" title="Auto-arrange layout" onClick={arrange} />

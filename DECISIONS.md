@@ -5,6 +5,34 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Naming Standards Phase 2 Slices B–C (preview + apply + manager UI)
+
+Built on Slice A's object + engine. Now usable end-to-end.
+
+**Slice B — preview + apply (logic):**
+- `mirrorForeignKeys` toggle on `NamingStandard` (**default on**, per decision: mirroring
+  as a per-standard flag). `previewNaming(model, standard)` (pure) computes each object's
+  final name (rule + optional FK mirror → FK column adopts its parent PK's final name),
+  the changes (from/to/reasons/mirrored), and **scope-aware collisions** with the exact
+  ids to skip. Relationships reference by stable id, so renames never affect integrity —
+  mirroring is purely cosmetic FK↔PK name sync.
+- `applyNamingStandard(standardId)` applies every non-colliding, valid-identifier change
+  as **one undo step**, preserving ids; returns `{applied, skipped, collisions}`. Colliding
+  or invalid renames are skipped, never forced. Mirror flag persisted only when `false`.
+
+**Slice C — manager UI:**
+- `NamingStandardsDialog` (opened from a new **Naming** ribbon button next to Domains):
+  create standards, edit rules (target/case/prefix/suffix/maxLength), toggle FK-mirroring,
+  see a **live read-only preview** (changes + collision warnings), and **Apply** (one undo,
+  pushes a result notice). Checking never mutates; Apply is the only mutation and is explicit.
+
+**Still deferred:** auto-apply-to-new-objects (opt-in, Phase 2 polish), reserved-word /
+per-dialect identifier-length rules (G8, P2), an Explorer node for standards (nicety),
+Copilot naming actions (Phase 4).
+
+- Tests +9 (Slice B: `namingPreview` ×4, `applyNamingStandard` ×3; Slice C:
+  `namingStandards.render` ×2). **440 TS tests pass; tsc + build clean.**
+
 ## 2026-10-11 — Domains feature audit + Phase 1 Slices 1–2 (erwin-standards roadmap)
 
 Ran a full read-only audit (5 parallel explorers) of Domains, Naming, Data Types,
