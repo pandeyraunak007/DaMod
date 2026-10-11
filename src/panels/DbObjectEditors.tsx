@@ -1,6 +1,6 @@
 import { useModelStore } from "../store/modelStore";
 import { validateIdentifier } from "../model/identifiers";
-import type { DbDialect } from "../model/model";
+import type { DbDialect, SnowflakeObject } from "../model/model";
 
 // Side-panel editors for the non-table database objects (FR-8 extensions):
 // views, indexes, sequences and raw dialect-specific objects.
@@ -274,6 +274,109 @@ export function SchemaEditor({ id, onGone }: { id: string; onGone: () => void })
       <button className="btn btn--danger btn--small" onClick={() => (del(id), onGone())}>
         Delete schema
       </button>
+    </div>
+  );
+}
+
+// Snowflake data-engineering object editor (Req 23 §5/§9) — kind-adaptive, read-only
+// of credentials (stages never expose secrets). Edits flow through the store op.
+const SF_FORMATS = ["CSV", "JSON", "PARQUET", "AVRO", "ORC", "XML"];
+export function SnowflakeObjectEditor({ id, onGone }: { id: string; onGone: () => void }) {
+  const obj = useModelStore((s) => s.model.snowflakeObjects?.find((o) => o.id === id));
+  const update = useModelStore((s) => s.updateSnowflakeObject);
+  const del = useModelStore((s) => s.deleteSnowflakeObject);
+  if (!obj) return null;
+  const set = (p: Partial<SnowflakeObject>) => update(id, p);
+  const field = (label: string, value: string | undefined, key: keyof SnowflakeObject, mono = false) => (
+    <div className="editor__section">
+      <label className="editor__label">{label}</label>
+      {mono ? (
+        <textarea className="editor__input" rows={4} style={{ fontFamily: "ui-monospace, monospace" }} value={value ?? ""} onChange={(e) => set({ [key]: e.target.value } as Partial<SnowflakeObject>)} />
+      ) : (
+        <input className="editor__input" value={value ?? ""} onChange={(e) => set({ [key]: e.target.value } as Partial<SnowflakeObject>)} />
+      )}
+    </div>
+  );
+
+  return (
+    <div className="editor">
+      <div className="editor__section">
+        <label className="editor__label">Name</label>
+        <input className="editor__input" value={obj.name} onChange={(e) => !validateIdentifier(e.target.value) && set({ name: e.target.value })} />
+      </div>
+
+      {obj.kind === "stage" && (
+        <>
+          <div className="editor__section">
+            <label className="editor__label">Stage type</label>
+            <select value={obj.stageType ?? "internal"} onChange={(e) => set({ stageType: e.target.value as SnowflakeObject["stageType"] })}>
+              <option value="internal">internal</option>
+              <option value="external">external</option>
+            </select>
+          </div>
+          {obj.stageType === "external" && field("URL", obj.url, "url")}
+          {field("File format (name)", obj.fileFormat, "fileFormat")}
+          <p className="field__hint">Credentials are never stored or shown here (§5).</p>
+        </>
+      )}
+
+      {obj.kind === "fileFormat" && (
+        <>
+          <div className="editor__section">
+            <label className="editor__label">Format type</label>
+            <select value={obj.formatType ?? "CSV"} onChange={(e) => set({ formatType: e.target.value })}>
+              {SF_FORMATS.map((f) => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </div>
+          {field("Options (raw)", obj.options, "options", true)}
+        </>
+      )}
+
+      {obj.kind === "pipe" && (
+        <>
+          {field("COPY INTO statement", obj.copyStatement, "copyStatement", true)}
+          <div className="editor__section">
+            <label className="checkbox"><input type="checkbox" checked={!!obj.autoIngest} onChange={(e) => set({ autoIngest: e.target.checked })} /> Auto-ingest</label>
+          </div>
+        </>
+      )}
+
+      {obj.kind === "stream" && (
+        <>
+          {field("Source object", obj.sourceObject, "sourceObject")}
+          <div className="editor__section">
+            <label className="editor__label">Stream type</label>
+            <select value={obj.streamType ?? "standard"} onChange={(e) => set({ streamType: e.target.value as SnowflakeObject["streamType"] })}>
+              <option value="standard">standard</option>
+              <option value="append_only">append_only</option>
+              <option value="insert_only">insert_only</option>
+            </select>
+          </div>
+        </>
+      )}
+
+      {obj.kind === "task" && (
+        <>
+          {field("Warehouse", obj.warehouse, "warehouse")}
+          {field("Schedule", obj.schedule, "schedule")}
+          {field("After (parent task)", obj.after, "after")}
+          {field("SQL body", obj.sql, "sql", true)}
+        </>
+      )}
+
+      {obj.kind === "dynamicTable" && (
+        <>
+          {field("Target lag", obj.targetLag, "targetLag")}
+          {field("Warehouse", obj.warehouse, "warehouse")}
+          {field("Query", obj.sql, "sql", true)}
+        </>
+      )}
+
+      <div className="editor__section">
+        <label className="editor__label">Comment</label>
+        <textarea className="editor__input" rows={2} value={obj.comment ?? ""} onChange={(e) => set({ comment: e.target.value || undefined })} />
+      </div>
+      <button className="btn btn--danger btn--small" onClick={() => (del(id), onGone())}>Delete {obj.kind}</button>
     </div>
   );
 }

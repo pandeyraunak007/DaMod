@@ -17,6 +17,7 @@ import type {
   Relationship,
   SchemaObj,
   Sequence,
+  SnowflakeObject,
   Udp,
   View,
 } from "../model/model";
@@ -154,6 +155,20 @@ function serializeSequence(s: Sequence): Record<string, unknown> {
   return out;
 }
 
+const SNOWFLAKE_OBJ_KEYS = [
+  "stageType", "url", "fileFormat", "formatType", "options", "copyStatement",
+  "autoIngest", "sourceObject", "streamType", "warehouse", "schedule", "sql", "after", "targetLag",
+] as const;
+function serializeSnowflakeObject(o: SnowflakeObject): Record<string, unknown> {
+  const out: Record<string, unknown> = { id: o.id, kind: o.kind, name: o.name };
+  for (const k of SNOWFLAKE_OBJ_KEYS) {
+    const v = o[k];
+    if (v !== undefined && v !== "") out[k] = v;
+  }
+  if (o.comment) out.comment = o.comment;
+  return out;
+}
+
 function serializeSchema(s: SchemaObj): Record<string, unknown> {
   const out: Record<string, unknown> = { id: s.id, name: s.name };
   if (s.owner) out.owner = s.owner;
@@ -185,6 +200,9 @@ export function modelToPlain(model: Model): Record<string, unknown> {
   out.entities = model.entities.map(serializeEntity);
   out.relationships = model.relationships.map(serializeRelationship);
   if (model.schemas && model.schemas.length) out.schemas = model.schemas.map(serializeSchema);
+  if (model.snowflakeObjects && model.snowflakeObjects.length) {
+    out.snowflakeObjects = model.snowflakeObjects.map(serializeSnowflakeObject);
+  }
   if (model.subjectAreas && model.subjectAreas.length) {
     out.subjectAreas = model.subjectAreas.map((a) => {
       const sa: Record<string, unknown> = { id: a.id, name: a.name };

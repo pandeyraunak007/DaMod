@@ -275,6 +275,45 @@ function schemaDDL(d: Dialect, s: NonNullable<Model["schemas"]>[number]): string
   return create;
 }
 
+// Snowflake data-engineering objects (Req 23 §5). Emitted only for the Snowflake
+// dialect; for other dialects a comment records that they were omitted (never
+// silently dropped, §15).
+function snowflakeObjectDDL(d: Dialect, o: NonNullable<Model["snowflakeObjects"]>[number]): string {
+  const q = d.quote;
+  const name = q(o.name);
+  const comment = o.comment ? ` COMMENT = ${sqlString(o.comment)}` : "";
+  switch (o.kind) {
+    case "stage": {
+      const url = o.stageType === "external" && o.url ? ` URL = ${sqlString(o.url)}` : "";
+      const ff = o.fileFormat ? ` FILE_FORMAT = ( FORMAT_NAME = ${q(o.fileFormat)} )` : "";
+      return `CREATE STAGE ${name}${url}${ff}${comment};`;
+    }
+    case "fileFormat": {
+      const opts = o.options?.trim() ? ` ${o.options.trim()}` : "";
+      return `CREATE FILE FORMAT ${name} TYPE = '${o.formatType ?? "CSV"}'${opts}${comment};`;
+    }
+    case "pipe": {
+      const ai = o.autoIngest ? " AUTO_INGEST = TRUE" : "";
+      return `CREATE PIPE ${name}${ai}${comment} AS\n${(o.copyStatement ?? "-- COPY INTO …").trim()};`;
+    }
+    case "stream": {
+      const flag = o.streamType === "append_only" ? " APPEND_ONLY = TRUE" : o.streamType === "insert_only" ? " INSERT_ONLY = TRUE" : "";
+      return `CREATE STREAM ${name} ON TABLE ${o.sourceObject ? q(o.sourceObject) : "<source>"}${flag}${comment};`;
+    }
+    case "task": {
+      const wh = o.warehouse ? `\n  WAREHOUSE = ${q(o.warehouse)}` : "";
+      const sched = o.schedule ? `\n  SCHEDULE = ${sqlString(o.schedule)}` : "";
+      const after = o.after ? `\n  AFTER ${q(o.after)}` : "";
+      return `CREATE TASK ${name}${wh}${sched}${after}${comment}\nAS\n${(o.sql ?? "-- task body").trim()};`;
+    }
+    case "dynamicTable": {
+      const lag = o.targetLag ? `\n  TARGET_LAG = ${sqlString(o.targetLag)}` : "";
+      const wh = o.warehouse ? `\n  WAREHOUSE = ${q(o.warehouse)}` : "";
+      return `CREATE DYNAMIC TABLE ${name}${lag}${wh}${comment}\nAS\n${(o.sql ?? "-- query").trim()};`;
+    }
+  }
+}
+
 function rawObjectDDL(d: Dialect, o: NonNullable<Model["rawObjects"]>[number]): string | null {
   if (o.dialect !== d.id || !o.sql.trim()) return null;
   return `-- ${o.name}${o.kind ? ` (${o.kind})` : ""}\n${o.sql.trim()}`;
@@ -298,6 +337,12 @@ function objectBlocks(model: Model, d: Dialect, schema?: string): { pre: string[
     .map((o) => rawObjectDDL(d, o))
     .filter((x): x is string => !!x);
   if (raws.length) post.push(raws.join("\n\n"));
+  // Snowflake data-engineering objects (Req 23 §5) — only for the Snowflake dialect.
+  const sfObjs = model.snowflakeObjects ?? [];
+  if (sfObjs.length) {
+    if (d.id === "snowflake") post.push(sfObjs.map((o) => snowflakeObjectDDL(d, o)).join("\n\n"));
+    else post.push(`-- ${sfObjs.length} Snowflake data-engineering object(s) omitted for ${d.label}`);
+  }
   return { pre, post };
 }
 

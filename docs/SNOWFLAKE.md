@@ -41,7 +41,7 @@ mock, awaits a live adapter · **Live** = needs a Snowflake account · **Deferre
 | Table variants (temporary/transient/external/hybrid) | **Done** | `Entity.tableKind`; DDL emits `CREATE TRANSIENT/HYBRID/TEMPORARY TABLE` (Snowflake keywords); Table-kind selector in the Inspector. Discovering the variant from a live source is a connector enhancement. |
 | Constraint enforcement (declared vs enforced, §4.2) | **Done** | `Relationship.enforced`; Snowflake standard/transient/external tables export PK/UNIQUE/FK as `NOT ENFORCED`, hybrid tables as enforced — so DDL never implies enforcement Snowflake doesn't provide. A validation rule warns when a FK is marked enforced on a non-hybrid Snowflake table. |
 | Secure/materialized views distinction | **Partial** | Views modeled (materialized flag exists); secure-view flag deferred. |
-| Data engineering objects (stages/file formats/pipes/streams/tasks/dynamic tables) | **Deferred** | Phase 4 — new object types (model + DDL + inspector), or carry as `rawObjects` today. |
+| Data engineering objects (stages/file formats/pipes/streams/tasks/dynamic tables) | **Done** | `Model.snowflakeObjects` (unified `SnowflakeObject`, kind-discriminated); Explorer groups (Snowflake-only), kind-adaptive Inspector editor, Snowflake DDL (`CREATE STAGE/FILE FORMAT/PIPE/STREAM/TASK/DYNAMIC TABLE`), omitted with a count comment on other dialects, validation warnings (pipe→COPY, stream→source, task/dynamic→SQL, external stage→URL). **Stage credentials are never stored or shown** (§5). |
 | Governance (roles/grants/tags/masking/row-access policies/shares) | **Deferred** | Phase 5. |
 | Copilot Snowflake context + reviewed actions | **Partial** | The generic Copilot create-actions (tables/columns/subject areas/semantic) work on a Snowflake model; Snowflake-object-specific actions are later. |
 | Live Snowflake adapter (account/warehouse/role + key-pair/OAuth) | **Deferred** | Needs an account to verify. |
@@ -59,10 +59,11 @@ mock, awaits a live adapter · **Live** = needs a Snowflake account · **Deferre
 - **Phase 3 (modeling):** *DONE:* table variants (`Entity.tableKind`) + the **constraint-
   enforcement flag** (`Relationship.enforced`, §4.2). *Remaining:* secure-view flag;
   clustering keys; discovering the table variant from a live source.
-- **Phase 4 (data engineering):** stages, file formats, pipes, streams, tasks, dynamic
-  tables — each a real model object (type + factory → store ops → serialize/Zod →
-  validation → Snowflake DDL → Explorer category → Inspector), mirroring the Req 19
-  object pattern. Interim: carry them as `rawObjects`.
+- **Phase 4 (data engineering):** *DONE.* Stages, file formats, pipes, streams, tasks,
+  dynamic tables modeled as one kind-discriminated `SnowflakeObject` (type + factory →
+  store ops → serialize/Zod → validation → Snowflake DDL → Explorer category → kind-
+  adaptive Inspector). Stage credentials are never stored or displayed. Discovering
+  these from a live account is a connector enhancement (needs an account).
 - **Phase 5 (governance):** roles/grants, tags, masking + row-access policies, shares —
   with policy↔object compatibility checks; kept separate from live privilege admin.
 - **Phase 6:** Snowflake-specific Copilot actions + Snowflake-aware schema-comparison

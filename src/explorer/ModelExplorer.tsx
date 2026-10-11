@@ -4,7 +4,8 @@ import { useModelStore } from "../store/modelStore";
 import { useWorkspaceStore } from "../store/workspaceStore";
 import { fieldTypeLabel } from "../model/fieldDisplay";
 import { displayName } from "../model/presentation";
-import type { Model } from "../model/model";
+import type { Model, SnowflakeObjectKind } from "../model/model";
+import { SNOWFLAKE_OBJECT_KINDS } from "../model/model";
 import {
   type LevelTerms,
   type ModelLevel,
@@ -34,6 +35,15 @@ const LEVEL_BADGE: Record<ModelLevel, string> = {
   Logical: "L",
   "Physical/Logical": "P/L",
   Physical: "P",
+};
+
+const SF_KIND_LABELS: Record<SnowflakeObjectKind, string> = {
+  stage: "Stages",
+  fileFormat: "File formats",
+  pipe: "Pipes",
+  stream: "Streams",
+  task: "Tasks",
+  dynamicTable: "Dynamic tables",
 };
 
 interface MenuItem {
@@ -236,16 +246,21 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
     useModelStore.getState().createRawObject("postgres");
     expand(`m:${tabId}:raw`);
   };
+  const addSnowflakeObject = async (tabId: string, kind: SnowflakeObjectKind) => {
+    await ensureActive(tabId);
+    useModelStore.getState().createSnowflakeObject(kind);
+    expand(`m:${tabId}:sf:${kind}`);
+  };
   const selectObject = async (
     tabId: string,
-    sel: { kind: "view" | "index" | "sequence" | "rawObject" | "schema"; id: string },
+    sel: { kind: "view" | "index" | "sequence" | "rawObject" | "schema" | "snowflakeObject"; id: string },
   ) => {
     await ensureActive(tabId);
     useModelStore.getState().select(sel);
   };
   const deleteObject = async (
     tabId: string,
-    kind: "view" | "index" | "sequence" | "rawObject" | "schema",
+    kind: "view" | "index" | "sequence" | "rawObject" | "schema" | "snowflakeObject",
     oid: string,
   ) => {
     await ensureActive(tabId);
@@ -254,6 +269,7 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
     else if (kind === "index") st.deleteIndex(oid);
     else if (kind === "sequence") st.deleteSequence(oid);
     else if (kind === "schema") st.deleteSchema(oid);
+    else if (kind === "snowflakeObject") st.deleteSnowflakeObject(oid);
     else st.deleteRawObject(oid);
   };
 
@@ -354,6 +370,7 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
             onAddIndex={() => addIndex(activeEntry.tabId)}
             onAddSequence={() => addSequence(activeEntry.tabId)}
             onAddRaw={() => addRaw(activeEntry.tabId)}
+            onAddSnowflakeObject={(kind) => addSnowflakeObject(activeEntry.tabId, kind)}
             onSelectObject={(sel) => selectObject(activeEntry.tabId, sel)}
             onDeleteObject={(kind, oid) => deleteObject(activeEntry.tabId, kind, oid)}
             onDuplicateModel={() => duplicateModel(activeEntry.tabId)}
@@ -447,6 +464,7 @@ function ModelBranch({
   onAddIndex,
   onAddSequence,
   onAddRaw,
+  onAddSnowflakeObject,
   onSelectObject,
   onDeleteObject,
   onDuplicateModel,
@@ -471,8 +489,9 @@ function ModelBranch({
   onAddIndex: () => void;
   onAddSequence: () => void;
   onAddRaw: () => void;
-  onSelectObject: (sel: { kind: "view" | "index" | "sequence" | "rawObject" | "schema"; id: string }) => void;
-  onDeleteObject: (kind: "view" | "index" | "sequence" | "rawObject" | "schema", id: string) => void;
+  onAddSnowflakeObject: (kind: SnowflakeObjectKind) => void;
+  onSelectObject: (sel: { kind: "view" | "index" | "sequence" | "rawObject" | "schema" | "snowflakeObject"; id: string }) => void;
+  onDeleteObject: (kind: "view" | "index" | "sequence" | "rawObject" | "schema" | "snowflakeObject", id: string) => void;
   onDuplicateModel: () => void;
   onDeleteModel: () => void;
 }) {
@@ -657,6 +676,22 @@ function ModelBranch({
                 onDelete={(id) => onDeleteObject("rawObject", id)}
                 openMenu={openMenu}
               />
+              {/* Snowflake data-engineering objects (Req 23 §5) — only for Snowflake models. */}
+              {model.dialect === "snowflake" &&
+                SNOWFLAKE_OBJECT_KINDS.map((kind) => (
+                  <ObjectGroup
+                    key={kind}
+                    open={isOpen(`m:${tabId}:sf:${kind}`)}
+                    onToggle={() => toggle(`m:${tabId}:sf:${kind}`)}
+                    name={SF_KIND_LABELS[kind]}
+                    count={(model.snowflakeObjects ?? []).filter((o) => o.kind === kind).length}
+                    onAdd={() => onAddSnowflakeObject(kind)}
+                    items={(model.snowflakeObjects ?? []).filter((o) => o.kind === kind).filter((v) => !filtering || matches(v.name, q))}
+                    onSelect={(id) => onSelectObject({ kind: "snowflakeObject", id })}
+                    onDelete={(id) => onDeleteObject("snowflakeObject", id)}
+                    openMenu={openMenu}
+                  />
+                ))}
             </>
           )}
         </>

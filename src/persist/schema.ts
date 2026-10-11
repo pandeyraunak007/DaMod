@@ -117,6 +117,27 @@ const zSubjectArea = z.object({
   entities: z.array(z.string()).default([]),
 });
 
+const zSnowflakeObject = z.object({
+  id: z.string(),
+  kind: z.enum(["stage", "fileFormat", "pipe", "stream", "task", "dynamicTable"]),
+  name: z.string(),
+  comment: z.string().optional(),
+  stageType: z.enum(["internal", "external"]).optional(),
+  url: z.string().optional(),
+  fileFormat: z.string().optional(),
+  formatType: z.string().optional(),
+  options: z.string().optional(),
+  copyStatement: z.string().optional(),
+  autoIngest: z.boolean().optional(),
+  sourceObject: z.string().optional(),
+  streamType: z.enum(["standard", "append_only", "insert_only"]).optional(),
+  warehouse: z.string().optional(),
+  schedule: z.string().optional(),
+  sql: z.string().optional(),
+  after: z.string().optional(),
+  targetLag: z.string().optional(),
+});
+
 const zIndex = z.object({
   id: z.string(),
   name: z.string(),
@@ -170,6 +191,7 @@ const zModel = z.object({
   relationships: z.array(zRelationship),
   schemas: z.array(zSchema).optional(),
   subjectAreas: z.array(zSubjectArea).optional(),
+  snowflakeObjects: z.array(zSnowflakeObject).optional(),
   views: z.array(zView).optional(),
   indexes: z.array(zIndex).optional(),
   sequences: z.array(zSequence).optional(),

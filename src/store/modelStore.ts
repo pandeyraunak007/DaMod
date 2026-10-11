@@ -13,6 +13,8 @@ import {
   type RawObject,
   type Relationship,
   type Sequence,
+  type SnowflakeObject,
+  type SnowflakeObjectKind,
   type SubjectArea,
   type View,
   findEntity,
@@ -25,6 +27,7 @@ import {
   newModel,
   newRawObject,
   newSchemaObject,
+  newSnowflakeObject,
   newSubjectArea,
   newSequence,
   newView,
@@ -63,6 +66,7 @@ export type Selection =
   | { kind: "rawObject"; id: string }
   | { kind: "domain"; id: string }
   | { kind: "schema"; id: string }
+  | { kind: "snowflakeObject"; id: string }
   | null;
 
 export interface Notice {
@@ -125,6 +129,11 @@ interface ModelStore {
   createSchema: () => string;
   updateSchema: (id: string, patch: Partial<SchemaObj>) => void;
   deleteSchema: (id: string) => void;
+
+  // Snowflake data-engineering objects (Req 23 §5)
+  createSnowflakeObject: (kind: SnowflakeObjectKind) => string;
+  updateSnowflakeObject: (id: string, patch: Partial<SnowflakeObject>) => void;
+  deleteSnowflakeObject: (id: string) => void;
 
   // subject areas (Req 21 §6) — database-agnostic: any model can group its entities.
   createSubjectArea: (name: string, entities?: string[], product?: string) => string;
@@ -659,6 +668,27 @@ export const useModelStore = create<ModelStore>((set, get) => {
         return existing.id;
       }
       return get().createSubjectArea(name ?? product, ids, product);
+    },
+
+    createSnowflakeObject: (kind) => {
+      const taken = new Set((get().model.snowflakeObjects ?? []).map((o) => o.name));
+      const obj = newSnowflakeObject(kind, uniqueName(`new_${kind.toLowerCase()}`, taken));
+      commit((m) => {
+        m.snowflakeObjects = [...(m.snowflakeObjects ?? []), obj];
+      });
+      set({ selection: { kind: "snowflakeObject", id: obj.id } });
+      return obj.id;
+    },
+    updateSnowflakeObject: (id, patch) => {
+      commit((m) => {
+        m.snowflakeObjects = (m.snowflakeObjects ?? []).map((o) => (o.id === id ? { ...o, ...patch } : o));
+      });
+    },
+    deleteSnowflakeObject: (id) => {
+      commit((m) => {
+        m.snowflakeObjects = (m.snowflakeObjects ?? []).filter((o) => o.id !== id);
+      });
+      set((s) => (s.selection?.kind === "snowflakeObject" && s.selection.id === id ? { selection: null } : {}));
     },
 
     createRawObject: (dialect) => {

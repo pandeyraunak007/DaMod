@@ -5,6 +5,35 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Req 23 Phase 4: Snowflake data-engineering objects
+
+Modeled stages, file formats, pipes, streams, tasks and dynamic tables as first-class
+objects (previously only carryable as opaque `rawObjects`).
+
+- **One unified type, not six.** `Model.snowflakeObjects: SnowflakeObject[]` where
+  `SnowflakeObject` is a single kind-discriminated interface (`kind` ∈ stage/fileFormat/
+  pipe/stream/task/dynamicTable) with a superset of optional fields. Chosen over six
+  parallel collections to avoid ~6× the store/serialize/Zod/Explorer boilerplate for
+  objects that share most plumbing; the kind gates which fields matter. ID prefix `y_`.
+- **Deterministic serialize + Zod** (fixed key order, omit-empty) → byte-identical
+  round-trip (tested). Store ops `create/update/deleteSnowflakeObject` are undo-tracked
+  via `commit`; create selects the new object; delete clears a matching selection.
+- **DDL (`snowflakeObjectDDL`):** emits `CREATE STAGE/FILE FORMAT/PIPE/STREAM/TASK/
+  DYNAMIC TABLE` for the `snowflake` dialect only; other dialects emit a single
+  `-- N Snowflake data-engineering object(s) omitted for <label>` comment (these objects
+  have no equivalent elsewhere, so silently dropping them would be misleading).
+- **Explorer:** six groups rendered only when `model.dialect === "snowflake"` (they'd be
+  noise on a Postgres model). **Inspector:** a kind-adaptive `SnowflakeObjectEditor`.
+- **Security (§5):** the stage editor exposes stageType/url/fileFormat only — **never
+  credentials**; no secret field exists on the model, so none can leak to JSON/DDL/LLM.
+- **Validation:** warnings (not errors — a model can be WIP) when a pipe lacks a COPY
+  statement, a stream lacks a source, a task/dynamic-table lacks SQL, or an external
+  stage lacks a URL.
+- **Not done:** discovering these from a live account (connector enhancement, needs an
+  account); governance objects (Phase 5); Snowflake-object-specific Copilot actions.
+- 394 TS tests (+14: `export/snowflakeObjects.test.ts` ×10, `store/snowflakeObjects.test.ts`
+  ×4); tsc/build clean.
+
 ## 2026-10-11 — Req 23 §4.1/§4.2: table variants + constraint-enforcement flag
 
 The §4.2 declared-vs-enforced distinction is correctness-sensitive — Snowflake standard

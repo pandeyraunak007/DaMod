@@ -662,6 +662,43 @@ function snowflakeEnforcement(ctx: ValidationContext): Issue[] {
   return issues;
 }
 
+// Snowflake data-engineering objects need their defining clause to produce valid
+// DDL (FR: §4 Phase 4). We warn (not error) because a model can legitimately be a
+// work in progress; the DDL exporter still emits a syntactically shaped stub.
+function snowflakeObjectIssues(ctx: ValidationContext): Issue[] {
+  const issues: Issue[] = [];
+  const need: Partial<Record<string, { field: string; label: string }>> = {
+    pipe: { field: "copyStatement", label: "a COPY INTO statement" },
+    stream: { field: "sourceObject", label: "a source object" },
+    task: { field: "sql", label: "a SQL body" },
+    dynamicTable: { field: "sql", label: "a query" },
+  };
+  for (const { id, model } of ctx.models) {
+    for (const obj of model.snowflakeObjects ?? []) {
+      const req = need[obj.kind];
+      if (req && !(obj as unknown as Record<string, unknown>)[req.field]) {
+        issues.push({
+          id: `sfObj:${id}:${obj.id}`,
+          rule: "snowflakeObjectIssues",
+          severity: "warning",
+          message: `Snowflake ${obj.kind} "${obj.name}" needs ${req.label}`,
+          target: { model: id },
+        });
+      }
+      if (obj.kind === "stage" && obj.stageType === "external" && !obj.url) {
+        issues.push({
+          id: `sfObj:${id}:${obj.id}:url`,
+          rule: "snowflakeObjectIssues",
+          severity: "warning",
+          message: `External stage "${obj.name}" needs a URL`,
+          target: { model: id },
+        });
+      }
+    }
+  }
+  return issues;
+}
+
 const RULES: ((ctx: ValidationContext) => Issue[])[] = [
   duplicateEntityNames,
   duplicateFieldNames,
@@ -684,6 +721,7 @@ const RULES: ((ctx: ValidationContext) => Issue[])[] = [
   schemaIssues,
   subjectAreaIssues,
   snowflakeEnforcement,
+  snowflakeObjectIssues,
 ];
 
 /** Run every rule over the workspace and return all issues (FR-10.1). */

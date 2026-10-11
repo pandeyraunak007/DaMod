@@ -251,6 +251,38 @@ export interface SubjectArea {
   product?: string;
 }
 
+/** Snowflake data-engineering objects (Req 23 §5): ingestion/transformation objects
+ *  with per-kind definitions and DDL. One flexible shape (kind-discriminated) rather
+ *  than six near-identical collections; only the fields relevant to each kind are used. */
+export const SNOWFLAKE_OBJECT_KINDS = ["stage", "fileFormat", "pipe", "stream", "task", "dynamicTable"] as const;
+export type SnowflakeObjectKind = (typeof SNOWFLAKE_OBJECT_KINDS)[number];
+
+export interface SnowflakeObject {
+  id: string;
+  kind: SnowflakeObjectKind;
+  name: string;
+  comment?: string;
+  // stage
+  stageType?: "internal" | "external";
+  url?: string;
+  fileFormat?: string; // referenced file-format name
+  // fileFormat
+  formatType?: string; // CSV / JSON / PARQUET / AVRO / ORC / XML
+  options?: string; // raw format / copy options
+  // pipe
+  copyStatement?: string; // COPY INTO …
+  autoIngest?: boolean;
+  // stream
+  sourceObject?: string;
+  streamType?: "standard" | "append_only" | "insert_only";
+  // task / dynamicTable
+  warehouse?: string;
+  schedule?: string; // task
+  sql?: string; // task body / dynamic-table query
+  after?: string; // task: parent task
+  targetLag?: string; // dynamicTable
+}
+
 export type DbDialect = "postgres" | "snowflake" | "databricks" | "oracle" | "sqlserver" | "mysql" | "bigquery";
 
 /** A free-form, dialect-specific object (Snowflake stage/stream/task, Databricks
@@ -284,6 +316,7 @@ export interface Model {
   relationships: Relationship[];
   schemas?: SchemaObj[];
   subjectAreas?: SubjectArea[];
+  snowflakeObjects?: SnowflakeObject[];
   views?: View[];
   indexes?: Index[];
   sequences?: Sequence[];
@@ -350,6 +383,14 @@ export function newSchemaObject(name: string): SchemaObj {
 
 export function newSubjectArea(name: string, entities: string[] = [], product?: string): SubjectArea {
   return { id: newId("subjectArea"), name, entities, ...(product ? { product } : {}) };
+}
+
+export function newSnowflakeObject(kind: SnowflakeObjectKind, name: string): SnowflakeObject {
+  const base: SnowflakeObject = { id: newId("snowflakeObject"), kind, name };
+  if (kind === "stage") base.stageType = "internal";
+  if (kind === "fileFormat") base.formatType = "CSV";
+  if (kind === "stream") base.streamType = "standard";
+  return base;
 }
 
 export function newRawObject(name: string, dialect: DbDialect): RawObject {
