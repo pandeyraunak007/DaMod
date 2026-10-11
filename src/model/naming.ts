@@ -32,10 +32,19 @@ export interface NamingStandard {
   name: string;
   description?: string;
   rules: NamingRule[];
+  /** When not false, applying the standard keeps a foreign-key column's name in sync
+   *  with the (renamed) parent PK column it derives from. Default on; set false to let
+   *  the attribute rule rename FK columns independently. */
+  mirrorForeignKeys?: boolean;
 }
 
 export function newNamingStandard(name: string): NamingStandard {
   return { id: newId("namingStandard"), name, rules: [] };
+}
+
+/** Whether FK-mirroring is active for a standard (default on). */
+export function mirrorsForeignKeys(standard: NamingStandard): boolean {
+  return standard.mirrorForeignKeys !== false;
 }
 
 // ---- transform engine (pure) ------------------------------------------------
@@ -111,6 +120,152 @@ function reasonsFor(current: string, rule: NamingRule): { proposed: string; reas
   }
   if (rule.maxLength != null && current.length > rule.maxLength) reasons.push("length");
   return { proposed, reasons };
+}
+
+// ---- preview + plan (pure, no mutation) -------------------------------------
+
+export interface NamingChange {
+  target: NamingTarget;
+  entityId?: string;
+  fieldId?: string;
+  indexId?: string;
+  from: string;
+  to: string;
+  reasons: string[];
+  /** This FK column's new name was taken from its parent PK (mirror), not the rule. */
+  mirrored?: boolean;
+}
+
+export interface NamingCollision {
+  /** Human scope label, e.g. "entity names" or "columns of Order". */
+  scope: string;
+  name: string;
+  /** Display names of the objects that would share `name`. */
+  members: string[];
+}
+
+export interface NamingPreview {
+  changes: NamingChange[];
+  collisions: NamingCollision[];
+  /** Object ids whose rename is unsafe (would duplicate a name in its scope). The
+   *  apply step skips these. */
+  collidingIds: string[];
+}
+
+function ruleFor(standard: NamingStandard, target: NamingTarget): NamingRule | undefined {
+  return standard.rules.find((r) => r.target === target);
+}
+
+function proposed(name: string, rule: NamingRule | undefined): string {
+  return rule ? applyNamingRule(name, rule) : name;
+}
+
+/** Compute the final name every entity/field/index would have under `standard`
+ *  (rule + optional FK mirroring), the resulting changes, and any name collisions.
+ *  Pure — does not touch the model. Collisions are reported so the caller can skip
+ *  the offending renames rather than create duplicates. */
+export function previewNaming(model: Model, standard: NamingStandard): NamingPreview {
+  const entityRule = ruleFor(standard, "entity");
+  const attrRule = ruleFor(standard, "attribute");
+  const indexRule = ruleFor(standard, "index");
+
+  // Final name per object id (start from rule-only proposals).
+  const fieldFinal = new Map<string, string>();
+  const entityFinal = new Map<string, string>();
+  const indexFinal = new Map<string, string>();
+  for (const e of model.entities) {
+    entityFinal.set(e.id, proposed(e.name, entityRule));
+    for (const f of e.fields) fieldFinal.set(f.id, proposed(f.name, attrRule));
+  }
+  for (const i of model.indexes ?? []) indexFinal.set(i.id, proposed(i.name, indexRule));
+
+  // FK mirroring: a child FK column adopts its parent PK column's final name.
+  const mirrored = new Set<string>();
+  if (mirrorsForeignKeys(standard)) {
+    for (const rel of model.relationships) {
+      const parent = model.entities.find((e) => e.id === rel.parentEntity);
+      if (!parent) continue;
+      const pks = parent.fields.filter((f) => f.primaryKey);
+      const fks = rel.foreignKeyFields ?? [];
+      for (let i = 0; i < Math.min(pks.length, fks.length); i++) {
+        const pkFinal = fieldFinal.get(pks[i].id);
+        if (pkFinal != null && fieldFinal.has(fks[i])) {
+          if (fieldFinal.get(fks[i]) !== pkFinal) mirrored.add(fks[i]);
+          fieldFinal.set(fks[i], pkFinal);
+        }
+      }
+    }
+  }
+
+  const changes: NamingChange[] = [];
+  const nameById = new Map<string, string>();
+  for (const e of model.entities) {
+    nameById.set(e.id, e.name);
+    for (const f of e.fields) nameById.set(f.id, f.name);
+  }
+  for (const i of model.indexes ?? []) nameById.set(i.id, i.name);
+
+  for (const e of model.entities) {
+    const to = entityFinal.get(e.id)!;
+    if (to !== e.name) {
+      changes.push({ target: "entity", entityId: e.id, from: e.name, to, reasons: reasonsFor(e.name, entityRule!).reasons });
+    }
+    for (const f of e.fields) {
+      const to2 = fieldFinal.get(f.id)!;
+      if (to2 !== f.name) {
+        const isMirror = mirrored.has(f.id);
+        changes.push({
+          target: "attribute",
+          entityId: e.id,
+          fieldId: f.id,
+          from: f.name,
+          to: to2,
+          reasons: isMirror ? ["mirror"] : attrRule ? reasonsFor(f.name, attrRule).reasons : [],
+          mirrored: isMirror || undefined,
+        });
+      }
+    }
+  }
+  for (const i of model.indexes ?? []) {
+    const to = indexFinal.get(i.id)!;
+    if (to !== i.name) changes.push({ target: "index", indexId: i.id, from: i.name, to, reasons: reasonsFor(i.name, indexRule!).reasons });
+  }
+
+  // Collisions: duplicate final names within a scope (entity names, each entity's
+  // columns, index names). Counts both renamed and unchanged members; every object
+  // in a clashing group is marked colliding so apply skips it (never create a dup).
+  const collisions: NamingCollision[] = [];
+  const colliding = new Set<string>();
+  const collect = (scope: string, pairs: { id: string; final: string; label: string }[]) => {
+    const byName = new Map<string, { id: string; label: string }[]>();
+    for (const p of pairs) {
+      const arr = byName.get(p.final) ?? [];
+      arr.push({ id: p.id, label: p.label });
+      byName.set(p.final, arr);
+    }
+    for (const [name, members] of byName) {
+      if (members.length > 1) {
+        collisions.push({ scope, name, members: members.map((m) => m.label) });
+        for (const m of members) colliding.add(m.id);
+      }
+    }
+  };
+  collect(
+    "entity names",
+    model.entities.map((e) => ({ id: e.id, final: entityFinal.get(e.id)!, label: e.name })),
+  );
+  for (const e of model.entities) {
+    collect(
+      `columns of ${e.name}`,
+      e.fields.map((f) => ({ id: f.id, final: fieldFinal.get(f.id)!, label: f.name })),
+    );
+  }
+  collect(
+    "index names",
+    (model.indexes ?? []).map((i) => ({ id: i.id, final: indexFinal.get(i.id)!, label: i.name })),
+  );
+
+  return { changes, collisions, collidingIds: [...colliding] };
 }
 
 /** Every violation of `standard` in `model`. Read-only — never mutates the model. */

@@ -9,8 +9,8 @@ import { usesPhysicalTypes } from "./levels";
 import type { NamingStandard } from "./naming";
 
 export type { LogicalTypeKind } from "./levels";
-export type { NamingStandard, NamingRule, NamingTarget, NameCase, NamingViolation } from "./naming";
-export { newNamingStandard, checkNaming, applyNamingRule } from "./naming";
+export type { NamingStandard, NamingRule, NamingTarget, NameCase, NamingViolation, NamingChange, NamingCollision, NamingPreview } from "./naming";
+export { newNamingStandard, checkNaming, applyNamingRule, previewNaming, mirrorsForeignKeys } from "./naming";
 
 export interface Position {
   x: number;

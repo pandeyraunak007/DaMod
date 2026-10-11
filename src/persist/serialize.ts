@@ -192,6 +192,8 @@ function serializeGovernanceObject(o: GovernanceObject): Record<string, unknown>
 function serializeNamingStandard(s: NamingStandard): Record<string, unknown> {
   const out: Record<string, unknown> = { id: s.id, name: s.name };
   if (s.description) out.description = s.description;
+  // Mirroring defaults on; persist only the non-default (false) to stay omit-empty.
+  if (s.mirrorForeignKeys === false) out.mirrorForeignKeys = false;
   out.rules = s.rules.map((r) => {
     const rule: Record<string, unknown> = { target: r.target, case: r.case };
     if (r.prefix) rule.prefix = r.prefix;

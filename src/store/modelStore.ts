@@ -31,6 +31,7 @@ import {
   newRawObject,
   newGovernanceObject,
   newNamingStandard,
+  previewNaming,
   newSchemaObject,
   newSnowflakeObject,
   newSubjectArea,
@@ -189,6 +190,10 @@ interface ModelStore {
   createNamingStandard: () => string;
   updateNamingStandard: (id: string, patch: Partial<Omit<NamingStandard, "id">>) => void;
   deleteNamingStandard: (id: string) => void;
+  /** Apply a naming standard to the whole model as ONE undo step: rename every
+   *  non-colliding, valid-identifier change (incl. FK mirroring when enabled).
+   *  Colliding or invalid renames are skipped (counted). Stable IDs are preserved. */
+  applyNamingStandard: (standardId: string) => { applied: number; skipped: number; collisions: number };
 
   // relationships
   openRelationshipDraft: (source: string, target: string) => void;
@@ -854,6 +859,39 @@ export const useModelStore = create<ModelStore>((set, get) => {
       commit((m) => {
         m.namingStandards = (m.namingStandards ?? []).filter((s) => s.id !== id);
       });
+    },
+    applyNamingStandard: (standardId) => {
+      const std = (get().model.namingStandards ?? []).find((s) => s.id === standardId);
+      if (!std) return { applied: 0, skipped: 0, collisions: 0 };
+      const preview = previewNaming(get().model, std);
+      const skip = new Set(preview.collidingIds);
+      const toApply = preview.changes.filter((c) => {
+        const id = c.fieldId ?? c.entityId ?? c.indexId!;
+        if (skip.has(id)) return false;
+        if (validateIdentifier(c.to)) return false; // never apply an invalid identifier
+        return true;
+      });
+      if (toApply.length) {
+        commit((m) => {
+          for (const c of toApply) {
+            if (c.target === "entity") {
+              const e = m.entities.find((x) => x.id === c.entityId);
+              if (e) e.name = c.to;
+            } else if (c.target === "attribute") {
+              const f = m.entities.find((x) => x.id === c.entityId)?.fields.find((x) => x.id === c.fieldId);
+              if (f) f.name = c.to;
+            } else if (c.target === "index") {
+              const i = (m.indexes ?? []).find((x) => x.id === c.indexId);
+              if (i) i.name = c.to;
+            }
+          }
+        });
+      }
+      return {
+        applied: toApply.length,
+        skipped: preview.changes.length - toApply.length,
+        collisions: preview.collisions.length,
+      };
     },
     bindFieldDomain: (entityId, fieldId, domainId) => {
       set((s) => {

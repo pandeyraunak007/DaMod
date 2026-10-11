@@ -151,6 +151,7 @@ const zNamingStandard = z.object({
   name: z.string(),
   description: z.string().optional(),
   rules: z.array(zNamingRule).default([]),
+  mirrorForeignKeys: z.boolean().optional(),
 });
 
 const zGovernanceObject = z.object({
