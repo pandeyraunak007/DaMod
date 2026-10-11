@@ -27,6 +27,7 @@ export const ID_PREFIXES = {
   subjectArea: "a_",
   snowflakeObject: "y_",
   governanceObject: "z_",
+  namingStandard: "j_",
   connection: "g_",
   snapshot: "s_",
   pipeline: "p_",
@@ -54,7 +55,7 @@ export function newId(kind: IdKind): string {
   return ID_PREFIXES[kind] + randomSuffix();
 }
 
-const ID_PATTERN = new RegExp(`^(m|e|f|r|l|c|t|d|k|b|v|x|q|o|n|h|w|a|y|z|g|s|p)_[0-9a-z]{${RANDOM_LENGTH}}$`);
+const ID_PATTERN = new RegExp(`^(m|e|f|r|l|c|t|d|k|b|v|x|q|o|n|h|w|a|y|z|j|g|s|p)_[0-9a-z]{${RANDOM_LENGTH}}$`);
 
 /** True when a string is a well-formed DaMod ID of any kind. */
 export function isId(value: string): boolean {

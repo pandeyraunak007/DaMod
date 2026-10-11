@@ -9,6 +9,7 @@ import {
   type Model,
   type GovernanceObject,
   type GovernanceObjectKind,
+  type NamingStandard,
   type Notation,
   type Position,
   type SchemaObj,
@@ -29,6 +30,7 @@ import {
   newModel,
   newRawObject,
   newGovernanceObject,
+  newNamingStandard,
   newSchemaObject,
   newSnowflakeObject,
   newSubjectArea,
@@ -181,6 +183,12 @@ interface ModelStore {
    *  current type (the legacy behaviour); "reassign" rebinds them to another domain
    *  (applying its type). One undo entry. */
   deleteDomainResolved: (id: string, mode: "detach" | "reassign", replacementId?: string) => void;
+
+  // naming standards (Phase 2) — reusable identifier conventions. Create/edit/delete
+  // are undo-tracked; checking/applying live in model/naming.ts + later slices.
+  createNamingStandard: () => string;
+  updateNamingStandard: (id: string, patch: Partial<Omit<NamingStandard, "id">>) => void;
+  deleteNamingStandard: (id: string) => void;
 
   // relationships
   openRelationshipDraft: (source: string, target: string) => void;
@@ -828,6 +836,24 @@ export const useModelStore = create<ModelStore>((set, get) => {
         domainDeletePending: null,
         ...(s.selection?.kind === "domain" && s.selection.id === id ? { selection: null } : {}),
       }));
+    },
+    createNamingStandard: () => {
+      const taken = new Set((get().model.namingStandards ?? []).map((s) => s.name));
+      const std = newNamingStandard(uniqueName("New standard", taken));
+      commit((m) => {
+        m.namingStandards = [...(m.namingStandards ?? []), std];
+      });
+      return std.id;
+    },
+    updateNamingStandard: (id, patch) => {
+      commit((m) => {
+        m.namingStandards = (m.namingStandards ?? []).map((s) => (s.id === id ? { ...s, ...patch } : s));
+      });
+    },
+    deleteNamingStandard: (id) => {
+      commit((m) => {
+        m.namingStandards = (m.namingStandards ?? []).filter((s) => s.id !== id);
+      });
     },
     bindFieldDomain: (entityId, fieldId, domainId) => {
       set((s) => {

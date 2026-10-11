@@ -6,8 +6,11 @@ import { newId } from "../lib/ids";
 import { type DataTypeKind, withTypeDefaults } from "./dataTypes";
 import type { LogicalTypeKind, ModelLevel } from "./levels";
 import { usesPhysicalTypes } from "./levels";
+import type { NamingStandard } from "./naming";
 
 export type { LogicalTypeKind } from "./levels";
+export type { NamingStandard, NamingRule, NamingTarget, NameCase, NamingViolation } from "./naming";
+export { newNamingStandard, checkNaming, applyNamingRule } from "./naming";
 
 export interface Position {
   x: number;
@@ -350,6 +353,7 @@ export interface Model {
   subjectAreas?: SubjectArea[];
   snowflakeObjects?: SnowflakeObject[];
   governanceObjects?: GovernanceObject[];
+  namingStandards?: NamingStandard[];
   views?: View[];
   indexes?: Index[];
   sequences?: Sequence[];

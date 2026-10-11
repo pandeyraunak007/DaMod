@@ -14,6 +14,7 @@ import type {
   GovernanceObject,
   Index,
   Model,
+  NamingStandard,
   RawObject,
   Relationship,
   SchemaObj,
@@ -188,6 +189,19 @@ function serializeGovernanceObject(o: GovernanceObject): Record<string, unknown>
   return out;
 }
 
+function serializeNamingStandard(s: NamingStandard): Record<string, unknown> {
+  const out: Record<string, unknown> = { id: s.id, name: s.name };
+  if (s.description) out.description = s.description;
+  out.rules = s.rules.map((r) => {
+    const rule: Record<string, unknown> = { target: r.target, case: r.case };
+    if (r.prefix) rule.prefix = r.prefix;
+    if (r.suffix) rule.suffix = r.suffix;
+    if (r.maxLength != null) rule.maxLength = r.maxLength;
+    return rule;
+  });
+  return out;
+}
+
 function serializeSchema(s: SchemaObj): Record<string, unknown> {
   const out: Record<string, unknown> = { id: s.id, name: s.name };
   if (s.owner) out.owner = s.owner;
@@ -224,6 +238,9 @@ export function modelToPlain(model: Model): Record<string, unknown> {
   }
   if (model.governanceObjects && model.governanceObjects.length) {
     out.governanceObjects = model.governanceObjects.map(serializeGovernanceObject);
+  }
+  if (model.namingStandards && model.namingStandards.length) {
+    out.namingStandards = model.namingStandards.map(serializeNamingStandard);
   }
   if (model.subjectAreas && model.subjectAreas.length) {
     out.subjectAreas = model.subjectAreas.map((a) => {

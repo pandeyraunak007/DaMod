@@ -138,6 +138,21 @@ const zSnowflakeObject = z.object({
   targetLag: z.string().optional(),
 });
 
+const zNamingRule = z.object({
+  target: z.enum(["entity", "attribute", "index"]),
+  case: z.enum(["snake_case", "screaming_snake", "pascal", "camel", "preserve"]),
+  prefix: z.string().optional(),
+  suffix: z.string().optional(),
+  maxLength: z.number().int().positive().optional(),
+});
+
+const zNamingStandard = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  rules: z.array(zNamingRule).default([]),
+});
+
 const zGovernanceObject = z.object({
   id: z.string(),
   kind: z.enum(["role", "grant", "tag", "maskingPolicy", "rowAccessPolicy", "share"]),
@@ -211,6 +226,7 @@ const zModel = z.object({
   subjectAreas: z.array(zSubjectArea).optional(),
   snowflakeObjects: z.array(zSnowflakeObject).optional(),
   governanceObjects: z.array(zGovernanceObject).optional(),
+  namingStandards: z.array(zNamingStandard).optional(),
   views: z.array(zView).optional(),
   indexes: z.array(zIndex).optional(),
   sequences: z.array(zSequence).optional(),
