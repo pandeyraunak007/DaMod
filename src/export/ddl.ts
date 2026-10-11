@@ -205,8 +205,8 @@ function sequenceDDL(
   s: NonNullable<Model["sequences"]>[number],
   schema?: string,
 ): string {
-  if (d.id === "databricks") {
-    return `-- sequence ${s.name}: Databricks has no CREATE SEQUENCE; use GENERATED ALWAYS AS IDENTITY on the column.`;
+  if (d.id === "databricks" || d.id === "mysql" || d.id === "bigquery") {
+    return `-- sequence ${s.name}: ${d.label} has no CREATE SEQUENCE; use an identity/auto-increment column.`;
   }
   return `CREATE SEQUENCE ${tableRef(d, s.name, schema)} START WITH ${s.start ?? 1} INCREMENT BY ${s.increment ?? 1};`;
 }
@@ -226,13 +226,13 @@ function indexDDL(
   if (cols.length === 0) return null;
   const tbl = tableRef(d, entity.name, schema);
   const list = cols.join(", ");
-  if (d.id === "postgres") {
+  if (d.id === "postgres" || d.id === "oracle" || d.id === "mysql" || d.id === "sqlserver") {
     return `CREATE ${idx.unique ? "UNIQUE " : ""}INDEX ${d.quote(idx.name)} ON ${tbl} (${list});`;
   }
   if (d.id === "snowflake") {
     return `ALTER TABLE ${tbl} CLUSTER BY (${list}); -- Snowflake has no indexes; using a clustering key`;
   }
-  return `-- Databricks: OPTIMIZE ${tbl} ZORDER BY (${list});`;
+  return `-- ${d.label}: OPTIMIZE ${tbl} ZORDER BY (${list});`;
 }
 
 function viewDDL(d: Dialect, v: NonNullable<Model["views"]>[number], schema?: string): string {

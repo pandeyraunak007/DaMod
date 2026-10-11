@@ -19,6 +19,10 @@ const DIALECT_HINTS: Record<DbDialect, string> = {
   postgres: "Full support: types, DDL, live connection and reverse-engineering.",
   snowflake: "Physical types and DDL export. No live connection yet.",
   databricks: "Physical types and DDL export. No live connection yet.",
+  oracle: "Physical types and DDL export (VARCHAR2/NUMBER/CLOB). No live connection yet.",
+  sqlserver: "Physical types and DDL export (T-SQL). No live connection yet.",
+  mysql: "Physical types and DDL export. No live connection yet.",
+  bigquery: "Physical types and DDL export (INT64/STRING). No live connection yet.",
 };
 
 // Create-model dialog. The modeling level is the primary choice (ERwin-style):

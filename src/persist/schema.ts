@@ -133,7 +133,7 @@ const zSequence = z.object({
 const zRawObject = z.object({
   id: z.string(),
   name: z.string(),
-  dialect: z.enum(["postgres", "snowflake", "databricks"]),
+  dialect: z.enum(["postgres", "snowflake", "databricks", "oracle", "sqlserver", "mysql", "bigquery"]),
   kind: z.string().optional(),
   sql: z.string(),
 });
@@ -159,7 +159,7 @@ const zModel = z.object({
   level: z.enum(MODEL_LEVELS as unknown as [string, ...string[]]).optional().default("Physical"),
   // Target database (Req 17). Optional: models written before Req 17 have none and
   // keep current behaviour (Postgres default applied at use via modelDialect).
-  dialect: z.enum(["postgres", "snowflake", "databricks"]).optional(),
+  dialect: z.enum(["postgres", "snowflake", "databricks", "oracle", "sqlserver", "mysql", "bigquery"]).optional(),
   notation: z.enum(["IE", "IDEF1X"]).optional(),
   derivedFrom: z.string().optional(),
   createdAt: z.string(),

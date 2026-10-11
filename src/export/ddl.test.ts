@@ -144,3 +144,53 @@ describe("referential integrity in DDL (ERwin RI)", () => {
     expect(sql).toContain("ON DELETE CASCADE ON UPDATE RESTRICT");
   });
 });
+
+import { newIndex, newSequence } from "../model/model";
+
+describe("additional DDL dialects (Oracle/SQL Server/MySQL/BigQuery)", () => {
+  function richModel(): Model {
+    const m = newModel("shop", "t", "Physical");
+    const e = newEntity("Invoice", { x: 0, y: 0 });
+    e.fields.push(newField("id", "uuid", { primaryKey: true, nullable: false }));
+    e.fields.push(newField("amount", "decimal", { precision: 12, scale: 2 }));
+    e.fields.push(newField("memo", "text"));
+    e.fields.push(newField("active", "boolean"));
+    m.entities.push(e);
+    m.indexes = [newIndex("invoice_amount_idx", e.id)];
+    m.indexes[0].fields = [e.fields[1].id];
+    m.sequences = [newSequence("invoice_seq")];
+    return m;
+  }
+
+  it("Oracle: VARCHAR2/NUMBER/CLOB + CREATE INDEX + CREATE SEQUENCE", () => {
+    const ddl = exportModelDDL(richModel(), DIALECTS.oracle);
+    expect(ddl).toContain("RAW(16)"); // uuid
+    expect(ddl).toContain("NUMBER(12,2)"); // decimal
+    expect(ddl).toContain("CLOB"); // text
+    expect(ddl).toContain("NUMBER(1)"); // boolean
+    expect(ddl).toContain("CREATE INDEX");
+    expect(ddl).toContain("CREATE SEQUENCE");
+  });
+
+  it("SQL Server: NVARCHAR/UNIQUEIDENTIFIER, bracket quoting, no comments", () => {
+    const ddl = exportModelDDL(richModel(), DIALECTS.sqlserver);
+    expect(ddl).toContain("UNIQUEIDENTIFIER");
+    expect(ddl).toContain("DECIMAL(12,2)");
+    expect(ddl).toContain("[Invoice]"); // bracket-quoted identifier
+    expect(ddl).not.toContain("COMMENT ON");
+  });
+
+  it("MySQL: backtick quoting, TINYINT(1) boolean, no CREATE SEQUENCE", () => {
+    const ddl = exportModelDDL(richModel(), DIALECTS.mysql);
+    expect(ddl).toContain("`Invoice`");
+    expect(ddl).toContain("TINYINT(1)");
+    expect(ddl).toContain("has no CREATE SEQUENCE");
+  });
+
+  it("BigQuery: INT64/STRING/NUMERIC", () => {
+    const ddl = exportModelDDL(richModel(), DIALECTS.bigquery);
+    expect(ddl).toContain("NUMERIC"); // decimal
+    expect(ddl).toContain("STRING"); // uuid/text
+    expect(ddl).toContain("BOOL");
+  });
+});

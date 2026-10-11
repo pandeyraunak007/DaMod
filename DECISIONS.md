@@ -5,6 +5,24 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Four more DDL dialects: Oracle, SQL Server, MySQL, BigQuery
+
+Added as DDL *output* targets (export + pipeline target + New Model target database),
+so a reverse-engineered EBS/Fusion/relational model can generate DDL for them.
+
+- `export/dialects.ts`: extended `DialectId`/`DIALECTS`/`DIALECT_IDS` with oracle/
+  sqlserver/mysql/bigquery (type map + quoting + commentStyle). Added `commentStyle:
+  "none"` for dialects without a simple column comment (SQL Server, BigQuery).
+- `ddl.ts`: `indexDDL` emits `CREATE INDEX` for postgres/oracle/mysql/sqlserver (clustering
+  for Snowflake, OPTIMIZE comment for Databricks/BigQuery); `sequenceDDL` emits `CREATE
+  SEQUENCE` for those with it (comment for Databricks/MySQL/BigQuery).
+- Kept `DbDialect` (model target) in sync + the Zod enums (model.dialect, rawObject),
+  New Model dialect hints, and the raw-object editor. Everything that maps over
+  `DIALECT_IDS` (ExportDialog, pipeline target platform) picks them up automatically.
+- **Not an Oracle *source*** — DaMod models FROM Oracle (via the connectors) and now
+  generates Oracle/SQL-Server/MySQL/BigQuery DDL *out*; still no live DB connection.
+- 369 TS tests (+4: per-dialect DDL in `ddl.test.ts`); tsc/build/cargo clean.
+
 ## 2026-10-11 — Source-snapshot browser (Req 21/22 §11)
 
 Surfaces the snapshot-only metadata that §11 keeps OFF the model — EBS application

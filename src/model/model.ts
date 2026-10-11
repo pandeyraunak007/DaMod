@@ -238,7 +238,7 @@ export interface SubjectArea {
   product?: string;
 }
 
-export type DbDialect = "postgres" | "snowflake" | "databricks";
+export type DbDialect = "postgres" | "snowflake" | "databricks" | "oracle" | "sqlserver" | "mysql" | "bigquery";
 
 /** A free-form, dialect-specific object (Snowflake stage/stream/task, Databricks
  *  table properties, etc.) whose SQL body is exported verbatim for its dialect. */

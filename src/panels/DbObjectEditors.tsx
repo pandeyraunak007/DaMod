@@ -181,7 +181,7 @@ export function SequenceEditor({ id, onGone }: { id: string; onGone: () => void 
   );
 }
 
-const DIALECTS: DbDialect[] = ["postgres", "snowflake", "databricks"];
+const DIALECTS: DbDialect[] = ["postgres", "snowflake", "databricks", "oracle", "sqlserver", "mysql", "bigquery"];
 
 export function RawObjectEditor({ id, onGone }: { id: string; onGone: () => void }) {
   const obj = useModelStore((s) => s.model.rawObjects?.find((o) => o.id === id));

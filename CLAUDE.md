@@ -223,7 +223,8 @@ auto-arrange, star layout, 50+ undo; atomic autosave, `.history/` + restore, ext
 change reload, format migration; cross-model links (same-as/references/derived-from) +
 workspace map; semantic/OLAP layer (terms, dimensions, time dims, metrics, derived
 metrics, cubes, lineage, semantic.yaml); multi-dialect DDL export (Postgres/Snowflake/
-Databricks); one-function-per-rule validation; **four modeling levels** (Conceptual/
+Databricks/**Oracle/SQL Server/MySQL/BigQuery** — 7 dialects, as output targets);
+one-function-per-rule validation; **four modeling levels** (Conceptual/
 Logical/Physical-Logical/Physical) governing fields/canvas/DDL eligibility; Model Explorer tree.
 
 **Beyond-spec modeling:** reusable **domains** (bind + propagate + detach-on-override);
