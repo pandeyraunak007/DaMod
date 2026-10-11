@@ -180,6 +180,50 @@ const zCreateGovernanceObject = z.object({
   accounts: z.array(z.string()).optional(),
 });
 
+// ---- Naming & Data Type Standards (Phase 4) ---------------------------------
+// Create-only for definitions; apply operates by standard name. Apply mutates
+// (renames / normalises params) → structural, reviewed + approved, one undo group.
+const zCreateNamingStandard = z.object({
+  kind: z.literal("create_naming_standard"),
+  name: z.string(),
+  description: z.string().optional(),
+  mirrorForeignKeys: z.boolean().optional(),
+  rules: z
+    .array(
+      z.object({
+        target: z.enum(["entity", "attribute", "index"]),
+        case: z.enum(["snake_case", "screaming_snake", "pascal", "camel", "preserve"]),
+        prefix: z.string().optional(),
+        suffix: z.string().optional(),
+        maxLength: z.number().int().positive().optional(),
+      }),
+    )
+    .default([]),
+});
+const zApplyNamingStandard = z.object({
+  kind: z.literal("apply_naming_standard"),
+  name: z.string(), // the standard's name
+});
+const zCreateTypeStandard = z.object({
+  kind: z.literal("create_type_standard"),
+  name: z.string(),
+  description: z.string().optional(),
+  rules: z
+    .array(
+      z.object({
+        type: z.enum(DATA_TYPE_KINDS as unknown as [string, ...string[]]),
+        length: z.number().int().positive().optional(),
+        precision: z.number().int().positive().optional(),
+        scale: z.number().int().nonnegative().optional(),
+      }),
+    )
+    .default([]),
+});
+const zApplyTypeStandard = z.object({
+  kind: z.literal("apply_type_standard"),
+  name: z.string(),
+});
+
 const zDeleteEntity = z.object({ kind: z.literal("delete_entity"), entity: z.string() });
 const zDeleteAttribute = z.object({
   kind: z.literal("delete_attribute"),
@@ -212,6 +256,10 @@ export const zAction = z.discriminatedUnion("kind", [
   zCreateMetric,
   zCreateSnowflakeObject,
   zCreateGovernanceObject,
+  zCreateNamingStandard,
+  zApplyNamingStandard,
+  zCreateTypeStandard,
+  zApplyTypeStandard,
   zDeleteEntity,
   zDeleteAttribute,
   zDeleteRelationship,
@@ -266,6 +314,10 @@ const STRUCTURAL = new Set([
   "create_metric",
   "create_snowflake_object",
   "create_governance_object",
+  "create_naming_standard",
+  "apply_naming_standard",
+  "create_type_standard",
+  "apply_type_standard",
 ]);
 export function requiresApproval(plan: CopilotPlan): boolean {
   const mutating = plan.actions.length;

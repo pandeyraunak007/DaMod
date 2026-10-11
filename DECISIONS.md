@@ -5,6 +5,34 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Copilot standards actions + compliance context (Phase 4 Slice A)
+
+The Copilot can now create and apply Naming & Data Type Standards, and reason about
+compliance read-only — all through the EXISTING action→execute→store path (no second
+engine, no direct JSON/Zustand mutation).
+
+- **Actions** (`actions.ts`): `create_naming_standard`, `apply_naming_standard`,
+  `create_type_standard`, `apply_type_standard`. All four are in the STRUCTURAL set →
+  reviewed + approved before running. Apply operates by standard NAME. `execute.ts`
+  reuses `createNamingStandard`/`updateNamingStandard`/`applyNamingStandard` (and the
+  type equivalents) verbatim, so a create+apply plan is ONE undo group and apply is
+  idempotent (conformant model → skipped). Create skips a duplicate-named standard.
+- **Read-only compliance** done via CONTEXT, not a new execution path (avoids the
+  "every action mutates" assumption): `context.ts` now lists each naming/type standard
+  with a live off-standard COUNT (via checkNaming/checkTypes), and populates the
+  previously-unused `namingStandards` + `validation` privacy categories. The prompt
+  tells the model to ANSWER compliance questions from context and only emit apply_* when
+  the user asks to fix. Only names + counts go to the LLM — never column data.
+- Zod widens the type-rule `type` to string (DATA_TYPE_KINDS cast); the enum still
+  guarantees validity, so execute casts to TypeRule[] at the boundary.
+
+**Deferred:** Copilot domain apply/replace/detach actions; a real before/after diff in
+the plan card (still a textual action list); update/delete of standards via Copilot.
+
+- Tests +5 (`copilot/standardsActions.test.ts`: create+apply one-undo, idempotent,
+  not-found fail, type normalise, invalid-rule rejection). **454 TS tests pass; tsc +
+  build clean.**
+
 ## 2026-10-11 — Data Type Standards Phase 3 (object + engine + apply + manager UI)
 
 Reusable per-model type-PARAMETER policies + dialect lossy-mapping surfacing. Key

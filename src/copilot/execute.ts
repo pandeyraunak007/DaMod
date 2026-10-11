@@ -9,7 +9,7 @@ import { useModelStore } from "../store/modelStore";
 import { useWorkspaceStore } from "../store/workspaceStore";
 import { validateIdentifier } from "../model/identifiers";
 import { validateWorkspace } from "../validation/rules";
-import type { Entity, Field, Model } from "../model/model";
+import type { Entity, Field, Model, TypeRule } from "../model/model";
 import type { CopilotAction, CopilotPlan } from "./actions";
 import { type DataTypeKind, withTypeDefaults } from "../model/dataTypes";
 import { newTerm, newDimension, newMetric } from "../semantic/semantic";
@@ -318,6 +318,51 @@ function applyAction(action: CopilotAction): ActionResult {
       const id = store.createGovernanceObject(objectKind);
       store.updateGovernanceObject(id, { name, ...rest });
       return ok(`Created ${objectKind} “${action.name}”`);
+    }
+
+    case "create_naming_standard": {
+      if (!action.name.trim()) return fail("naming standard needs a name");
+      if ((model().namingStandards ?? []).some((s) => s.name.toLowerCase() === action.name.toLowerCase())) {
+        return skip(`naming standard “${action.name}” already exists`);
+      }
+      const id = store.createNamingStandard();
+      store.updateNamingStandard(id, {
+        name: action.name,
+        ...(action.description ? { description: action.description } : {}),
+        ...(action.mirrorForeignKeys === false ? { mirrorForeignKeys: false } : {}),
+        rules: action.rules,
+      });
+      return ok(`Created naming standard “${action.name}” (${action.rules.length} rule(s))`);
+    }
+
+    case "apply_naming_standard": {
+      const std = (model().namingStandards ?? []).find((s) => s.name.toLowerCase() === action.name.toLowerCase());
+      if (!std) return fail(`Naming standard “${action.name}” not found`);
+      const r = store.applyNamingStandard(std.id);
+      if (r.applied === 0 && r.skipped === 0) return skip(`Model already conforms to “${action.name}”`);
+      return ok(`Applied “${action.name}”: ${r.applied} rename(s)${r.skipped ? `, ${r.skipped} skipped` : ""}${r.collisions ? `, ${r.collisions} collision(s)` : ""}`);
+    }
+
+    case "create_type_standard": {
+      if (!action.name.trim()) return fail("type standard needs a name");
+      if ((model().typeStandards ?? []).some((s) => s.name.toLowerCase() === action.name.toLowerCase())) {
+        return skip(`type standard “${action.name}” already exists`);
+      }
+      const id = store.createTypeStandard();
+      store.updateTypeStandard(id, {
+        name: action.name,
+        ...(action.description ? { description: action.description } : {}),
+        rules: action.rules as TypeRule[], // Zod widened `type` to string; the enum guarantees validity
+      });
+      return ok(`Created type standard “${action.name}” (${action.rules.length} rule(s))`);
+    }
+
+    case "apply_type_standard": {
+      const std = (model().typeStandards ?? []).find((s) => s.name.toLowerCase() === action.name.toLowerCase());
+      if (!std) return fail(`Type standard “${action.name}” not found`);
+      const r = store.applyTypeStandard(std.id);
+      if (r.applied === 0) return skip(`Model already conforms to “${action.name}”`);
+      return ok(`Applied “${action.name}”: normalised ${r.applied} column(s)`);
     }
 
     case "delete_entity": {

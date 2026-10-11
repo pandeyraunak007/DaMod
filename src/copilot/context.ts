@@ -4,6 +4,7 @@
 // and a raw object used for the no-secret leak check.
 
 import type { Model, Entity } from "../model/model";
+import { checkNaming, checkTypes } from "../model/model";
 import { fieldTypeLabel } from "../model/fieldDisplay";
 import { levelTerms } from "../model/levels";
 import type { SemanticDoc } from "../semantic/semantic";
@@ -91,6 +92,16 @@ export function buildContext(
   if (model.governanceObjects?.length) {
     lines.push(`Snowflake governance objects (${model.governanceObjects.length}): ${model.governanceObjects.map((o) => `${o.name} [${o.kind}]`).join(", ")}`);
   }
+  // Governance standards + a live compliance summary so the AI can answer read-only
+  // "what violates X?" questions and reference existing standards by name.
+  for (const std of model.namingStandards ?? []) {
+    const n = checkNaming(model, std).length;
+    lines.push(`Naming standard “${std.name}” (${std.rules.length} rule(s)): ${n} object(s) off-standard`);
+  }
+  for (const std of model.typeStandards ?? []) {
+    const n = checkTypes(model, std).length;
+    lines.push(`Type standard “${std.name}” (${std.rules.length} rule(s)): ${n} column(s) off-standard`);
+  }
   // Semantic layer is workspace-wide (always available regardless of level) — list
   // what exists so the AI references rather than duplicates it.
   if (semantic && (semantic.terms.length || semantic.dimensions.length || semantic.metrics.length)) {
@@ -105,6 +116,8 @@ export function buildContext(
   const hasSensitive = inScope.some((e) => e.description) || true; // names are sensitive
   if (inScope.some((e) => e.description || e.fields.some((f) => f.description))) categories.push("descriptions");
   if (model.domains?.length) categories.push("domains");
+  if (model.namingStandards?.length) categories.push("namingStandards");
+  if ((model.namingStandards?.length ?? 0) + (model.typeStandards?.length ?? 0) > 0) categories.push("validation");
 
   return {
     text: lines.join("\n"),

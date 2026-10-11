@@ -38,6 +38,10 @@ Action is one of:
 - { "kind": "create_metric", "name": string, "aggregate"?: "sum"|"count"|"count_distinct"|"avg"|"min"|"max", "entity"?: string, "field"?: string, "description"?: string }   // SEMANTIC LAYER: a measure, e.g. sum of Order.total
 - { "kind": "create_snowflake_object", "objectKind": "stage"|"fileFormat"|"pipe"|"stream"|"task"|"dynamicTable", "name": string, ... }   // SNOWFLAKE ONLY data-engineering object. Per kind: stage(stageType,url,fileFormat), fileFormat(formatType,options), pipe(copyStatement,autoIngest), stream(sourceObject,streamType), task(warehouse,schedule,sql,after), dynamicTable(targetLag,warehouse,sql). NEVER include credentials/secrets.
 - { "kind": "create_governance_object", "objectKind": "role"|"grant"|"tag"|"maskingPolicy"|"rowAccessPolicy"|"share", "name": string, ... }   // SNOWFLAKE ONLY governance object. Per kind: role(grantedRoles[]), grant(privilege,onObject,toRole), tag(allowedValues[]), maskingPolicy(argType,returnType,body), rowAccessPolicy(signature,body), share(shareObjects[],accounts[]). Policy bodies are author-provided expressions, never secrets.
+- { "kind": "create_naming_standard", "name": string, "description"?: string, "mirrorForeignKeys"?: boolean, "rules": Array<{ "target": "entity"|"attribute"|"index", "case": "snake_case"|"screaming_snake"|"pascal"|"camel"|"preserve", "prefix"?: string, "suffix"?: string, "maxLength"?: number }> }   // GOVERNANCE: a reusable naming convention
+- { "kind": "apply_naming_standard", "name": string }   // rename objects to conform to a standard (by its name); colliding/invalid renames are skipped
+- { "kind": "create_type_standard", "name": string, "description"?: string, "rules": Array<{ "type": type, "length"?: number, "precision"?: number, "scale"?: number }> }   // GOVERNANCE: reusable type-parameter policy (e.g. decimal→(15,2))
+- { "kind": "apply_type_standard", "name": string }   // normalise column type parameters to a standard (by its name); domain-bound columns are left alone
 - { "kind": "delete_entity", "entity": string }
 - { "kind": "delete_attribute", "entity": string, "field": string }
 - { "kind": "delete_relationship", "parent": string, "child": string }
@@ -48,6 +52,7 @@ Rules:
 - Do NOT invent uniqueness/mandatory/business rules unless the user asked or it is an obvious key; put any guess in "assumptions".
 - Only use the modeling terminology shown in the context's level for TABLE/COLUMN edits.
 - Semantic-layer actions (create_term/create_dimension/create_metric) and subject areas, schemas, views, indexes, sequences, domains and check constraints are available at ANY modeling level — use them when asked.
+- For compliance questions ("what violates my naming/type standard?"), ANSWER from the context's standard summaries — do NOT emit an apply_* action unless the user asks to fix/apply. apply_naming_standard / apply_type_standard reference an existing standard by name.
 - Snowflake data-engineering (create_snowflake_object) and governance (create_governance_object) objects apply ONLY when the model targets Snowflake. NEVER put credentials, secret values, or sensitive policy content in any field.
 - Keep the plan minimal and grounded in the given model; do not reference objects that are not in the context.`;
 

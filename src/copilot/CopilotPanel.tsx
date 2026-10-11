@@ -345,6 +345,14 @@ function describeAction(a: CopilotPlan["actions"][number]): string {
       return `+ ${a.objectKind} ${a.name}`;
     case "create_governance_object":
       return `+ ${a.objectKind} ${a.name}`;
+    case "create_naming_standard":
+      return `+ naming standard ${a.name} (${a.rules.length} rule${a.rules.length === 1 ? "" : "s"})`;
+    case "apply_naming_standard":
+      return `▶ apply naming standard ${a.name}`;
+    case "create_type_standard":
+      return `+ type standard ${a.name} (${a.rules.length} rule${a.rules.length === 1 ? "" : "s"})`;
+    case "apply_type_standard":
+      return `▶ apply type standard ${a.name}`;
     case "delete_entity":
       return `🗑 delete table ${a.entity}`;
     case "delete_attribute":
