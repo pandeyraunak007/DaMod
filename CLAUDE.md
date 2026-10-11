@@ -9,19 +9,47 @@
 
 ## NEXT SESSION — START HERE
 
-**Current status:** Branch `main`. **erwin-style reusable-standards roadmap Phases 1–5
-complete + committed (not pushed): Domains end-to-end, Naming Standards, Data Type
-Standards, Copilot standards actions, integration/hardening.** Author commits/pushes
-explicitly, do not commit or push unless asked. **460 TS tests pass · typecheck clean ·
-`npm run build` clean** (no Rust changed this track). The standards work has its own
-reference: **`docs/STANDARDS.md`**. Newest `DECISIONS.md` entries cover each phase.
-Remaining standards backlog (deferred, see `docs/STANDARDS.md`): Postgres `CREATE DOMAIN`
+**Current status:** Branch `main`, **all work committed AND pushed** (latest `067ac6c`).
+**559 TS tests pass · typecheck clean · `npm run build` clean** (no Rust changed recently).
+Author commits/pushes explicitly — but this session the author repeatedly authorized it, so
+everything is on `origin/main`. Newest `DECISIONS.md` entries cover each item below (newest
+on top); the standards work still has its own reference `docs/STANDARDS.md`, connector/ETL
+is `docs/CONNECTORS.md`, ETL gaps are `docs/etl_e2e/ETL_GAP_REGISTER.md`.
+
+**Most recent session (workspace UX + connectors + ETL Copilot) — all shipped:**
+- **Tabs: close ≠ delete.** The tab `✕` now CLOSES the tab (keeps the file); delete moved to
+  right-click (and the Explorer context menu), still gated by the "cannot be undone" confirm.
+  A `+` picker in the tab bar reopens closed models. Store: `availableFiles`, `closeTab`,
+  `openModelFile` (`workspaceStore`).
+- **Launch no longer force-opens every model.** `openWorkspace` opens only the previously-open
+  set (`meta.openModels`) or the active/first model. New **"Open model file…"**
+  (`openModelFilePicker`) — pick a single `.model.json`; its folder opens as the workspace
+  (File ribbon + Welcome).
+- **UX hardening pass** (review-driven): closing the last tab resets the model store to a blank
+  + Home/Diagram ribbon gated on `activeId` (no phantom editing); `openWorkspace` saves the
+  dirty model before switching; `+` menu has Escape/outside-click dismissal.
+- **Reverse-engineering BROWSE flow** (`ReversePanelBrowse` in `ConnectionsDialog.tsx`): list
+  schemas → pick which to discover → browse discovered tables/views (grouped, per-table
+  checkboxes) → preview → import. Table exclusion is a pure metadata prune
+  (`connectors/browseFilter.ts`); reuses `discover({schemas})`, no new capability/Rust.
+- **Copilot `bind_domain`** — attach a reusable domain to columns (omit entity/attribute for
+  all). Bulk binds are batched (one notice, not a toast per column) via
+  `modelStore.bindFieldsToDomain`.
+- **ETL G-UNDO (done):** per-pipeline undo/redo — transient `pipelineHistory` in
+  `workspaceStore`; ↶/↷ buttons + ⌘Z/⌘⇧Z in the ETL Designer.
+- **ETL G-AI (done):** Copilot ETL actions — `create_pipeline` (source model → target via
+  `planFullLoad`) and `add_transform_node` (filter/select/aggregate/distinct, spliced via pure
+  `spliceTransformNode` in `graphEdit.ts`). Context now summarizes pipelines.
+- **Remaining ETL gaps (deferred, see gap register):** G-INC (incremental/CDC), G-EXEC
+  (execution — intentionally external/authorized/dry-run-first). Optional niceties:
+  `suggest_mapping` advisory action, derive/cast transform nodes.
+
+**Standards backlog (still deferred, see `docs/STANDARDS.md`):** Postgres `CREATE DOMAIN`
 DDL + domain reverse-eng (opt-in), naming auto-apply-to-new-objects, reserved-word/
 per-dialect length rules, Explorer nodes for standards, Copilot domain apply/detach +
 standard update/delete, a real Copilot before/after diff.
 
-Older context (Reqs 17–23) follows below; the entries under here predate the standards
-roadmap.
+Older context (standards roadmap + Reqs 17–23) follows below.
 - See the top DECISIONS entries:
 - **Subject areas for ALL databases:** the standard Model Explorer now has a Subject
   areas section (create/rename/delete, add selected table, entity-context "New subject
@@ -230,7 +258,7 @@ grown a reusable **connector framework + ETL planner** and an **AI Copilot (BYOL
 
 ## 6. Implemented features & verified status
 
-Everything below is **committed, 238 tests green, tsc/build/cargo clean**. UI-interaction
+Everything below is **committed, 559 tests green, tsc/build/cargo clean**. UI-interaction
 details are author-verified in the running app (per verification limits).
 
 **Core modeling (original Phases 0–4):** workspaces + models in tabs; entities/fields/
@@ -293,7 +321,12 @@ as deferred in the matrix — NOT shown as empty placeholder categories.
 user/assistant bubbles and a bottom composer (⌘↵). Propose → review (plan card with
 Approve/Reject) → apply through existing ops (one undo group) → inline result + Undo.
 Supported actions: create/update/rename/delete for entities, attributes, relationships,
-and descriptions — all Zod-validated, idempotent, destructive-gated. BYOLLM provider
+and descriptions; subject areas; schemas/views/indexes/sequences/domains/check-constraints/
+stereotypes; semantic-layer objects (terms/dimensions/metrics); naming/type standards
+(create + apply); **`bind_domain`** (attach a domain to columns); and **ETL actions**
+(`create_pipeline`, `add_transform_node`) — all Zod-validated, idempotent, destructive-gated;
+model actions apply as one undo group, ETL actions land in the pipeline's own undo history.
+BYOLLM provider
 (OpenAI-compatible: Groq tested; Test connection + Load models + JSON-mode fallback);
 API key in keychain only; **privacy policy** (verified/unverified/unsupported no-training;
 blocks confidential context when unverified; secret-leak guard on context; no telemetry).
