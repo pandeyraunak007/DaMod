@@ -12,7 +12,7 @@ the end-to-end workflow.
 | **G-UNDO** | No undo/redo for pipeline edits | Stage 12 undo/redo | Edits persist via `upsertPipeline`; no history stack (model undo is separate) | A per-pipeline edit history in `workspaceStore` (or route graph edits through a small undo wrapper) | M |
 | **G-AI** | No Copilot ETL actions | Stage 14 | General Copilot can't explain/suggest pipelines | New Zod actions (e.g. `suggest_mapping`, `add_transform_node`) through the existing action→execute→approve path; feed pipeline+schema context | L |
 | **G-INC** | Full-load only | Incremental / CDC / scheduling | `LOAD_STRATEGIES = ["full"]` | Widen load strategy + watermark config (design-time first); execution needs G-EXEC | L (design) |
-| **G-DDL-GRAPH** | Target DDL derives from flat `objects`, not the DAG target node | DDL for DAG-only targets (e.g. fact_sales created purely via nodes) | `targetDdl` reads `spec.objects` | Derive CREATE TABLE from a target node's inferred schema (reuse `inferNodeSchemas`) | M |
+| ~~G-DDL-GRAPH~~ | ~~Target DDL from flat objects, not the DAG target node~~ | **DONE** | `graphTargetDdl` derives CREATE TABLE from each target node's inferred schema (reusing `inferNodeSchemas`); PipelineDialog's Target DDL tab prefers it when the graph has target nodes, else the flat `targetDdl`. | — |
 | **G-LIVE-RE** | SQL reverse-engineer is paste/file only; live-DB reverse-eng needs a connection | N/A (fixtures use Import SQL) | Import SQL path is offline; live discovery via Connections | (not blocking for this playbook) | — |
 | **G-DEDUP-NULL** | Null-handling / data-quality is only via `derive`/`filter` expressions, no dedicated node | Explicit null-default / DQ rules | Workable via expression (`COALESCE(...)`) + filter | Optional `null-handling`/`dq` node later | S |
 
@@ -20,6 +20,7 @@ the end-to-end workflow.
 - **G-EXEC is the headline gap**: everything through SQL generation works in DaMod; moving
   data is out of scope and must stay explicit, user-initiated, dry-run-first, and never run
   automatically. Until then the workflow is **design-in-DaMod, execute-externally**.
-- **G-AGG is now implemented** (aggregate node) — the retail fact can optionally be
-  aggregated (e.g. sales by customer/day) instead of line-grain. G-DDL-GRAPH (objects-based
-  target DDL) remains the main use-case limiter.
+- **G-AGG and G-DDL-GRAPH are now implemented** — the retail fact can be aggregated, and
+  Target DDL derives from the DAG target node (so DAG-only targets like `fact_sales` get
+  correct CREATE TABLE). **G-EXEC** (external execution only) is now the primary limiter,
+  with G-XFORM / G-UNDO / G-AI / G-INC remaining.

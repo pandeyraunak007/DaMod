@@ -12,6 +12,7 @@ import { DIALECTS, type DialectId } from "../../export/dialects";
 import { exportModelDDL } from "../../export/ddl";
 import { newId } from "../../lib/ids";
 import { deriveStarterGraph } from "./graphDerive";
+import { inferNodeSchemas } from "./graph";
 import {
   type ColumnMapping,
   type PipelineFilter,
@@ -262,4 +263,28 @@ export function targetDdl(spec: PipelineSpec): string {
     model.entities.push(entity);
   }
   return exportModelDDL(model, DIALECTS[spec.target.platform as DialectId]);
+}
+
+/** Target DDL derived from the transform DAG's target node(s) rather than the flat
+ *  objects (G-DDL-GRAPH). Each `target` node becomes a CREATE TABLE whose columns are
+ *  that node's inferred input schema; falls back to the flat `targetDdl` when the spec
+ *  has no target nodes. Reuses the existing DDL generator in the target platform. */
+export function graphTargetDdl(spec: PipelineSpec, model: Model): string {
+  const targets = (spec.nodes ?? []).filter((n) => n.kind === "target");
+  if (!targets.length) return targetDdl(spec);
+  const { schemas } = inferNodeSchemas(spec, model);
+  const out = newModel(`${spec.name}_target`, "1970-01-01T00:00:00.000Z", "Physical");
+  for (const t of [...targets].sort((a, b) => (a.targetObject ?? a.id).localeCompare(b.targetObject ?? b.id))) {
+    const entity = newEntity(t.targetObject ?? t.label ?? t.id, { x: 0, y: 0 });
+    entity.fields = (schemas.get(t.id) ?? []).map((f) =>
+      newField(f.name, (f.type?.type ?? "text") as DataTypeKind, {
+        length: f.type?.length,
+        precision: f.type?.precision,
+        scale: f.type?.scale,
+        nullable: f.nullable ?? true,
+      }),
+    );
+    out.entities.push(entity);
+  }
+  return exportModelDDL(out, DIALECTS[spec.target.platform as DialectId]);
 }

@@ -149,8 +149,9 @@ quoted in the source dialect. **Verify:** compare shape to `ETL_EXPECTED_RESULTS
 **Where:** PipelineDialog **Target DDL** tab → **Export report + SQL + DDL**. **Expected:**
 `<name>.target.sql`, `<name>.extract.sql`, `<name>.pipeline-report.txt` written to the workspace.
 **Verify:** `target.sql` ≈ `fixtures/target_schema.expected.sql`. **Status:** A.
-**Note (G-DDL-GRAPH):** Target DDL derives from the flat `objects`; for a DAG-only target you
-may hand-use `target_schema.expected.sql`. **Result:** ___
+**Note (G-DDL-GRAPH done):** when the pipeline has a DAG with target nodes and the source
+model is open, the Target DDL tab now derives CREATE TABLE from each **target node's inferred
+schema** (`graphTargetDdl`); it falls back to the flat objects-based DDL otherwise. **Result:** ___
 
 ---
 

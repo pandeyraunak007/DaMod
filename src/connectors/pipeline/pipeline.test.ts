@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { planFullLoad, validatePipeline, pipelineReport, targetDdl } from "./planner";
+import { planFullLoad, validatePipeline, pipelineReport, targetDdl, graphTargetDdl } from "./planner";
 import { serializePipeline, parsePipeline } from "./spec";
 import { serializePipelines, parsePipelinesFile, emptyPipelinesDoc } from "./pipelinesPersist";
 import { newModel, newEntity, newField, type Model } from "../../model/model";
@@ -225,5 +225,29 @@ describe("joins + filters (Req 22 §8.6)", () => {
     const parsed = parsePipeline(JSON.parse(once));
     expect(parsed.ok).toBe(true);
     if (parsed.ok) expect(serializePipeline(parsed.value)).toBe(once);
+  });
+});
+
+describe("graphTargetDdl (G-DDL-GRAPH)", () => {
+  it("derives CREATE TABLE from a DAG target node's inferred schema", () => {
+    const m = sourceModel();
+    const spec = planFullLoad(m, ["Order"], "postgres", { name: "sales" });
+    spec.nodes = [
+      { id: "s", kind: "source", sourceObject: "Order" },
+      { id: "t", kind: "target", targetObject: "sales_t" },
+    ];
+    spec.edges = [{ id: "e1", from: "s", to: "t" }];
+    const ddl = graphTargetDdl(spec, m);
+    expect(ddl).toContain('CREATE TABLE "sales_t"');
+    expect(ddl).toContain('"id" uuid NOT NULL');   // source Order.id (pk, not null)
+    expect(ddl).toContain('"total" numeric(12,2)'); // source Order.total (decimal)
+  });
+
+  it("falls back to flat targetDdl when the spec has no target nodes", () => {
+    const m = sourceModel();
+    const spec = planFullLoad(m, ["Customer"], "postgres", { name: "c" });
+    spec.nodes = [];
+    spec.edges = [];
+    expect(graphTargetDdl(spec, m)).toBe(targetDdl(spec));
   });
 });

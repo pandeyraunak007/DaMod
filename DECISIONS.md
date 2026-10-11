@@ -5,6 +5,18 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — ETL: DAG-derived target DDL (G-DDL-GRAPH)
+
+`planner.graphTargetDdl(spec, model)`: each DAG `target` node becomes a CREATE TABLE whose
+columns are that node's **inferred input schema** (via `inferNodeSchemas`), rendered by the
+existing `exportModelDDL` in the target platform; falls back to the flat objects-based
+`targetDdl` when there are no target nodes. PipelineDialog's **Target DDL** tab prefers it
+when the graph has target nodes + the source model is open. So a DAG-only target (e.g. a
+`fact_sales` built purely from nodes) now gets correct DDL instead of the flat 1:1 shape.
+Additive; flat `targetDdl` unchanged. Tests +2 (derive from target node; fall back when no
+targets). Docs synced (gap register G-DDL-GRAPH done, playbook S9.3). **536 TS tests pass;
+tsc + build clean.**
+
 ## 2026-10-11 — ETL: aggregate node (G-AGG)
 
 Added an `aggregate` transform node to the DAG — the first gap from the ETL playbook's

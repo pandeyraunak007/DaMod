@@ -4,7 +4,7 @@ import { DIALECT_IDS, DIALECTS, type DialectId } from "../../export/dialects";
 import { joinPath, writeFile } from "../../persist/fs";
 import { validateIdentifier } from "../../model/identifiers";
 import type { Model } from "../../model/model";
-import { planFullLoad, validatePipeline, pipelineReport, targetDdl, pipelineSql } from "./planner";
+import { planFullLoad, validatePipeline, pipelineReport, targetDdl, graphTargetDdl, pipelineSql } from "./planner";
 import { graphSql } from "./graphSql";
 import { MappingEditor } from "./MappingEditor";
 import type { PipelineSpec } from "./spec";
@@ -142,7 +142,13 @@ function PipelineView({ id, onDeleted }: { id: string; onDeleted: () => void }) 
 
   const issues = useMemo(() => (spec && model ? validatePipeline(spec, model) : []), [spec, model]);
   const report = useMemo(() => (spec ? pipelineReport(spec, issues) : ""), [spec, issues]);
-  const ddl = useMemo(() => (spec ? targetDdl(spec) : ""), [spec]);
+  // Prefer DAG-derived target DDL when the graph has target nodes + the model is open;
+  // otherwise the flat objects-based DDL (G-DDL-GRAPH).
+  const ddl = useMemo(() => {
+    if (!spec) return "";
+    const targets = (spec.nodes ?? []).filter((n) => n.kind === "target");
+    return model && targets.length ? graphTargetDdl(spec, model) : targetDdl(spec);
+  }, [spec, model]);
   // Extraction SQL needs the source model's dialect; blank until it's open. Prefer the
   // transform-graph SQL when the pipeline has a DAG (v2); fall back to the flat 1:1 SQL.
   const hasGraph = (spec?.nodes?.length ?? 0) > 0;
