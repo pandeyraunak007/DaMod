@@ -5,6 +5,24 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — ETL Phase 2: pipeline persistence hardening + layout field
+
+Prerequisite infrastructure before the visual designer (Phase 3). Additive + backward-
+compatible — old `pipelines.json` loads unchanged.
+
+- **Version gate + migration shim** (`pipelinesPersist.ts`): `parsePipelinesFile` now
+  reads `formatVersion` first and returns a clear "update DaMod" message for newer files
+  (instead of a cryptic Zod literal mismatch); `migratePipelinesDoc` is the no-op upgrade
+  hook (mirrors `persist/schema.ts`). This is the home any future spec change needs.
+- **Optional `layout?` on the spec** (`spec.ts`): `{ nodes: {id,x,y}[] }`, node positions
+  keyed by stable id for the Phase-3 canvas. Additive (absent → auto-arrange), deterministic
+  (nodes sorted by id, emitted only when non-empty), approach-agnostic re Q2 (works for a
+  spec-projection OR a DAG canvas). No version bump needed (optional field).
+
+- Tests +6 (`pipeline/pipelinePersist.test.ts`: version gate rejects newer/invalid, v1
+  round-trips, migrate no-op; layout omit-empty + sorted round-trip + backward-compat).
+  Existing 16 pipeline tests unaffected. **504 TS tests pass; tsc + build clean.**
+
 ## 2026-10-11 — ETL Designer audit + Phase 1: pipeline source-SQL generation
 
 Audited the existing ETL/pipeline surface for an ETL-Designer roadmap (assessment-only;

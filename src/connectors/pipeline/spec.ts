@@ -73,6 +73,13 @@ const zJoin = z.object({
 });
 export type PipelineJoin = z.infer<typeof zJoin>;
 
+/** Optional canvas layout for the visual designer (Phase 3): node positions keyed by
+ *  stable node id. Purely presentational — absent layouts auto-arrange. Approach-
+ *  agnostic (works whether the canvas is a projection of the flat spec or a DAG). */
+const zLayoutNode = z.object({ id: z.string(), x: z.number(), y: z.number() });
+const zLayout = z.object({ nodes: z.array(zLayoutNode).default([]) });
+export type PipelineLayout = z.infer<typeof zLayout>;
+
 const zSpec = z.object({
   specVersion: z.literal(PIPELINE_SPEC_VERSION),
   id: z.string(),
@@ -91,6 +98,8 @@ const zSpec = z.object({
   objects: z.array(zPipelineObject),
   /** Cross-object joins describing how the source objects relate (Req 22 §8.6). */
   joins: z.array(zJoin).default([]),
+  /** Optional visual-designer layout (Phase 3). Additive; absent for older specs. */
+  layout: zLayout.optional(),
 });
 export type PipelineSpec = z.infer<typeof zSpec>;
 
@@ -150,6 +159,16 @@ export function specToPlain(spec: PipelineSpec): Record<string, unknown> {
           joins: [...spec.joins]
             .sort((a, b) => `${a.leftObject}.${a.leftColumn}`.localeCompare(`${b.leftObject}.${b.leftColumn}`))
             .map((j) => ({ leftObject: j.leftObject, leftColumn: j.leftColumn, rightObject: j.rightObject, rightColumn: j.rightColumn, kind: j.kind })),
+        }
+      : {}),
+    // Layout last; emitted only when it has nodes, sorted by id (deterministic).
+    ...(spec.layout && spec.layout.nodes.length
+      ? {
+          layout: {
+            nodes: [...spec.layout.nodes]
+              .sort((a, b) => a.id.localeCompare(b.id))
+              .map((n) => ({ id: n.id, x: n.x, y: n.y })),
+          },
         }
       : {}),
   };
