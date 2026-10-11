@@ -5,6 +5,34 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Copilot: `bind_domain` action (domain ≠ data type)
+
+Asking the Copilot to "create domains and add them to all columns" failed plan validation:
+`actions.10.type: Invalid enum value … received 'identifier_domain'`. The LLM had no way to
+express "attach this domain to a column", so it stuffed the domain *name* into an
+attribute's `type` — which Zod restricts to the fixed `DATA_TYPE_KINDS`. Root cause: a
+`create_domain` action existed but **no bind action**.
+
+Added `bind_domain` end-to-end:
+- **Schema** (`actions.ts`): `{ kind:"bind_domain", domain, entity?, attribute? }`. Omit
+  `entity` → every entity; omit `attribute` → every column in scope. In STRUCTURAL (bulk
+  type change ⇒ needs approval). Not destructive.
+- **Executor** (`execute.ts`): resolves the domain by name (fails if missing — "create it
+  first"), iterates the scoped entities × fields, calls the existing
+  `modelStore.bindFieldDomain(entityId, fieldId, domainId)` so each column takes the
+  domain's physical type; reports how many columns were bound. Runs inside the plan's single
+  undo group like every other action.
+- **Prompt** (`orchestrate.ts`): catalog line + an explicit rule — "a DOMAIN is a reusable
+  named type, NOT a value of the `type` enum; create_domain then bind_domain; never pass a
+  domain name as a `type`." This steers the model away from the failure above.
+- **Panel** (`CopilotPanel.tsx`): plan-card label for the new kind.
+- **Tests**: 3 new in `execute.test.ts` (bind-all / entity-scoped / missing-domain-fails),
+  incl. a one-undo assertion. 542 green, tsc/build clean.
+
+Reused the existing `bindFieldDomain` store op (ERwin propagation already lives there) — no
+new model machinery. Create-only still: no unbind/detach action yet (manual override on a
+column already detaches; a Copilot `unbind_domain` is a future add if asked).
+
 ## 2026-10-11 — Tabs: close ≠ delete; launch no longer opens every model
 
 Two UX fixes the author hit while reverse-engineering `enterprise.sql`.

@@ -105,6 +105,16 @@ const zCreateDomain = z.object({
   name: z.string(),
   type: z.enum(DATA_TYPE_KINDS as unknown as [string, ...string[]]).optional(),
 });
+// Bind an existing reusable domain onto columns (ERwin). A domain is NOT a data type —
+// never put a domain name in an attribute's `type`; create_domain then bind_domain.
+// Omit `entity` to bind across every entity; omit `attribute` to bind every column in
+// the targeted entity/entities. Each bound column takes the domain's physical type.
+const zBindDomain = z.object({
+  kind: z.literal("bind_domain"),
+  domain: z.string(),
+  entity: z.string().optional(),
+  attribute: z.string().optional(),
+});
 const zCreateCheckConstraint = z.object({
   kind: z.literal("create_check_constraint"),
   entity: z.string(),
@@ -249,6 +259,7 @@ export const zAction = z.discriminatedUnion("kind", [
   zCreateIndex,
   zCreateSequence,
   zCreateDomain,
+  zBindDomain,
   zCreateCheckConstraint,
   zSetStereotype,
   zCreateTerm,
@@ -307,6 +318,7 @@ const STRUCTURAL = new Set([
   "create_index",
   "create_sequence",
   "create_domain",
+  "bind_domain",
   "create_check_constraint",
   "set_stereotype",
   "create_term",

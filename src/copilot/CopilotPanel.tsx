@@ -331,6 +331,8 @@ function describeAction(a: CopilotPlan["actions"][number]): string {
       return `+ sequence ${a.name}`;
     case "create_domain":
       return `+ domain ${a.name}${a.type ? ` (${a.type})` : ""}`;
+    case "bind_domain":
+      return `◉ bind domain ${a.domain} → ${a.attribute ? `${a.entity}.${a.attribute}` : a.entity ? `all columns of ${a.entity}` : "all columns"}`;
     case "create_check_constraint":
       return `+ check on ${a.entity}: ${a.expression}`;
     case "set_stereotype":

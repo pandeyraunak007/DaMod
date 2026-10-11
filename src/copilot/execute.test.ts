@@ -185,6 +185,68 @@ describe("create_subject_area action (Req 21/22 §6)", () => {
   });
 });
 
+describe("bind_domain action (apply a reusable domain to columns)", () => {
+  // Seed two entities with a couple of plain columns each.
+  function seed() {
+    const e1 = s().createEntity(); s().renameEntity(e1, "Customer");
+    s().addField(e1); s().addField(e1);
+    const e2 = s().createEntity(); s().renameEntity(e2, "Order");
+    s().addField(e2);
+  }
+
+  it("binds a domain to all columns across all entities when entity/attribute omitted", () => {
+    seed();
+    const plan = parsePlan({
+      summary: "standardise ids",
+      actions: [
+        { kind: "create_domain", name: "Money", type: "decimal" },
+        { kind: "bind_domain", domain: "Money" },
+      ],
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    const res = executePlan(plan.value);
+    expect(res.failed).toBe(0);
+    const domain = s().model.domains!.find((d) => d.name === "Money")!;
+    const allFields = s().model.entities.flatMap((e) => e.fields);
+    expect(allFields.length).toBeGreaterThan(0);
+    // Every column is now bound to the domain and carries its physical type.
+    expect(allFields.every((f) => f.domainId === domain.id)).toBe(true);
+    expect(allFields.every((f) => f.type === "decimal")).toBe(true);
+    // ONE undo reverts the whole plan (domain + all binds).
+    s().undo();
+    expect(s().model.domains ?? []).toHaveLength(0);
+    expect(s().model.entities.flatMap((e) => e.fields).every((f) => !f.domainId)).toBe(true);
+  });
+
+  it("scopes to a single entity when only entity is given", () => {
+    seed();
+    const plan = parsePlan({
+      summary: "x",
+      actions: [
+        { kind: "create_domain", name: "Money", type: "decimal" },
+        { kind: "bind_domain", domain: "Money", entity: "Order" },
+      ],
+    });
+    if (!plan.ok) return;
+    executePlan(plan.value);
+    const domain = s().model.domains!.find((d) => d.name === "Money")!;
+    const order = s().model.entities.find((e) => e.name === "Order")!;
+    const customer = s().model.entities.find((e) => e.name === "Customer")!;
+    expect(order.fields.every((f) => f.domainId === domain.id)).toBe(true);
+    expect(customer.fields.every((f) => !f.domainId)).toBe(true); // untouched
+  });
+
+  it("fails when the domain does not exist", () => {
+    seed();
+    const plan = parsePlan({ summary: "x", actions: [{ kind: "bind_domain", domain: "Ghost" }] });
+    if (!plan.ok) return;
+    const res = executePlan(plan.value);
+    expect(res.failed).toBe(1);
+    expect(res.applied).toBe(0);
+  });
+});
+
 import { useWorkspaceStore } from "../store/workspaceStore";
 import { emptySemanticDoc } from "../semantic/semantic";
 

@@ -224,6 +224,38 @@ function applyAction(action: CopilotAction): ActionResult {
       return ok(`Created domain “${action.name}”`);
     }
 
+    case "bind_domain": {
+      const domain = (model().domains ?? []).find(
+        (d) => d.name.toLowerCase() === action.domain.toLowerCase(),
+      );
+      if (!domain) return fail(`Domain “${action.domain}” not found (create it first)`);
+      // Scope: a named entity (else all entities) × a named attribute (else all columns).
+      const entities = action.entity ? [entityByName(model(), action.entity)] : model().entities;
+      if (action.entity && !entities[0]) return fail(`Entity “${action.entity}” not found`);
+      let bound = 0;
+      for (const e of entities) {
+        if (!e) continue;
+        const fields = action.attribute
+          ? ([fieldByName(e, action.attribute)].filter(Boolean) as Field[])
+          : e.fields;
+        for (const f of fields) {
+          store.bindFieldDomain(e.id, f.id, domain.id);
+          bound++;
+        }
+      }
+      if (bound === 0) {
+        return action.attribute
+          ? fail(`Attribute “${action.attribute}” not found`)
+          : skip("no columns to bind");
+      }
+      const scope = action.attribute
+        ? `${action.entity}.${action.attribute}`
+        : action.entity
+          ? `all ${bound} columns of ${action.entity}`
+          : `all ${bound} columns`;
+      return ok(`Bound domain “${action.domain}” to ${scope}`);
+    }
+
     case "create_check_constraint": {
       const e = entityByName(model(), action.entity);
       if (!e) return fail(`Entity “${action.entity}” not found`);

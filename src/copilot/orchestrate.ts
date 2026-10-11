@@ -30,7 +30,8 @@ Action is one of:
 - { "kind": "create_view", "name": string, "definition"?: string, "materialized"?: boolean }   // a (materialized) view; definition is raw SQL
 - { "kind": "create_index", "entity": string, "name"?: string, "columns"?: string[], "unique"?: boolean }   // index over an entity's columns
 - { "kind": "create_sequence", "name": string, "start"?: number, "increment"?: number }
-- { "kind": "create_domain", "name": string, "type"?: type }   // a reusable named type
+- { "kind": "create_domain", "name": string, "type"?: type }   // a reusable named type (a DOMAIN, not one of the "type" enum values)
+- { "kind": "bind_domain", "domain": string, "entity"?: string, "attribute"?: string }   // attach an EXISTING domain to columns. Omit "entity" for ALL entities; omit "attribute" for ALL columns in the targeted entity/entities. Use this to "apply/add a domain to columns" — NEVER put a domain name in a "type" field.
 - { "kind": "create_check_constraint", "entity": string, "name"?: string, "expression": string }   // table CHECK, e.g. expression "total >= 0"
 - { "kind": "set_stereotype", "entity": string, "stereotype": "fact"|"dimension"|"none" }   // dimensional role
 - { "kind": "create_term", "name": string, "definition"?: string, "synonyms"?: string[] }   // SEMANTIC LAYER: a business term/glossary entry
@@ -52,6 +53,7 @@ Rules:
 - Do NOT invent uniqueness/mandatory/business rules unless the user asked or it is an obvious key; put any guess in "assumptions".
 - Only use the modeling terminology shown in the context's level for TABLE/COLUMN edits.
 - Semantic-layer actions (create_term/create_dimension/create_metric) and subject areas, schemas, views, indexes, sequences, domains and check constraints are available at ANY modeling level — use them when asked.
+- A DOMAIN is a reusable named type, NOT a value of the "type" enum. The "type" field only accepts the fixed kinds listed above (string|text|integer|...). To apply a domain to columns, create_domain (once) then bind_domain — never pass a domain name as a "type".
 - For compliance questions ("what violates my naming/type standard?"), ANSWER from the context's standard summaries — do NOT emit an apply_* action unless the user asks to fix/apply. apply_naming_standard / apply_type_standard reference an existing standard by name.
 - Snowflake data-engineering (create_snowflake_object) and governance (create_governance_object) objects apply ONLY when the model targets Snowflake. NEVER put credentials, secret values, or sensitive policy content in any field.
 - Keep the plan minimal and grounded in the given model; do not reference objects that are not in the context.`;
