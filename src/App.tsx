@@ -70,7 +70,10 @@ export default function App() {
   const tabs = useWorkspaceStore((s) => s.tabs);
   const activeId = useWorkspaceStore((s) => s.activeId);
   const wsPath = useWorkspaceStore((s) => s.path);
+  const availableFiles = useWorkspaceStore((s) => s.availableFiles);
   const activeTab = tabs.find((t) => t.id === activeId);
+  // Models that exist in the folder but aren't open as tabs (reopen via the TabBar + picker).
+  const closedCount = availableFiles.filter((f) => !tabs.some((t) => t.fileName === f)).length;
 
   const showExplorer = useUiStore((s) => s.showExplorer);
   const showProperties = useUiStore((s) => s.showProperties);
@@ -240,9 +243,13 @@ export default function App() {
               <Canvas />
             ) : (
               <div className="canvas-error">
-                <p className="canvas-error__title">No models yet</p>
+                <p className="canvas-error__title">
+                  {closedCount > 0 ? "No model open" : "No models yet"}
+                </p>
                 <p className="canvas-error__reason">
-                  Create your first model and choose its type to open the canvas.
+                  {closedCount > 0
+                    ? `Reopen a model with the + button in the tab bar (${closedCount} available), or create a new one.`
+                    : "Create your first model and choose its type to open the canvas."}
                 </p>
                 <button className="btn btn--primary" onClick={() => setNewModelOpen(true)}>
                   New model

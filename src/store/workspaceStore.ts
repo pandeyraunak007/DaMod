@@ -93,6 +93,9 @@ interface WorkspaceState {
   name: string;
   createdAt: string;
   tabs: Tab[];
+  /** All model filenames in the workspace folder (open + closed), for the “open model”
+   *  picker. Closing a tab keeps the file here so it can be reopened. */
+  availableFiles: string[];
   activeId: string | null;
   saving: boolean;
   links: LinksDoc;
@@ -107,6 +110,10 @@ interface WorkspaceState {
   importModel: (model: Model, name: string) => Promise<string | null>;
   duplicateModel: (id: string) => Promise<void>;
   deleteModel: (id: string) => Promise<void>;
+  /** Close a model tab WITHOUT deleting its file (keeps it in availableFiles). */
+  closeTab: (id: string) => Promise<void>;
+  /** Open a model file from the workspace folder into a tab (or switch if already open). */
+  openModelFile: (fileName: string) => Promise<void>;
   switchTab: (id: string) => Promise<void>;
   saveActive: (explicit: boolean) => Promise<void>;
   scheduleAutosave: () => void;
@@ -235,6 +242,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     name: "",
     createdAt: nowIso(),
     tabs: [],
+    availableFiles: [],
     activeId: null,
     saving: false,
     links: emptyLinksDoc(),
@@ -307,8 +315,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       const name = meta.name || baseName(path);
       const createdAt = meta.createdAt || nowIso();
 
+      // All model files in the folder, and which to OPEN as tabs: the previously-open
+      // set (meta.openModels) if recorded, else just the active/first model — so opening
+      // a folder no longer force-opens every model. The rest stay reopenable (availableFiles).
+      const allFiles = listing.model_files.filter(isModelFile);
+      let toOpen: string[];
+      if (meta.openModels && meta.openModels.length) {
+        toOpen = allFiles.filter((fn) => meta.openModels!.includes(fn));
+      } else if (meta.activeModel && allFiles.includes(meta.activeModel)) {
+        toOpen = [meta.activeModel];
+      } else {
+        toOpen = allFiles.slice(0, 1);
+      }
+      if (!toOpen.length && allFiles.length) toOpen = allFiles.slice(0, 1);
+
       const tabs: Tab[] = [];
-      for (const fn of listing.model_files.filter(isModelFile)) {
+      for (const fn of toOpen) {
         const full = joinPath(path, fn);
         const text = await readTextFile(full);
         const mt = await fileMtime(full);
@@ -347,6 +369,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
         name,
         createdAt,
         tabs,
+        availableFiles: allFiles,
         links,
         semantic,
         connections,
@@ -393,7 +416,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
         externalChange: false,
         loadError: null,
       };
-      set((s) => ({ tabs: [...s.tabs, tab] }));
+      set((s) => ({ tabs: [...s.tabs, tab], availableFiles: s.availableFiles.includes(fileName) ? s.availableFiles : [...s.availableFiles, fileName] }));
       activate(model.id);
       await writeWorkspaceMeta();
       return null;
@@ -425,6 +448,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
             loadError: null,
           },
         ],
+        availableFiles: s.availableFiles.includes(fileName) ? s.availableFiles : [...s.availableFiles, fileName],
       }));
       activate(toAdd.id);
       await writeWorkspaceMeta();
@@ -464,6 +488,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
             loadError: null,
           },
         ],
+        availableFiles: s.availableFiles.includes(fileName) ? s.availableFiles : [...s.availableFiles, fileName],
       }));
       activate(copy.id);
       await writeWorkspaceMeta();
@@ -476,7 +501,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       if (!tab) return;
       await deleteFile(joinPath(path, tab.fileName));
       const remaining = tabs.filter((t) => t.id !== id);
-      set({ tabs: remaining });
+      // Drop the deleted file from both the open tabs and the reopen picker up front, so
+      // it can't linger in availableFiles when the last-model branch below returns early.
+      set((s) => ({ tabs: remaining, availableFiles: s.availableFiles.filter((f) => f !== tab.fileName) }));
       if (get().activeId === id) {
         const next = remaining.find((t) => !t.loadError) ?? remaining[0];
         if (next) {
@@ -488,6 +515,47 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
           return;
         }
       }
+      await writeWorkspaceMeta();
+    },
+
+    closeTab: async (id) => {
+      const { tabs } = get();
+      const tab = tabs.find((t) => t.id === id);
+      if (!tab) return;
+      // Persist any pending edits before closing (autosave discipline); the file stays.
+      if (get().activeId === id && get().isActiveDirty()) await get().saveActive(false);
+      const remaining = tabs.filter((t) => t.id !== id);
+      set({ tabs: remaining });
+      if (get().activeId === id) {
+        const next = remaining.find((t) => !t.loadError) ?? remaining[0];
+        set({ activeId: next?.id ?? null });
+        if (next?.model) useModelStore.getState().loadModel(next.model);
+      }
+      await writeWorkspaceMeta(); // openModels shrinks → the closed tab stays closed on reopen
+    },
+
+    openModelFile: async (fileName) => {
+      const { path, tabs } = get();
+      if (!path) return;
+      const existing = tabs.find((t) => t.fileName === fileName);
+      if (existing) {
+        await get().switchTab(existing.id);
+        return;
+      }
+      const full = joinPath(path, fileName);
+      const text = await readTextFile(full);
+      const mt = await fileMtime(full);
+      const parsed = parseModelFile(text);
+      const tab: Tab = parsed.ok
+        ? { id: parsed.value.id, fileName, model: parsed.value, lastSavedText: serializeModel(parsed.value), savedMtime: mt, externalChange: false, loadError: null }
+        : { id: `err:${fileName}`, fileName, model: null, lastSavedText: "", savedMtime: mt, externalChange: false, loadError: parsed.error };
+      set((s) => ({
+        tabs: [...s.tabs, tab],
+        availableFiles: s.availableFiles.includes(fileName) ? s.availableFiles : [...s.availableFiles, fileName],
+      }));
+      if (get().isActiveDirty()) await get().saveActive(false);
+      set({ activeId: tab.id });
+      if (tab.model) useModelStore.getState().loadModel(tab.model);
       await writeWorkspaceMeta();
     },
 

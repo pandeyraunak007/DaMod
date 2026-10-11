@@ -5,6 +5,42 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Tabs: close ≠ delete; launch no longer opens every model
+
+Two UX fixes the author hit while reverse-engineering `enterprise.sql`.
+
+**1. The tab `✕` is now a true close, not a delete.** Previously the `✕` called
+`onDeleteModel` → the "Delete model … cannot be undone" dialog, so there was no way to
+dismiss a tab without destroying the file. Now:
+- `✕` → `workspaceStore.closeTab(id)` — saves any pending edits first (autosave
+  discipline), removes the tab, activates the next loadable tab, and **keeps the file**.
+  The file moves to `availableFiles` (reopenable). Tooltip + the `✕:hover` colour changed
+  from danger-red to accent so it no longer reads as destructive.
+- **Delete is still reachable** (it's genuinely destructive, so it stays gated): right-click
+  a tab → the existing "Delete model?" confirm. (Explorer delete is unchanged.)
+- A trailing **`+` picker** in the tab bar lists models in the folder that aren't open and
+  reopens them via `openModelFile(fileName)`; the bar now renders even with zero open tabs
+  when closed models exist, and the empty-canvas state says "No model open — reopen with +
+  (N available)" instead of the misleading "No models yet".
+
+**2. Opening a workspace folder no longer force-opens every model.** `openWorkspace` used to
+load a tab for *every* `.model.json` in the folder. Now it opens only the previously-open
+set (`meta.openModels`, already persisted by `writeWorkspaceMeta`), else the active/first
+model; all files are recorded in `availableFiles` for the `+` picker. Because `closeTab`
+re-persists the shrunken `openModels`, closing a tab now *sticks* across relaunch.
+
+New store surface: `availableFiles: string[]`, `closeTab(id)`, `openModelFile(fileName)`;
+`newModel`/`importModel`/`duplicateModel` append to `availableFiles`; `deleteModel` removes
+from it (moved the removal up so the last-model→`newModel` early-return can't leave a dead
+entry in the picker).
+
+**One-time caveat:** a workspace whose persisted `meta.openModels` already lists *all*
+models (recorded by the old force-open code) will restore all of them on the first launch
+after this change — it self-corrects the moment the author closes a tab. Not worth a
+migration heuristic. Not done: per-model window/positions, a "close others/all" action,
+drag-reorder of tabs. tsc/build clean, 539 tests green (no new test — the store path is
+fs/tauri-bound and has no existing unit harness).
+
 ## 2026-10-11 — ETL: DAG-derived target DDL (G-DDL-GRAPH)
 
 `planner.graphTargetDdl(spec, model)`: each DAG `target` node becomes a CREATE TABLE whose

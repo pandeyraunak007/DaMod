@@ -833,7 +833,58 @@ body,
   padding: 0 0.1rem;
 }
 .tab__close:hover {
-  color: var(--danger);
+  color: var(--accent);
+}
+
+/* ---- open-another-model picker (reopen a closed model file) ---- */
+.tab-open {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.tab-open__btn {
+  border: 1px solid var(--border);
+  border-bottom: none;
+  background: #dde3ea;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+  border-radius: 6px 6px 0 0;
+  padding: 0.3rem 0.5rem;
+}
+.tab-open__btn:hover {
+  background: #fff;
+  color: var(--accent);
+}
+.tab-open__menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  min-width: 180px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  padding: 0.25rem;
+}
+.tab-open__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.82rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.tab-open__item:hover {
+  background: #eef1f5;
 }
 
 /* ---- external-change banner ---- */
