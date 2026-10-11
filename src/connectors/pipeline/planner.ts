@@ -15,6 +15,7 @@ import {
   type ColumnMapping,
   type PipelineSpec,
   type SpecType,
+  filterNeedsValue,
 } from "./spec";
 
 export interface PipelineIssue {
@@ -58,6 +59,7 @@ export function planFullLoad(
       sourceObject: e.name,
       targetObject: e.name,
       columns: e.fields.map(columnFromField),
+      filters: [],
     }));
 
   return {
@@ -73,6 +75,7 @@ export function planFullLoad(
     target: { platform: targetPlatform, schema: opts.schema },
     loadStrategy: "full",
     objects,
+    joins: [],
   };
 }
 
@@ -121,6 +124,29 @@ export function validatePipeline(spec: PipelineSpec, model: Model): PipelineIssu
         });
       }
     }
+    // Source-side filters (§8.6): the column must exist; value-ops need a value.
+    for (const f of obj.filters) {
+      if (!srcEntity.fields.some((x) => x.name.toLowerCase() === f.column.toLowerCase())) {
+        issues.push({ severity: "error", object: obj.sourceObject, column: f.column, message: `Filter on unknown column “${obj.sourceObject}.${f.column}”` });
+      }
+      if (filterNeedsValue(f.op) && !(f.value ?? "").trim()) {
+        issues.push({ severity: "error", object: obj.sourceObject, column: f.column, message: `Filter ${f.column} ${f.op} needs a value` });
+      }
+    }
+  }
+
+  // Cross-object joins (§8.6): both endpoints must exist in the model.
+  for (const j of spec.joins) {
+    const le = entityByName(j.leftObject);
+    const re = entityByName(j.rightObject);
+    if (!le) issues.push({ severity: "error", object: j.leftObject, message: `Join references unknown object “${j.leftObject}”` });
+    if (!re) issues.push({ severity: "error", object: j.rightObject, message: `Join references unknown object “${j.rightObject}”` });
+    if (le && !le.fields.some((f) => f.name.toLowerCase() === j.leftColumn.toLowerCase())) {
+      issues.push({ severity: "error", object: j.leftObject, column: j.leftColumn, message: `Join column “${j.leftObject}.${j.leftColumn}” not found` });
+    }
+    if (re && !re.fields.some((f) => f.name.toLowerCase() === j.rightColumn.toLowerCase())) {
+      issues.push({ severity: "error", object: j.rightObject, column: j.rightColumn, message: `Join column “${j.rightObject}.${j.rightColumn}” not found` });
+    }
   }
   return issues;
 }
@@ -134,6 +160,13 @@ export function pipelineReport(spec: PipelineSpec, issues: PipelineIssue[]): str
     `load strategy: ${spec.loadStrategy}`,
     "",
   ];
+  if (spec.joins.length) {
+    lines.push("Joins:");
+    for (const j of [...spec.joins].sort((a, b) => `${a.leftObject}.${a.leftColumn}`.localeCompare(`${b.leftObject}.${b.leftColumn}`))) {
+      lines.push(`  ${j.leftObject}.${j.leftColumn} ${j.kind} join ${j.rightObject}.${j.rightColumn}`);
+    }
+    lines.push("");
+  }
   for (const obj of [...spec.objects].sort((a, b) => a.targetObject.localeCompare(b.targetObject))) {
     lines.push(`## ${obj.sourceObject} → ${obj.targetObject}`);
     for (const c of obj.columns) {
@@ -142,6 +175,9 @@ export function pipelineReport(spec: PipelineSpec, issues: PipelineIssue[]): str
       const arrow = c.transform ? `={${c.transform}}=>` : "→";
       const src = c.source || "(none)";
       lines.push(`  ${src} (${s}) ${arrow} ${c.target} (${t})${c.required ? " NOT NULL" : ""}`);
+    }
+    for (const f of obj.filters) {
+      lines.push(`  filter: ${f.column} ${f.op}${filterNeedsValue(f.op) ? ` ${f.value ?? ""}` : ""}`);
     }
     lines.push("");
   }

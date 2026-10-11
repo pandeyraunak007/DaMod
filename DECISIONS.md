@@ -5,6 +5,22 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Pipeline cross-object joins + source-side filters (Req 22 §8.6)
+
+Extended the pipeline spec/planner/editor with joins and filters (the mapping editor
+already did columns/types/transforms).
+
+- **Spec:** `PipelineObject.filters` (column/op/value — `FILTER_OPS` incl. is null/is not
+  null) and spec-level `joins` (`leftObject.leftColumn {inner|left} rightObject.rightColumn`).
+  Both default `[]` (backward-compatible); `specToPlain` omits them when empty → old specs
+  round-trip unchanged.
+- **Planner:** `validatePipeline` checks filter columns exist + value-ops have a value, and
+  join endpoints/columns exist in the model; `pipelineReport` lists joins + filters.
+- **UI:** `MappingEditor` gains a Joins section (spec-level) + per-object Filters, live-
+  validated, saved with the rest of the mapping.
+- Still a PLAN, not execution (joins/filters are declared metadata + lineage, honored by a
+  future executor). 361 TS tests (+3); tsc/build/cargo clean.
+
 ## 2026-10-11 — Source-to-target mapping editor (Req 22 §8)
 
 The pipeline *spec/planner* already modeled column mappings (source/target/transform/

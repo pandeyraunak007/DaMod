@@ -175,3 +175,55 @@ describe("source-to-target mapping edits (Req 22 §8)", () => {
     if (parsed.ok) expect(serializePipeline(parsed.value)).toBe(once);
   });
 });
+
+describe("joins + filters (Req 22 §8.6)", () => {
+  it("validates filters: unknown column + value-op needing a value", () => {
+    const model = sourceModel();
+    const base = planFullLoad(model, ["Order"], "postgres", { name: "p" });
+    const filtered = edit(base, (s) => {
+      s.objects[0].filters = [
+        { column: "nope", op: "=", value: "1" }, // unknown column
+        { column: "total", op: ">", value: "" }, // needs a value
+        { column: "total", op: "is not null" }, // ok, no value needed
+      ];
+    });
+    const issues = validatePipeline(filtered, model);
+    expect(issues.some((i) => /unknown column/.test(i.message))).toBe(true);
+    expect(issues.some((i) => /needs a value/.test(i.message))).toBe(true);
+    // The valid filter contributes no error.
+    const forValid = issues.filter((i) => /is not null/.test(i.message));
+    expect(forValid).toHaveLength(0);
+  });
+
+  it("validates joins against the model and reports them", () => {
+    const model = sourceModel();
+    const base = planFullLoad(model, ["Customer", "Order"], "postgres", { name: "p" });
+    const joined = edit(base, (s) => {
+      s.joins = [{ leftObject: "Order", leftColumn: "id", rightObject: "Customer", rightColumn: "id", kind: "inner" }];
+    });
+    expect(validatePipeline(joined, model)).toHaveLength(0);
+    expect(pipelineReport(joined, []).replace(/\s+/g, " ")).toContain("Order.id inner join Customer.id");
+
+    const broken = edit(joined, (s) => {
+      s.joins[0].rightColumn = "ghost";
+      s.joins.push({ leftObject: "Order", leftColumn: "x", rightObject: "Missing", rightColumn: "y", kind: "left" });
+    });
+    const issues = validatePipeline(broken, model);
+    expect(issues.some((i) => /Join column “Customer.ghost” not found/.test(i.message))).toBe(true);
+    expect(issues.some((i) => /unknown object “Missing”/.test(i.message))).toBe(true);
+  });
+
+  it("round-trips a spec with joins + filters deterministically", () => {
+    const model = sourceModel();
+    const spec = edit(planFullLoad(model, ["Customer", "Order"], "postgres", { name: "p" }), (s) => {
+      s.objects[0].filters = [{ column: "email", op: "is not null" }];
+      s.joins = [{ leftObject: "Order", leftColumn: "id", rightObject: "Customer", rightColumn: "id", kind: "left" }];
+    });
+    const once = serializePipeline(spec);
+    expect(once).toContain('"joins"');
+    expect(once).toContain('"filters"');
+    const parsed = parsePipeline(JSON.parse(once));
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) expect(serializePipeline(parsed.value)).toBe(once);
+  });
+});

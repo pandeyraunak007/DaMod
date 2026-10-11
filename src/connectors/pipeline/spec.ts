@@ -37,12 +37,41 @@ const zColumnMapping = z.object({
 });
 export type ColumnMapping = z.infer<typeof zColumnMapping>;
 
+/** Source-side filter operators (Req 22 §8.6). */
+export const FILTER_OPS = ["=", "!=", "<", "<=", ">", ">=", "in", "is null", "is not null"] as const;
+export type FilterOp = (typeof FILTER_OPS)[number];
+const VALUELESS_OPS = new Set<FilterOp>(["is null", "is not null"]);
+export function filterNeedsValue(op: FilterOp): boolean {
+  return !VALUELESS_OPS.has(op);
+}
+
+const zFilter = z.object({
+  column: z.string(), // source column name
+  op: z.enum(FILTER_OPS),
+  value: z.string().optional(),
+});
+export type PipelineFilter = z.infer<typeof zFilter>;
+
 const zPipelineObject = z.object({
   sourceObject: z.string(),
   targetObject: z.string(),
   columns: z.array(zColumnMapping),
+  /** Source-side row filters applied before load (Req 22 §8.6). */
+  filters: z.array(zFilter).default([]),
 });
 export type PipelineObject = z.infer<typeof zPipelineObject>;
+
+/** A cross-object join relating two source objects on key columns (Req 22 §8.6). */
+export const JOIN_KINDS = ["inner", "left"] as const;
+export type JoinKind = (typeof JOIN_KINDS)[number];
+const zJoin = z.object({
+  leftObject: z.string(),
+  leftColumn: z.string(),
+  rightObject: z.string(),
+  rightColumn: z.string(),
+  kind: z.enum(JOIN_KINDS),
+});
+export type PipelineJoin = z.infer<typeof zJoin>;
 
 const zSpec = z.object({
   specVersion: z.literal(PIPELINE_SPEC_VERSION),
@@ -60,6 +89,8 @@ const zSpec = z.object({
   }),
   loadStrategy: z.enum(LOAD_STRATEGIES),
   objects: z.array(zPipelineObject),
+  /** Cross-object joins describing how the source objects relate (Req 22 §8.6). */
+  joins: z.array(zJoin).default([]),
 });
 export type PipelineSpec = z.infer<typeof zSpec>;
 
@@ -91,19 +122,36 @@ export function specToPlain(spec: PipelineSpec): Record<string, unknown> {
     loadStrategy: spec.loadStrategy,
     objects: [...spec.objects]
       .sort((a, b) => a.targetObject.localeCompare(b.targetObject))
-      .map((o) => ({
-        sourceObject: o.sourceObject,
-        targetObject: o.targetObject,
-        columns: o.columns.map((c) => {
-          const out: Record<string, unknown> = { source: c.source, target: c.target };
-          const st = typeToPlain(c.sourceType);
-          if (st) out.sourceType = st;
-          out.targetType = typeToPlain(c.targetType);
-          if (c.transform) out.transform = c.transform;
-          out.required = c.required;
-          return out;
-        }),
-      })),
+      .map((o) => {
+        const obj: Record<string, unknown> = {
+          sourceObject: o.sourceObject,
+          targetObject: o.targetObject,
+          columns: o.columns.map((c) => {
+            const out: Record<string, unknown> = { source: c.source, target: c.target };
+            const st = typeToPlain(c.sourceType);
+            if (st) out.sourceType = st;
+            out.targetType = typeToPlain(c.targetType);
+            if (c.transform) out.transform = c.transform;
+            out.required = c.required;
+            return out;
+          }),
+        };
+        if (o.filters.length) {
+          obj.filters = o.filters.map((f) => {
+            const out: Record<string, unknown> = { column: f.column, op: f.op };
+            if (f.value !== undefined) out.value = f.value;
+            return out;
+          });
+        }
+        return obj;
+      }),
+    ...(spec.joins.length
+      ? {
+          joins: [...spec.joins]
+            .sort((a, b) => `${a.leftObject}.${a.leftColumn}`.localeCompare(`${b.leftObject}.${b.leftColumn}`))
+            .map((j) => ({ leftObject: j.leftObject, leftColumn: j.leftColumn, rightObject: j.rightObject, rightColumn: j.rightColumn, kind: j.kind })),
+        }
+      : {}),
   };
 }
 

@@ -987,6 +987,26 @@ body,
   margin-top: 0.2rem;
   font-size: 0.76rem;
 }
+.map-join,
+.map-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0.15rem 0.3rem 0.15rem 0;
+  font-size: 0.76rem;
+}
+.map-join select,
+.map-filter select,
+.map-filter input {
+  font-size: 0.76rem;
+}
+.map-filters {
+  margin-top: 0.3rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem;
+}
 .src-info {
   border-collapse: collapse;
   font-size: 0.78rem;
