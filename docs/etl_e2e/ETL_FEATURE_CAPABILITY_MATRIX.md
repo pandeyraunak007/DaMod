@@ -19,7 +19,7 @@ external tool (DaMod emits the artifact) · **C** blocked by a product gap.
 | C10 | **Visual DAG designer** (Data ribbon → **Designer**) | ✅ | A | `etl/EtlDesigner.tsx`, `etl/PipelineCanvas.tsx` | separate React-Flow canvas |
 | C11 | Transform nodes: source, filter, select, derive, cast, join, target | ✅ | A | `pipeline/spec.ts` `NODE_KINDS`, `etl/NodeInspector.tsx` | join = inner/left |
 | C12 | Transform nodes: **aggregate / group-by** | ✅ | A | `pipeline/spec.ts` `AGG_FNS`, `graph.ts` (schema+validate), `graphSql.ts` (GROUP BY), `etl/NodeInspector.tsx` | sum/count/count_distinct/avg/min/max; G-AGG **done** |
-| C13 | Transform nodes: **dedup / union / lookup / SCD** | 🟥 | C | — | G-XFORM |
+| C13 | Transform nodes: dedup ✅ / **union / lookup / SCD** 🟥 | 🟡 | A / C | `spec.ts` (`distinct` kind), `graph.ts`, `graphSql.ts` (`SELECT DISTINCT`), `NodeInspector.tsx` | dedup (full-row distinct) done; union/lookup/SCD remain (G-XFORM); key-based dedup later |
 | C14 | **Per-node schema propagation** | ✅ | A | `pipeline/graph.ts` `inferNodeSchemas` | names+types flow downstream |
 | C15 | Graph **validation** (dangling edge, cycle, arity, unknown refs, type/required) | ✅ | A | `pipeline/graph.ts` `validateGraph`, `planner.validatePipeline` | warnings/errors, non-blocking |
 | C16 | **SQL generation** — flat (per-object SELECT) | ✅ | A | `pipeline/planner.ts` `pipelineSql` | design-time text |

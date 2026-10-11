@@ -187,6 +187,12 @@ export function inferNodeSchemas(spec: PipelineSpec, model: Model): GraphResult 
         for (const d of dupNames(out)) issues.push({ severity: "error", nodeId: id, message: `Aggregate output has duplicate column “${d}”` });
         break;
       }
+      case "distinct": {
+        // Full-row dedup — schema is the input unchanged.
+        if (inputs.length !== 1) issues.push({ severity: "error", nodeId: id, message: "Distinct node needs exactly one input" });
+        out = inputSchema(inputs[0]);
+        break;
+      }
       case "target": {
         if (inputs.length !== 1) issues.push({ severity: "error", nodeId: id, message: "Target node needs exactly one input" });
         out = inputSchema(inputs[0]);

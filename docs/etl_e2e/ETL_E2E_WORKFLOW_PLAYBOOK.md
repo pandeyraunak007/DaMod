@@ -115,8 +115,8 @@ creates it; you can create it first then design). **Where:** **Data ribbon → D
 **Inputs:** the mapping spec. **Expected:** nodes connect without a cycle error; selecting the
 derive node shows `line_amount` in its **output schema**. **Verify:** `ETL_SOURCE_TO_TARGET_MAPPING.md`
 DAG + schema. **Failure scenarios:** see N5–N12 in `ETL_TEST_CASES.md`. **Status:** A (nodes
-source/filter/select/derive/cast/join/**aggregate**/target — G-AGG done). **dedup/union/
-lookup/SCD = C (G-XFORM).** To aggregate (e.g. sales by customer), insert an `aggregate`
+source/filter/select/derive/cast/join/**aggregate**/**distinct**/target). **union/lookup/
+SCD = C (G-XFORM remaining); dedup done.** To aggregate (e.g. sales by customer), insert an `aggregate`
 node (group-by columns + measures sum/count/count_distinct/avg/min/max) before the target.
 **Evidence:** `etl/EtlDesigner.tsx`, `etl/NodeInspector.tsx`, `pipeline/graph.ts`. **Result:** ___
 
@@ -232,7 +232,7 @@ actions, no credentials/source rows sent by default. **Status:** C. **Result:** 
 | 4 source model | ✅ | | |
 | 5 target model | ✅ | | |
 | 6 mapping | ✅ | | |
-| 7 transforms | ✅ filter/select/derive/cast/join/**aggregate** | | dedup/union/lookup/SCD (G-XFORM) |
+| 7 transforms | ✅ filter/select/derive/cast/join/**aggregate**/**distinct** | | union/lookup/SCD (G-XFORM) |
 | 8 validate | ✅ | | |
 | 9 generate | ✅ SQL + DDL + export | | — |
 | 10 execute | | ✅ external psql | native exec (G-EXEC) |

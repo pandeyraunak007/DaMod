@@ -132,6 +132,9 @@ export function NodeInspector({
       );
     }
 
+    case "distinct":
+      return <p className="field__hint">Removes duplicate rows (full-row <code>SELECT DISTINCT</code>). No configuration. Key-based dedup is a later enhancement.</p>;
+
     case "aggregate": {
       const groupBy = node.groupBy ?? [];
       const aggs = node.aggregates ?? [];

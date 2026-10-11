@@ -105,6 +105,18 @@ describe("graphSql", () => {
     expect(sql).toContain('SELECT "id", SUM("total") AS "total_sum", COUNT(*) AS "n" FROM "src"\nGROUP BY "id"');
   });
 
+  it("distinct → SELECT DISTINCT", () => {
+    const { spec: s, model: m } = spec(
+      [
+        { id: "src", kind: "source", sourceObject: "Customer" },
+        { id: "dist", kind: "distinct" },
+        { id: "tgt", kind: "target" },
+      ],
+      [{ id: "e1", from: "src", to: "dist" }, { id: "e2", from: "dist", to: "tgt" }],
+    );
+    expect(graphSql(s, m).sql).toContain('SELECT DISTINCT * FROM "src"');
+  });
+
   it("reports a node with no input as unsupported (no SQL for that target)", () => {
     const { spec: s, model: m } = spec(
       [{ id: "flt", kind: "filter" }], // filter with no upstream

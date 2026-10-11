@@ -141,6 +141,25 @@ describe("aggregate node (G-AGG)", () => {
   });
 });
 
+describe("distinct node (G-XFORM)", () => {
+  it("passes the input schema through unchanged and needs exactly one input", () => {
+    const nodes: PipelineNode[] = [
+      { id: "s", kind: "source", sourceObject: "Customer" },
+      { id: "d", kind: "distinct" },
+      { id: "t", kind: "target" },
+    ];
+    const edges: PipelineEdge[] = [{ id: "e1", from: "s", to: "d" }, { id: "e2", from: "d", to: "t" }];
+    const { schemas, issues } = inferNodeSchemas(specWith(nodes, edges), model());
+    expect(issues.filter((i) => i.severity === "error")).toHaveLength(0);
+    expect(schemas.get("d")!.map((f) => f.name).sort()).toEqual(["email", "id"]);
+  });
+
+  it("flags a distinct node with no input", () => {
+    const issues = validateGraph(specWith([{ id: "d", kind: "distinct" }], []), model());
+    expect(issues.some((i) => i.message.includes("exactly one input"))).toBe(true);
+  });
+});
+
 describe("node/edge serialization round-trip", () => {
   it("serializes nodes+edges deterministically (sorted by id) and round-trips", () => {
     const nodes: PipelineNode[] = [

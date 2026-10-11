@@ -93,6 +93,8 @@ export function graphSql(spec: PipelineSpec, model: Model): { sql: string; unsup
         const groupBy = groups.length ? `\nGROUP BY ${groups.join(", ")}` : "";
         return `SELECT ${cols.length ? cols.join(", ") : "*"} FROM ${inCte}${groupBy}`;
       }
+      case "distinct":
+        return inCte ? `SELECT DISTINCT * FROM ${inCte}` : null;
       case "target":
         return inCte ? `SELECT * FROM ${inCte}` : null;
     }

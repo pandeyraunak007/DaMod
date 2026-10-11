@@ -78,7 +78,7 @@ export type PipelineJoin = z.infer<typeof zJoin>;
 // node (same style as SnowflakeObject/GovernanceObject); the engine (graph.ts) enforces
 // per-kind semantics and infers each node's output schema. Becomes authoritative in a
 // later slice (spec v2 + migration); for now it is optional and non-breaking.
-export const NODE_KINDS = ["source", "filter", "select", "derive", "cast", "join", "aggregate", "target"] as const;
+export const NODE_KINDS = ["source", "filter", "select", "derive", "cast", "join", "aggregate", "distinct", "target"] as const;
 export type NodeKind = (typeof NODE_KINDS)[number];
 
 /** Aggregate functions for the aggregate node (G-AGG). `count` may omit its column
