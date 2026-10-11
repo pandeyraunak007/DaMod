@@ -31,6 +31,12 @@ See the top DECISIONS entries:
   `create_check_constraint`/`set_stereotype`) — all through the existing store/semantic
   ops, reviewed + approved, one undo group for model actions. Context now summarizes the
   semantic layer. Create-only for the new types (update/delete deferred).
+- **Req 23 (Snowflake, Phase 1–2):** Snowflake was already a DDL dialect/target/source
+  type; added the missing **connector to discover FROM Snowflake** (`snowflake` mock) +
+  `mapSnowflakeType` (VARIANT/GEOGRAPHY/… preserved as native). End-to-end path works:
+  "+ Snowflake (mock)" → discover → reverse-engineer → Snowflake DDL → compare. Data-
+  engineering objects (stages/pipes/streams/tasks/dynamic tables), governance, table
+  variants + enforcement flags, and the live adapter are deferred (`docs/SNOWFLAKE.md`).
 - **Req 22 (Fusion Cloud, offline/mock):** `oracle-fusion` mock connector (Financials),
   `mapFusionType`, `fusionSnapshotToModel`, `metadata.fusion` (REST resources + extract
   data stores), `source.apiVersion`, connector-generic Connections UI, and a

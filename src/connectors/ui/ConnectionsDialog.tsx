@@ -36,9 +36,13 @@ function isFusion(p: ConnectionProfile): boolean {
   return p.systemType === "oracle-fusion";
 }
 
-/** An application source modeled offline via a mock connector (no DB credentials). */
+function isSnowflakeMock(p: ConnectionProfile): boolean {
+  return p.systemType === "snowflake";
+}
+
+/** A source modeled offline via a mock connector (no live DB credentials). */
 function isAppMock(p: ConnectionProfile): boolean {
-  return isEbs(p) || isFusion(p);
+  return isEbs(p) || isFusion(p) || isSnowflakeMock(p);
 }
 
 // Read-only EBS application-dictionary counts in the reverse-engineer preview
@@ -137,6 +141,11 @@ export function ConnectionsDialog({
     // Mock/offline Oracle Fusion Cloud source — instance URL only (Req 22 Phase 1).
     addConnection({ id, name: "oracle_fusion", systemType: "oracle-fusion", params: { baseUrl: "https://example.fa.ocs.oraclecloud.com" } });
   };
+  const newSnowflakeConnection = () => {
+    const id = newId("connection");
+    // Mock/offline Snowflake source — account/database only (Req 23 Phase 2).
+    addConnection({ id, name: "snowflake", systemType: "snowflake", params: { database: "ANALYTICS" } });
+  };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -164,6 +173,7 @@ export function ConnectionsDialog({
             <button className="btn btn--small" onClick={newPgConnection}>+ PostgreSQL connection</button>
             <button className="btn btn--small" onClick={newEbsConnection}>+ Oracle EBS (mock)</button>
             <button className="btn btn--small" onClick={newFusionConnection}>+ Oracle Fusion (mock)</button>
+            <button className="btn btn--small" onClick={newSnowflakeConnection}>+ Snowflake (mock)</button>
             <button
               className={`conn__item ${importing ? "conn__item--active" : ""}`}
               onClick={() => {
@@ -232,8 +242,9 @@ function ConnectionEditor({
   // source (EBS / Fusion) needs only an instance and carries no credentials.
   const ebs = isEbs(profile);
   const fusion = isFusion(profile);
+  const snowflake = isSnowflakeMock(profile);
   const appMock = isAppMock(profile);
-  // Fusion uses `baseUrl` (instance URL); EBS uses `database` (service name).
+  // Fusion uses `baseUrl` (instance URL); EBS + Snowflake use `database`.
   const instanceKey = fusion ? "baseUrl" : "database";
   const configured = appMock
     ? !!params[instanceKey]?.trim()
@@ -246,9 +257,11 @@ function ConnectionEditor({
   const readyReason = !configured
     ? fusion
       ? "Enter the Fusion instance URL."
-      : ebs
-        ? "Enter the EBS instance / service name."
-        : "Fill in host, database and user."
+      : snowflake
+        ? "Enter the Snowflake account / database."
+        : ebs
+          ? "Enter the EBS instance / service name."
+          : "Fill in host, database and user."
     : dirty
       ? appMock
         ? "Save your changes first."
@@ -302,17 +315,19 @@ function ConnectionEditor({
       {appMock ? (
         <>
           <div className="field">
-            <label>{fusion ? "Fusion instance URL" : "EBS instance / service name"}</label>
+            <label>{fusion ? "Fusion instance URL" : snowflake ? "Snowflake account / database" : "EBS instance / service name"}</label>
             <input
               value={params[instanceKey] ?? ""}
-              placeholder={fusion ? "https://<tenant>.fa.ocs.oraclecloud.com" : "e.g. VIS"}
+              placeholder={fusion ? "https://<tenant>.fa.ocs.oraclecloud.com" : snowflake ? "e.g. ANALYTICS" : "e.g. VIS"}
               onChange={(e) => setParam(instanceKey, e.target.value)}
             />
           </div>
           <p className="field__hint">
             {fusion
               ? "Oracle Fusion Cloud (mock/offline source). Read-only metadata discovery — no credentials; the live REST connector (tenant + OAuth) is a later increment (see docs/ORACLE_FUSION.md). API version is reported on Test."
-              : "Oracle E-Business Suite (mock/offline source). Read-only metadata discovery — no credentials required; the live Oracle adapter is pending a driver sign-off (see docs/ORACLE_EBS.md). EBS release & DB version are reported on Test."}
+              : snowflake
+                ? "Snowflake (mock/offline source). Read-only metadata discovery — no credentials; the live adapter (account/warehouse/role + key-pair/OAuth) is a later increment (see docs/SNOWFLAKE.md). Snowflake-specific types (VARIANT/GEOGRAPHY/…) are preserved as native types."
+                : "Oracle E-Business Suite (mock/offline source). Read-only metadata discovery — no credentials required; the live Oracle adapter is pending a driver sign-off (see docs/ORACLE_EBS.md). EBS release & DB version are reported on Test."}
           </p>
         </>
       ) : (

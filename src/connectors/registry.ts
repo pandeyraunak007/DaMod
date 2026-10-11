@@ -8,6 +8,7 @@ import { createMockConnector } from "./mock/mockConnector";
 import { createPostgresConnector } from "./postgres/postgresConnector";
 import { createMockEbsConnector } from "./oracle/mockEbsConnector";
 import { createMockFusionConnector } from "./fusion/mockFusionConnector";
+import { createMockSnowflakeConnector } from "./snowflake/mockSnowflakeConnector";
 
 const registry = new Map<SourceSystemType, ConnectorFactory>();
 
@@ -32,3 +33,6 @@ registerConnector("oracle-ebs", createMockEbsConnector);
 // Oracle Fusion Cloud — mock/offline connector (Req 22 Phase 1). The live REST
 // connector (tenant + OAuth + pagination/rate limits) is a later increment.
 registerConnector("oracle-fusion", createMockFusionConnector);
+// Snowflake — mock/offline connector (Req 23 Phase 2). The live adapter needs
+// account/warehouse/role + key-pair/OAuth auth and an account to verify against.
+registerConnector("snowflake", createMockSnowflakeConnector);

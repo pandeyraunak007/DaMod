@@ -5,6 +5,30 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Req 23 (Phase 1–2): Snowflake connector + end-to-end discovery path
+
+Snowflake was already a DDL dialect + target + source-system type, but there was **no
+connector to discover FROM Snowflake** — so reverse-engineering a Snowflake schema wasn't
+possible. Added that (mock/offline), completing the §15 end-to-end path.
+
+- **`snowflakeTypes.mapSnowflakeType`** — NUMBER/VARCHAR/BOOLEAN/DATE/TIMESTAMP_*/VARIANT/
+  OBJECT/ARRAY → canonical; GEOGRAPHY/GEOMETRY/VECTOR/BINARY unmappable → preserved as the
+  field's **nativeType** (the field-level source added earlier makes VARIANT/GEOGRAPHY
+  survive reverse-engineering even when normalized/unmapped).
+- **Mock Snowflake connector** (ANALYTICS.PUBLIC: CUSTOMER with VARIANT/GEOGRAPHY/
+  TIMESTAMP_NTZ, ORDERS with a **declared-not-enforced** FK, a view); registered
+  `snowflake`. Reuses `metadataToModel` (Snowflake tables are relational) → model → the
+  existing Snowflake DDL export + diff/migration + snapshot/drift all work unchanged.
+- **UI:** generalized the app-mock Connections editor to a third source — "+ Snowflake
+  (mock)" (account/database only, no credentials).
+- **Capability audit:** `docs/SNOWFLAKE.md` (what already existed vs. this increment vs.
+  deferred). Deliberately did NOT add Snowflake-only types (VARIANT/GEOGRAPHY/…) to the
+  fixed canonical type set — preserved as native, same policy as Oracle/Fusion, avoiding a
+  fork of the one type engine.
+- Deferred (documented): table variants + constraint-enforcement flags (§4.2), data-
+  engineering objects (stages/pipes/streams/tasks/dynamic tables), governance, live adapter.
+- No new deps, no Rust. 378 TS tests (+7); tsc/build/cargo clean.
+
 ## 2026-10-11 — Four more DDL dialects: Oracle, SQL Server, MySQL, BigQuery
 
 Added as DDL *output* targets (export + pipeline target + New Model target database),
