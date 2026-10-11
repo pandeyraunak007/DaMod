@@ -5,6 +5,29 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — ETL Phase 3 Slice C: graph-aware SQL generation
+
+SQL from the transform DAG (the flat-spec `pipelineSql` from Phase 1 is unchanged and
+still serves flat pipelines). Pure, deterministic, DESIGN-TIME text — never executed.
+
+- `connectors/pipeline/graphSql.ts` (new, pure): `graphSql(spec, model)` emits, per
+  target/terminal node, one `WITH <cte-per-node> … SELECT * FROM <target>` in the SOURCE
+  model's dialect. Each node → a CTE: source `SELECT * FROM obj`, filter `… WHERE`, select
+  explicit column list (keep + rename), derive `SELECT *, <expr> AS c`, cast `CAST(c AS t)
+  AS c`, join `left.*, right.* … JOIN … ON` (left/right by port). Reuses `inferNodeSchemas`
+  for per-node column lists; CTEs ordered upstream-first. Nodes with no input are reported
+  in `unsupported` (that target is skipped, not emitted wrong).
+- `EtlDesigner`: a header **SQL ⇄ Canvas** toggle shows the generated SQL (+ Copy) in the
+  center when a graph exists.
+
+**Deferred:** Slice D v2 migration (derive a graph from flat specs on load + bump
+specVersion + make the DAG authoritative); execution remains out of scope.
+
+- Tests +6 (`graphSql.test.ts`: WITH-chain source→target, filter/derive/cast, select
+  keep+rename, join ON, source-dialect quoting, unsupported no-input). Fixed a test import
+  path (types from `./spec`, not `model`) that strict `tsc` caught though vitest tolerated
+  it. **529 TS tests pass; tsc + build clean.**
+
 ## 2026-10-11 — ETL Phase 3 Slice B2: canvas editing + per-node config inspector
 
 Makes the ETL Designer canvas editable. Pure edit ops (tested) + the React-Flow wiring

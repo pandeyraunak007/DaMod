@@ -2561,3 +2561,5 @@ body,
 .etl-node { font-size: 0.8rem; }
 .etl__palette { display: flex; flex-wrap: wrap; gap: 0.25rem; padding: 0.25rem 0.5rem; }
 .etl__error { position: absolute; bottom: 0.5rem; left: 0.5rem; background: #fff; padding: 0.25rem 0.5rem; border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.15); }
+.etl__sql { height: 100%; overflow: auto; padding: 0.5rem; }
+.etl__sql .export-preview { white-space: pre; }

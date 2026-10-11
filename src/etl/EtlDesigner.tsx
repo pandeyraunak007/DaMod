@@ -6,6 +6,7 @@ import { NodeInspector } from "./NodeInspector";
 import { deriveStarterGraph } from "./graphBuild";
 import { addGraphNode, updateGraphNode } from "./graphEdit";
 import { inferNodeSchemas, type GraphField } from "../connectors/pipeline/graph";
+import { graphSql } from "../connectors/pipeline/graphSql";
 import { formatType } from "../model/dataTypes";
 import type { Model } from "../model/model";
 import { NODE_KINDS, type NodeKind, type PipelineSpec, type PipelineNode } from "../connectors/pipeline/spec";
@@ -25,11 +26,13 @@ export function EtlDesigner() {
   const [pipelineId, setPipelineId] = useState<string | null>(pipelines[0]?.id ?? null);
   const [nodeId, setNodeId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sqlOpen, setSqlOpen] = useState(false);
 
   const spec = pipelines.find((p) => p.id === pipelineId) ?? null;
   const model: Model | undefined = spec ? allModels().find((m) => m.id === spec.source.modelId)?.model : undefined;
 
   const graph = useMemo(() => (spec && model ? inferNodeSchemas(spec, model) : null), [spec, model]);
+  const sql = useMemo(() => (spec && model ? graphSql(spec, model) : null), [spec, model]);
   const hasGraph = !!(spec?.nodes && spec.nodes.length);
   const selectedNode = spec?.nodes?.find((n) => n.id === nodeId) ?? null;
 
@@ -58,6 +61,11 @@ export function EtlDesigner() {
     <div className="etl">
       <div className="panel-head">
         <span className="panel-head__title">ETL Designer</span>
+        {hasGraph && (
+          <button className={`btn btn--small ${sqlOpen ? "btn--primary" : ""}`} onClick={() => setSqlOpen((v) => !v)}>
+            {sqlOpen ? "Canvas" : "SQL"}
+          </button>
+        )}
         <button className="btn btn--small" onClick={() => close(false)}>← Back to modeling</button>
       </div>
 
@@ -97,6 +105,14 @@ export function EtlDesigner() {
               <p>This pipeline has no visual graph yet.</p>
               <button className="btn btn--primary btn--small" onClick={createStarter}>Create starter graph</button>
               <p className="side__hint">Derives source→target nodes from the pipeline’s objects. Then edit on the canvas.</p>
+            </div>
+          ) : sqlOpen ? (
+            <div className="etl__sql">
+              <button className="btn btn--small" onClick={() => navigator.clipboard?.writeText(sql?.sql ?? "")}>Copy SQL</button>
+              <pre className="export-preview">
+                {sql?.sql}
+                {sql && sql.unsupported.length ? `\n-- Notes:\n${sql.unsupported.map((u) => `-- ${u}`).join("\n")}\n` : ""}
+              </pre>
             </div>
           ) : (
             <PipelineCanvas spec={spec} selectedId={nodeId} onSelect={setNodeId} onChange={save} onError={setError} />
