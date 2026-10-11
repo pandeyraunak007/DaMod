@@ -15,6 +15,7 @@ import type {
   Index,
   Model,
   NamingStandard,
+  TypeStandard,
   RawObject,
   Relationship,
   SchemaObj,
@@ -204,6 +205,19 @@ function serializeNamingStandard(s: NamingStandard): Record<string, unknown> {
   return out;
 }
 
+function serializeTypeStandard(s: TypeStandard): Record<string, unknown> {
+  const out: Record<string, unknown> = { id: s.id, name: s.name };
+  if (s.description) out.description = s.description;
+  out.rules = s.rules.map((r) => {
+    const rule: Record<string, unknown> = { type: r.type };
+    if (r.length != null) rule.length = r.length;
+    if (r.precision != null) rule.precision = r.precision;
+    if (r.scale != null) rule.scale = r.scale;
+    return rule;
+  });
+  return out;
+}
+
 function serializeSchema(s: SchemaObj): Record<string, unknown> {
   const out: Record<string, unknown> = { id: s.id, name: s.name };
   if (s.owner) out.owner = s.owner;
@@ -243,6 +257,9 @@ export function modelToPlain(model: Model): Record<string, unknown> {
   }
   if (model.namingStandards && model.namingStandards.length) {
     out.namingStandards = model.namingStandards.map(serializeNamingStandard);
+  }
+  if (model.typeStandards && model.typeStandards.length) {
+    out.typeStandards = model.typeStandards.map(serializeTypeStandard);
   }
   if (model.subjectAreas && model.subjectAreas.length) {
     out.subjectAreas = model.subjectAreas.map((a) => {

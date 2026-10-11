@@ -154,6 +154,20 @@ const zNamingStandard = z.object({
   mirrorForeignKeys: z.boolean().optional(),
 });
 
+const zTypeRule = z.object({
+  type: z.enum(DATA_TYPE_KINDS as unknown as [string, ...string[]]),
+  length: z.number().int().positive().optional(),
+  precision: z.number().int().positive().optional(),
+  scale: z.number().int().nonnegative().optional(),
+});
+
+const zTypeStandard = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  rules: z.array(zTypeRule).default([]),
+});
+
 const zGovernanceObject = z.object({
   id: z.string(),
   kind: z.enum(["role", "grant", "tag", "maskingPolicy", "rowAccessPolicy", "share"]),
@@ -228,6 +242,7 @@ const zModel = z.object({
   snowflakeObjects: z.array(zSnowflakeObject).optional(),
   governanceObjects: z.array(zGovernanceObject).optional(),
   namingStandards: z.array(zNamingStandard).optional(),
+  typeStandards: z.array(zTypeStandard).optional(),
   views: z.array(zView).optional(),
   indexes: z.array(zIndex).optional(),
   sequences: z.array(zSequence).optional(),

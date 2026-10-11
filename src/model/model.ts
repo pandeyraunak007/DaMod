@@ -7,10 +7,13 @@ import { type DataTypeKind, withTypeDefaults } from "./dataTypes";
 import type { LogicalTypeKind, ModelLevel } from "./levels";
 import { usesPhysicalTypes } from "./levels";
 import type { NamingStandard } from "./naming";
+import type { TypeStandard } from "./typeStandards";
 
 export type { LogicalTypeKind } from "./levels";
 export type { NamingStandard, NamingRule, NamingTarget, NameCase, NamingViolation, NamingChange, NamingCollision, NamingPreview } from "./naming";
 export { newNamingStandard, checkNaming, applyNamingRule, previewNaming, mirrorsForeignKeys } from "./naming";
+export type { TypeStandard, TypeRule, TypeViolation, LossyWarning } from "./typeStandards";
+export { newTypeStandard, checkTypes, lossyTypeWarnings } from "./typeStandards";
 
 export interface Position {
   x: number;
@@ -354,6 +357,7 @@ export interface Model {
   snowflakeObjects?: SnowflakeObject[];
   governanceObjects?: GovernanceObject[];
   namingStandards?: NamingStandard[];
+  typeStandards?: TypeStandard[];
   views?: View[];
   indexes?: Index[];
   sequences?: Sequence[];

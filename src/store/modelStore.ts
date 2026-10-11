@@ -10,6 +10,7 @@ import {
   type GovernanceObject,
   type GovernanceObjectKind,
   type NamingStandard,
+  type TypeStandard,
   type Notation,
   type Position,
   type SchemaObj,
@@ -32,6 +33,8 @@ import {
   newGovernanceObject,
   newNamingStandard,
   previewNaming,
+  newTypeStandard,
+  checkTypes,
   newSchemaObject,
   newSnowflakeObject,
   newSubjectArea,
@@ -194,6 +197,15 @@ interface ModelStore {
    *  non-colliding, valid-identifier change (incl. FK mirroring when enabled).
    *  Colliding or invalid renames are skipped (counted). Stable IDs are preserved. */
   applyNamingStandard: (standardId: string) => { applied: number; skipped: number; collisions: number };
+
+  // data type standards (Phase 3) — reusable type-parameter policies.
+  createTypeStandard: () => string;
+  updateTypeStandard: (id: string, patch: Partial<Omit<TypeStandard, "id">>) => void;
+  deleteTypeStandard: (id: string) => void;
+  /** Normalise every non-conforming column's type parameters to the standard as ONE
+   *  undo step (domain-bound columns are left to the domain); realigns FK types after.
+   *  Returns the number of columns changed. */
+  applyTypeStandard: (standardId: string) => { applied: number };
 
   // relationships
   openRelationshipDraft: (source: string, target: string) => void;
@@ -892,6 +904,42 @@ export const useModelStore = create<ModelStore>((set, get) => {
         skipped: preview.changes.length - toApply.length,
         collisions: preview.collisions.length,
       };
+    },
+    createTypeStandard: () => {
+      const taken = new Set((get().model.typeStandards ?? []).map((s) => s.name));
+      const std = newTypeStandard(uniqueName("New type standard", taken));
+      commit((m) => {
+        m.typeStandards = [...(m.typeStandards ?? []), std];
+      });
+      return std.id;
+    },
+    updateTypeStandard: (id, patch) => {
+      commit((m) => {
+        m.typeStandards = (m.typeStandards ?? []).map((s) => (s.id === id ? { ...s, ...patch } : s));
+      });
+    },
+    deleteTypeStandard: (id) => {
+      commit((m) => {
+        m.typeStandards = (m.typeStandards ?? []).filter((s) => s.id !== id);
+      });
+    },
+    applyTypeStandard: (standardId) => {
+      const std = (get().model.typeStandards ?? []).find((s) => s.id === standardId);
+      if (!std) return { applied: 0 };
+      const violations = checkTypes(get().model, std);
+      if (!violations.length) return { applied: 0 };
+      commit((m) => {
+        for (const v of violations) {
+          const f = m.entities.find((e) => e.id === v.entityId)?.fields.find((x) => x.id === v.fieldId);
+          if (!f) continue;
+          if (v.proposed.length != null) f.length = v.proposed.length;
+          if (v.proposed.precision != null) f.precision = v.proposed.precision;
+          if (v.proposed.scale != null) f.scale = v.proposed.scale;
+        }
+        // A normalised PK parameter must propagate to its FK columns.
+        reconcileForeignKeyTypes(m);
+      });
+      return { applied: violations.length };
     },
     bindFieldDomain: (entityId, fieldId, domainId) => {
       set((s) => {
