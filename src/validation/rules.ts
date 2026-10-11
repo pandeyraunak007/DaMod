@@ -3,7 +3,9 @@
 // the rest (FR-10.5). Validation never blocks saving — only export checks it.
 
 import type { Field, Model } from "../model/model";
+import { modelDialect } from "../model/model";
 import { validateIdentifier } from "../model/identifiers";
+import { exceedsIdentifierLength, identifierMax, isReservedWord } from "../model/dialectIdentifiers";
 import { isConceptual, physicalToLogical, usesPhysicalTypes } from "../model/levels";
 import { formatType } from "../model/dataTypes";
 import {
@@ -722,6 +724,43 @@ function governanceObjectIssues(ctx: ValidationContext): Issue[] {
   return issues;
 }
 
+// Dialect-specific identifier constraints (gap G8): reserved words + length limits for
+// the model's target dialect. Physical levels only (identifiers are a physical concern).
+// Warnings — reserved words are quoted on export; over-length is the DB's hard limit.
+function dialectIdentifierIssues(ctx: ValidationContext): Issue[] {
+  const issues: Issue[] = [];
+  for (const { id, model } of ctx.models) {
+    if (!usesPhysicalTypes(model.level)) continue;
+    const dialect = modelDialect(model);
+    const max = identifierMax(dialect);
+    const check = (name: string, target: IssueTarget, key: string, label: string) => {
+      if (exceedsIdentifierLength(dialect, name)) {
+        issues.push({
+          id: `idLen:${key}`,
+          rule: "dialectIdentifierIssues",
+          severity: "warning",
+          message: `${label} “${name}” exceeds ${dialect}'s ${max}-character identifier limit`,
+          target,
+        });
+      }
+      if (isReservedWord(dialect, name)) {
+        issues.push({
+          id: `idRes:${key}`,
+          rule: "dialectIdentifierIssues",
+          severity: "warning",
+          message: `${label} “${name}” is a reserved word in ${dialect} (will be quoted on export)`,
+          target,
+        });
+      }
+    };
+    for (const e of model.entities) {
+      check(e.name, { model: id, entity: e.id }, `${id}:${e.id}`, "Table");
+      for (const f of e.fields) check(f.name, { model: id, entity: e.id, field: f.id }, `${id}:${e.id}:${f.id}`, "Column");
+    }
+  }
+  return issues;
+}
+
 const RULES: ((ctx: ValidationContext) => Issue[])[] = [
   duplicateEntityNames,
   duplicateFieldNames,
@@ -746,6 +785,7 @@ const RULES: ((ctx: ValidationContext) => Issue[])[] = [
   snowflakeEnforcement,
   snowflakeObjectIssues,
   governanceObjectIssues,
+  dialectIdentifierIssues,
 ];
 
 /** Run every rule over the workspace and return all issues (FR-10.1). */
