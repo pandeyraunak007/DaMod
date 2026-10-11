@@ -5,6 +5,20 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — ETL: wire graph SQL into the pipeline dialog's output tabs
+
+The flat PipelineDialog (tabular editor) now shares the graph-based SQL, so the two UIs
+(dialog + visual Designer) agree on generated SQL.
+
+- `PipelineView` SQL tab: prefers `graphSql(spec, model)` when the pipeline has a DAG
+  (always, post-v2); falls back to the flat `pipelineSql` for graphless specs. A header
+  comment states the source ("transform graph" vs "flat 1:1 load").
+- Export now also writes `<name>.extract.sql` (the SQL) alongside the report + target DDL;
+  button relabelled "Export report + SQL + DDL".
+- Thin UI wiring over the already-tested `graphSql`/`pipelineSql` generators — no new test
+  (consistent with the repo not render-testing PipelineDialog). **531 TS tests pass; tsc +
+  build clean; dev server hot-reloads the change.**
+
 ## 2026-10-11 — ETL Phase 3 Slice D: spec v2 migration (transform DAG always present)
 
 Completes the DAG arc. `PIPELINE_SPEC_VERSION` → **2**: every pipeline now carries a

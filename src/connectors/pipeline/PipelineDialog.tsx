@@ -5,6 +5,7 @@ import { joinPath, writeFile } from "../../persist/fs";
 import { validateIdentifier } from "../../model/identifiers";
 import type { Model } from "../../model/model";
 import { planFullLoad, validatePipeline, pipelineReport, targetDdl, pipelineSql } from "./planner";
+import { graphSql } from "./graphSql";
 import { MappingEditor } from "./MappingEditor";
 import type { PipelineSpec } from "./spec";
 
@@ -142,12 +143,15 @@ function PipelineView({ id, onDeleted }: { id: string; onDeleted: () => void }) 
   const issues = useMemo(() => (spec && model ? validatePipeline(spec, model) : []), [spec, model]);
   const report = useMemo(() => (spec ? pipelineReport(spec, issues) : ""), [spec, issues]);
   const ddl = useMemo(() => (spec ? targetDdl(spec) : ""), [spec]);
-  // Source-extraction SQL needs the source model's dialect; blank until it's open.
+  // Extraction SQL needs the source model's dialect; blank until it's open. Prefer the
+  // transform-graph SQL when the pipeline has a DAG (v2); fall back to the flat 1:1 SQL.
+  const hasGraph = (spec?.nodes?.length ?? 0) > 0;
   const sql = useMemo(() => {
     if (!spec || !model) return "";
-    const r = pipelineSql(spec, model);
-    return r.unsupported.length ? `${r.sql}\n-- Notes:\n${r.unsupported.map((u) => `-- ${u}`).join("\n")}\n` : r.sql;
-  }, [spec, model]);
+    const r = hasGraph ? graphSql(spec, model) : pipelineSql(spec, model);
+    const header = `-- Source: ${hasGraph ? "transform graph" : "flat 1:1 load"}\n`;
+    return header + (r.unsupported.length ? `${r.sql}\n-- Notes:\n${r.unsupported.map((u) => `-- ${u}`).join("\n")}\n` : r.sql);
+  }, [spec, model, hasGraph]);
 
   if (!spec) return null;
   const errors = issues.filter((i) => i.severity === "error").length;
@@ -157,7 +161,8 @@ function PipelineView({ id, onDeleted }: { id: string; onDeleted: () => void }) 
     if (!path) return;
     await writeFile(joinPath(path, `${spec.name}.pipeline-report.txt`), report, false);
     await writeFile(joinPath(path, `${spec.name}.target.sql`), ddl, false);
-    setSaved(`${spec.name}.pipeline-report.txt + ${spec.name}.target.sql`);
+    if (sql) await writeFile(joinPath(path, `${spec.name}.extract.sql`), sql, false);
+    setSaved(`${spec.name}.pipeline-report.txt + ${spec.name}.target.sql${sql ? ` + ${spec.name}.extract.sql` : ""}`);
   };
 
   return (
@@ -197,7 +202,7 @@ function PipelineView({ id, onDeleted }: { id: string; onDeleted: () => void }) 
           Delete
         </button>
         <button className="btn btn--small" onClick={() => navigator.clipboard?.writeText(tab === "report" ? report : tab === "sql" ? sql : ddl)}>Copy</button>
-        <button className="btn btn--primary btn--small" onClick={exportFiles} disabled={!path}>Export report + DDL</button>
+        <button className="btn btn--primary btn--small" onClick={exportFiles} disabled={!path}>Export report + SQL + DDL</button>
       </div>
     </div>
   );
