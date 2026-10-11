@@ -5,6 +5,36 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Data Type Standards Phase 3 (object + engine + apply + manager UI)
+
+Reusable per-model type-PARAMETER policies + dialect lossy-mapping surfacing. Key
+architectural decision: **do NOT fork the fixed canonical type set or the per-dialect
+renderers** (those remain the single source of truth). A Data Type Standard only
+normalises string length / decimal precision+scale and reports fidelity risks — it
+never remaps one canonical type to another (that would change data meaning; deferred).
+
+- `model/typeStandards.ts`: `TypeStandard`/`TypeRule`; `checkTypes()` (pure) flags
+  columns whose params deviate (current/proposed/reasons), **skipping columns with no
+  physical type and domain-bound columns** — encoding the precedence explicit override >
+  domain > type-standard default. `lossyTypeWarnings()` flags canonical→dialect mappings
+  with no native equivalent (uuid on Snowflake/MySQL/BigQuery/Databricks; json on
+  Oracle/SQL Server/Databricks; boolean on Oracle). Model import kept type-only (inlined
+  the dialect default) to avoid a runtime cycle with model.ts's re-exports.
+- Preview == `checkTypes` (current→proposed), so Phase 3 collapsed foundation+preview+
+  apply into one logic slice (no collision/mirroring complexity like naming).
+- `applyTypeStandard` normalises params as ONE undo step then `reconcileForeignKeyTypes`
+  so FK params follow a normalised PK. Persistence: Zod + deterministic serialize +
+  round-trip. id prefix `u_` (ids.test unknown-prefix example moved to `i_`).
+- `TypeStandardsDialog` on a new **Types** ribbon button: rules editor (param inputs
+  gated by the type's shape), live read-only preview, lossy-mapping warnings for the
+  model's dialect, explicit Apply (one undo + notice).
+
+**Deferred:** editable per-dialect *mapping profiles* (override how canonical→physical
+renders — the P2 item; would change DDL output); canonical-type remapping; Copilot type
+actions (Phase 4).
+
+- Tests +9 (engine ×5, store ×2, dialog render ×2). **449 TS tests pass; tsc + build clean.**
+
 ## 2026-10-11 — Naming Standards Phase 2 Slices B–C (preview + apply + manager UI)
 
 Built on Slice A's object + engine. Now usable end-to-end.

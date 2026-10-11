@@ -19,6 +19,7 @@ import { PropertiesDialog } from "./panels/PropertiesDialog";
 import { DomainsDialog } from "./panels/DomainsDialog";
 import { DomainDeleteDialog } from "./panels/DomainDeleteDialog";
 import { NamingStandardsDialog } from "./panels/NamingStandardsDialog";
+import { TypeStandardsDialog } from "./panels/TypeStandardsDialog";
 import { ImportDialog } from "./import/ImportDialog";
 import { ConnectionsDialog } from "./connectors/ui/ConnectionsDialog";
 import { PipelineDialog } from "./connectors/pipeline/PipelineDialog";
@@ -46,6 +47,7 @@ export default function App() {
   const [exportOpen, setExportOpen] = useState(false);
   const [domainsOpen, setDomainsOpen] = useState(false);
   const [namingOpen, setNamingOpen] = useState(false);
+  const [typesOpen, setTypesOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [connectionsReverse, setConnectionsReverse] = useState(false);
@@ -195,6 +197,7 @@ export default function App() {
         onOpenExport={() => setExportOpen(true)}
         onOpenDomains={() => setDomainsOpen(true)}
         onOpenNaming={() => setNamingOpen(true)}
+        onOpenTypes={() => setTypesOpen(true)}
         onToggleSemantic={() => setSemanticOpen((v) => !v)}
         onToggleCopilot={() => setCopilotOpen(!copilotOpen)}
         copilotActive={copilotOpen}
@@ -258,6 +261,7 @@ export default function App() {
       {exportOpen && <ExportDialog onClose={() => setExportOpen(false)} />}
       {domainsOpen && <DomainsDialog onClose={() => setDomainsOpen(false)} />}
       {namingOpen && <NamingStandardsDialog onClose={() => setNamingOpen(false)} />}
+      {typesOpen && <TypeStandardsDialog onClose={() => setTypesOpen(false)} />}
       <DomainDeleteDialog />
       {importOpen && <ImportDialog onClose={() => setImportOpen(false)} />}
       {connectionsOpen && (
