@@ -35,8 +35,9 @@ See the top DECISIONS entries:
   `mapFusionType`, `fusionSnapshotToModel`, `metadata.fusion` (REST resources + extract
   data stores), `source.apiVersion`, connector-generic Connections UI, and a
   **Fusion-aware Explorer view** (family/module grouping) sharing the `AppExplorer`
-  component with EBS (Model/EBS|Fusion toggle). Live REST connector + Fusion Properties
-  panels deferred (`docs/ORACLE_FUSION.md`).
+  component with EBS (Model/EBS|Fusion toggle), and a **Fusion business-object Properties
+  panel** (Inspector General tab shows family/module/API path/version). Live REST connector
+  + attribute/API-resource/extract panels deferred (`docs/ORACLE_FUSION.md`).
 - **Source-to-target mapping (Req 22 §8):** the pipeline designer has an editable
   **Mapping** tab (`connectors/pipeline/MappingEditor.tsx`) — rename target columns,
   convert types, add transforms, drop/add columns, live-validated, saved via

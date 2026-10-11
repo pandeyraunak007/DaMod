@@ -95,9 +95,12 @@ export function fusionSnapshotToModel(
     tags.add(`fusion:${a.family}`);
     entity.tags = [...tags];
     if (entity.source) {
-      // Reuse the generic provenance product slot for the family grouping key.
+      // Group by family (product slot) / module (schema slot) — the module is finer
+      // than the catalog schema name, so it wins when documented.
       entity.source.product = a.family;
-      if (a.module) entity.source.schema = entity.source.schema ?? a.module;
+      if (a.module) entity.source.schema = a.module;
+      if (a.apiPath) entity.source.apiPath = a.apiPath;
+      if (a.apiVersion) entity.source.apiVersion = a.apiVersion;
     }
   }
   return { ...result, families: fusionFamilies(md) };

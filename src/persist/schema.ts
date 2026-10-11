@@ -48,6 +48,8 @@ const zObjectSource = z.object({
   product: z.string().optional(),
   provenance: z.string().optional(),
   confidence: z.number().min(0).max(1).optional(),
+  apiPath: z.string().optional(),
+  apiVersion: z.string().optional(),
 });
 
 const zEntity = z.object({

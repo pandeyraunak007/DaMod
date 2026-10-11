@@ -95,6 +95,10 @@ export interface ObjectSource {
   provenance?: string;
   /** 0..1 confidence for inferred mappings. */
   confidence?: number;
+  /** Fusion Cloud REST resource path (Req 22 §7), e.g. ".../invoices". */
+  apiPath?: string;
+  /** Fusion Cloud REST API version. */
+  apiVersion?: string;
 }
 
 export interface Entity {

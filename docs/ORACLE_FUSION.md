@@ -33,7 +33,7 @@ OAuth · **Deferred** = not yet built.
 | Connection setup + test + reverse (UI) | **Done (mock)** | Connections dialog: "+ Oracle Fusion (mock)" (instance URL only, no credentials); Test reports API version; Reverse-engineer imports a Fusion-enriched model; offline "Import metadata file…" works too. |
 | Offline metadata-file import | **Done** | Any canonical JSON (incl. a Fusion package) imports via "Import metadata file…" (`parseMetadataFile`, rejects credential leaks). |
 | Fusion-aware Model Explorer view | **Done** | `FusionExplorer` — a Model/Fusion toggle (shown when the active model has Fusion provenance); groups business objects by **family** or **module** with counts, search, expand/collapse, click-to-reveal; subject-area shortcuts; scoped to the active tab; read-only. Shares the `AppExplorer` component with the EBS view. |
-| Fusion-specific Properties Inspector panels | **Deferred** | `entity.source` provenance shows in the General tab today; API-resource / extract-data-store panels are later. |
+| Fusion-specific Properties Inspector panel (business object) | **Done** | The entity General tab shows a **Fusion Cloud source** block — Application family / Module / Business object / **API path** / **API version** / provenance (`entity.source` now carries apiPath+apiVersion). Attribute source-native-type + standalone API-resource / extract-data-store panels (snapshot-only) are later. |
 | Source-to-target mapping | **Done** | Pipeline designer gains an editable **Mapping** tab (`MappingEditor`): per object, rename the target column, convert its type, add a transform expression, toggle NOT NULL, drop columns, add back un-mapped source columns — live-validated (type-conversion / required / drift), saved through the existing store. Works for any source model (EBS/Fusion/relational) → Postgres/Snowflake/Databricks target. Cross-object joins/filters deferred. |
 | Live data extraction / pipeline execution | **Deferred** | Out of scope by design — discovery, planning and execution stay separate (§8/§11). |
 | Live REST connector (tenant + OAuth) | **Deferred** | Same contract; add when a tenant is available to verify. |
@@ -52,10 +52,11 @@ OAuth · **Deferred** = not yet built.
 ## Roadmap — deferred phases (Req 22 §12)
 
 - **Phase 2/3 (more):** *DONE:* the Fusion-aware Explorer view (family / module grouping,
-  `FusionExplorer`). *Remaining:* Fusion Properties panels (business object / attribute /
-  API resource / extract data store); API-resource / extract-definition tree nodes
-  (they live on the snapshot, so they need a snapshot-reading surface); more families
-  (Procurement, SCM, HCM, Sales) via fixtures.
+  `FusionExplorer`) + the **business-object Properties panel** (family/module/API path/
+  version). *Remaining:* attribute source-native-type (needs a field-level `source`);
+  standalone API-resource / extract-data-store panels + tree nodes (they live on the
+  snapshot, so they need a snapshot-reading surface); more families (Procurement, SCM,
+  HCM, Sales) via fixtures.
 - **Phase 4:** live BICC / Data Extraction metadata (offerings, data stores, extract
   fields, full/incremental indicators) — kept separate from model discovery.
 - **Phase 5:** *DONE:* source-to-target mapping UI + type conversions (`MappingEditor` —

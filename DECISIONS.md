@@ -5,6 +5,23 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Fusion-specific Properties panel (business object) (Req 22 §7)
+
+The Fusion REST specifics (API path/version) lived only in the snapshot's `native.fusion`;
+`fusionSnapshotToModel` carried family/module to `entity.source` but not the API fields, so
+the Inspector couldn't show them.
+
+- `ObjectSource` += `apiPath`/`apiVersion` (optional, serialize + Zod); `fusionSnapshotToModel`
+  now sets them on each entity. **Bug fixed along the way:** it kept the catalog schema name
+  as `source.schema` instead of the finer **module** — now the module wins (so the Fusion
+  Explorer's Module grouping + the panel are correct).
+- `EntitySourceInfo` (Inspector General tab) is now **source-aware**: for `oracle-fusion` it
+  renders a "Fusion Cloud source" block with Application family / Module / Business object /
+  API path / API version; EBS/relational keep their generic labels.
+- Deferred (documented): attribute source-native-type (needs a field-level `source`) and
+  standalone API-resource / extract-data-store panels (snapshot-only).
+- 362 TS tests (+1 render + source assertions); tsc/build/cargo clean.
+
 ## 2026-10-11 — Pipeline cross-object joins + source-side filters (Req 22 §8.6)
 
 Extended the pipeline spec/planner/editor with joins and filters (the mapping editor

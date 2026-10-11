@@ -211,17 +211,20 @@ function EntitySchemaField({
 // Read-only discovery provenance (Req 21 §5/§7) — where a reverse-engineered object
 // came from. Shown as facts (source identifier/product), never editable here.
 function EntitySourceInfo({ source }: { source: NonNullable<Entity["source"]> }) {
+  const fusion = source.system === "oracle-fusion";
   const rows: [string, string][] = [];
   if (source.system) rows.push(["Source system", source.system]);
-  if (source.product) rows.push(["EBS product", source.product]);
-  if (source.schema) rows.push(["Source schema", source.schema]);
-  if (source.nativeId) rows.push(["Source identifier", source.nativeId]);
+  if (source.product) rows.push([fusion ? "Application family" : "EBS product", source.product]);
+  if (source.schema) rows.push([fusion ? "Module" : "Source schema", source.schema]);
+  if (source.nativeId) rows.push([fusion ? "Business object" : "Source identifier", source.nativeId]);
+  if (source.apiPath) rows.push(["API path", source.apiPath]);
+  if (source.apiVersion) rows.push(["API version", source.apiVersion]);
   if (source.provenance) rows.push(["Provenance", source.provenance]);
   if (source.confidence !== undefined) rows.push(["Confidence", `${Math.round(source.confidence * 100)}%`]);
   if (!rows.length) return null;
   return (
     <div className="field">
-      <label>Discovery source (read-only)</label>
+      <label>{fusion ? "Fusion Cloud source (read-only)" : "Discovery source (read-only)"}</label>
       <table className="src-info">
         <tbody>
           {rows.map(([k, v]) => (

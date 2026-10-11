@@ -64,6 +64,9 @@ describe("Fusion reverse-engineering → model (Req 22 §6)", () => {
     const inv = model.entities.find((e) => e.name === "InvoiceHeader")!;
     expect(inv.tags).toContain("fusion:Financials");
     expect(inv.source?.product).toBe("Financials");
+    expect(inv.source?.schema).toBe("Payables");
+    expect(inv.source?.apiPath).toContain("/invoices");
+    expect(inv.source?.apiVersion).toBe("11.13.18.05");
     // Nested child → composite PK + relationship to the header.
     const line = model.entities.find((e) => e.name === "InvoiceLine")!;
     expect(line.fields.filter((f) => f.primaryKey).map((f) => f.name)).toEqual(["InvoiceId", "LineNumber"]);

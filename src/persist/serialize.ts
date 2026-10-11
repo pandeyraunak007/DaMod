@@ -90,6 +90,8 @@ function serializeEntity(e: Entity): Record<string, unknown> {
     if (s.product) src.product = s.product;
     if (s.provenance) src.provenance = s.provenance;
     if (s.confidence !== undefined) src.confidence = s.confidence;
+    if (s.apiPath) src.apiPath = s.apiPath;
+    if (s.apiVersion) src.apiVersion = s.apiVersion;
     if (Object.keys(src).length) out.source = src;
   }
   udpsOut(out, e.note, e.udps);
