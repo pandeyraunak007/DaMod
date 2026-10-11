@@ -11,6 +11,7 @@ import { validateIdentifier } from "../../model/identifiers";
 import { DIALECTS, type DialectId } from "../../export/dialects";
 import { exportModelDDL } from "../../export/ddl";
 import { newId } from "../../lib/ids";
+import { deriveStarterGraph } from "./graphDerive";
 import {
   type ColumnMapping,
   type PipelineFilter,
@@ -63,8 +64,8 @@ export function planFullLoad(
       filters: [],
     }));
 
-  return {
-    specVersion: 1,
+  const spec: PipelineSpec = {
+    specVersion: 2,
     id: newId("pipeline"),
     name: opts.name,
     source: {
@@ -78,6 +79,9 @@ export function planFullLoad(
     objects,
     joins: [],
   };
+  // v2: born with a starter transform DAG so the designer always has a graph.
+  const g = deriveStarterGraph(spec);
+  return { ...spec, nodes: g.nodes, edges: g.edges };
 }
 
 /** Validate a spec against the current source model (type-compat, required, drift). */

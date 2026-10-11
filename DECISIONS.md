@@ -5,6 +5,37 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — ETL Phase 3 Slice D: spec v2 migration (transform DAG always present)
+
+Completes the DAG arc. `PIPELINE_SPEC_VERSION` → **2**: every pipeline now carries a
+transform graph. The **flat objects/joins path is deliberately RETAINED** (tabular
+MappingEditor, Report, Target DDL, flat `pipelineSql`, 16 flat tests) — ripping it out
+would regress working, tested features, so the DAG is authoritative for the visual
+designer + `graphSql` while the flat spec stays the tabular-editor/creation path. The two
+coexist; full consolidation is explicitly out of scope.
+
+- `connectors/pipeline/graphDerive.ts` (new, pipeline layer): `deriveStarterGraph` moved
+  here from `etl/graphBuild.ts` (re-exported there) so the planner + migration can seed a
+  graph without a UI-layer dependency.
+- `spec.ts`: version const → 2 (`zSpec.specVersion` literal follows); serialize writes 2.
+- `planner.planFullLoad`: emits v2 **with** a derived starter graph — new pipelines are
+  born with a DAG.
+- `pipelinesPersist.migratePipelinesDoc`: real per-spec migration — a v1 spec is upgraded
+  to v2 and, if it has no graph, seeded from its flat objects; runs before Zod (which now
+  requires v2). Returns the same ref when nothing needs upgrading (true no-op); never
+  clobbers a spec that already has a graph. Doc `formatVersion` unchanged (spec-level bump).
+- Render test fix: the EtlDesigner shell test strips the auto-seeded graph to keep
+  exercising the no-graph state (which avoids a jsdom React-Flow mount / missing
+  ResizeObserver).
+
+**The ETL Designer DAG arc is complete:** model/engine (A) → workspace + read-only canvas
+(B1) → canvas editing + inspector (B2) → graph SQL (C) → v2 migration (D). Deferred beyond
+the arc: execution, incremental/CDC, flat↔graph consolidation, Copilot ETL actions.
+
+- Tests +2 (`pipelinePersist.test.ts`: v1→v2 upgrade + starter-graph on load; existing-graph
+  not clobbered) + render-test fix. **531 TS tests pass; tsc + build clean.** Old
+  `pipelines.json` (v1) upgrades on load.
+
 ## 2026-10-11 — ETL Phase 3 Slice C: graph-aware SQL generation
 
 SQL from the transform DAG (the flat-spec `pipelineSql` from Phase 1 is unchanged and

@@ -11,7 +11,7 @@ import { DATA_TYPE_KINDS } from "../../model/dataTypes";
 import { DIALECT_IDS } from "../../export/dialects";
 import type { ParseResult } from "../metadata";
 
-export const PIPELINE_SPEC_VERSION = 1;
+export const PIPELINE_SPEC_VERSION = 2;
 
 /** Only full-load for the first milestone (§5.2). */
 export const LOAD_STRATEGIES = ["full"] as const;

@@ -27,7 +27,7 @@ describe("pipelines.json version gate", () => {
     expect(parsePipelinesFile("not json").ok).toBe(false);
   });
 
-  it("still loads a valid v1 document (round-trip)", () => {
+  it("round-trips a current-version document", () => {
     const doc = emptyPipelinesDoc();
     doc.pipelines.push(planFullLoad(model(), ["Customer"], "postgres", { name: "p" }));
     const text = serializePipelines(doc);
@@ -36,9 +36,44 @@ describe("pipelines.json version gate", () => {
     if (parsed.ok) expect(serializePipelines(parsed.value)).toBe(text);
   });
 
-  it("migratePipelinesDoc is a no-op for the current version", () => {
+  it("migratePipelinesDoc returns the same ref when nothing needs upgrading", () => {
     const raw = { formatVersion: 1, pipelines: [] };
     expect(migratePipelinesDoc(raw)).toBe(raw);
+  });
+
+  it("upgrades a pre-v2 (flat) spec to v2 and seeds a starter graph on load", () => {
+    const v1 = {
+      specVersion: 1,
+      id: "p_legacy00",
+      name: "legacy",
+      source: { modelId: "m_x", modelName: "m" },
+      target: { platform: "postgres" },
+      loadStrategy: "full",
+      objects: [
+        { sourceObject: "Customer", targetObject: "Customer", columns: [{ source: "id", target: "id", targetType: { type: "uuid" }, required: true }], filters: [] },
+      ],
+      joins: [],
+    };
+    const parsed = parsePipelinesFile(JSON.stringify({ formatVersion: 1, pipelines: [v1] }));
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    const p = parsed.value.pipelines[0];
+    expect(p.specVersion).toBe(2); // upgraded
+    expect((p.nodes ?? []).length).toBeGreaterThan(0); // starter graph derived
+    expect(p.nodes!.some((n) => n.kind === "source" && n.sourceObject === "Customer")).toBe(true);
+    expect(p.objects).toHaveLength(1); // flat objects retained (tabular editor still works)
+  });
+
+  it("does not clobber a pre-v2 spec that already has a graph", () => {
+    const v1 = {
+      specVersion: 1, id: "p_x", name: "g", source: { modelId: "m", modelName: "m" },
+      target: { platform: "postgres" }, loadStrategy: "full", objects: [], joins: [],
+      nodes: [{ id: "keep", kind: "source", sourceObject: "X" }], edges: [],
+    };
+    const r = migratePipelinesDoc({ formatVersion: 1, pipelines: [v1] });
+    const p = (r.pipelines as Record<string, unknown>[])[0];
+    expect((p.nodes as { id: string }[])[0].id).toBe("keep"); // existing graph preserved
+    expect(p.specVersion).toBe(2);
   });
 });
 

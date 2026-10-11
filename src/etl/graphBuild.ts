@@ -1,26 +1,12 @@
 // Pure helpers for the ETL Designer canvas (Phase 3 Slice B). No DOM, no React.
-//  - deriveStarterGraph: a first node/edge DAG from a flat pipeline spec, so an
-//    existing (flat) pipeline has something to show/edit on the canvas. This is a
-//    convenience seed, NOT the authoritative v2 migration (that's a later slice).
+//  - deriveStarterGraph (re-exported from the pipeline layer): a first node/edge DAG
+//    from a flat spec, so an existing pipeline has something to show/edit.
 //  - autoLayout: deterministic left-to-right positions by topological depth, used
 //    when a spec carries no persisted layout.
 
-import type { PipelineSpec, PipelineNode, PipelineEdge, PipelineLayout } from "../connectors/pipeline/spec";
+import type { PipelineNode, PipelineEdge, PipelineLayout } from "../connectors/pipeline/spec";
 
-/** Build a starter DAG from a flat spec: one source→target pair per object. Ids are
- *  index-based (deterministic, stable across re-derivation for the same objects). */
-export function deriveStarterGraph(spec: PipelineSpec): { nodes: PipelineNode[]; edges: PipelineEdge[] } {
-  const nodes: PipelineNode[] = [];
-  const edges: PipelineEdge[] = [];
-  spec.objects.forEach((obj, i) => {
-    const srcId = `n_src_${i}`;
-    const tgtId = `n_tgt_${i}`;
-    nodes.push({ id: srcId, kind: "source", sourceObject: obj.sourceObject, label: obj.sourceObject });
-    nodes.push({ id: tgtId, kind: "target", targetObject: obj.targetObject, label: obj.targetObject });
-    edges.push({ id: `e_${i}`, from: srcId, to: tgtId });
-  });
-  return { nodes, edges };
-}
+export { deriveStarterGraph } from "../connectors/pipeline/graphDerive";
 
 const COL_W = 240;
 const ROW_H = 120;

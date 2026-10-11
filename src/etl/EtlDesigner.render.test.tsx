@@ -26,7 +26,9 @@ function model(): Model {
 }
 
 beforeEach(() => {
-  const spec = planFullLoad(model(), ["Customer"], "postgres", { name: "load_customers" });
+  // Strip the auto-seeded v2 graph so we exercise the no-graph shell state (which does
+  // NOT mount React Flow — jsdom has no ResizeObserver).
+  const spec = { ...planFullLoad(model(), ["Customer"], "postgres", { name: "load_customers" }), nodes: undefined, edges: undefined };
   useWorkspaceStore.setState({ pipelines: [spec] });
   container = document.createElement("div");
   document.body.appendChild(container);
