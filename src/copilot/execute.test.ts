@@ -245,6 +245,27 @@ describe("bind_domain action (apply a reusable domain to columns)", () => {
     expect(res.failed).toBe(1);
     expect(res.applied).toBe(0);
   });
+
+  it("emits AT MOST ONE FK-reconcile notice for a bulk bind (no toast storm)", () => {
+    // Parent/child with a FK so re-typing the parent PK cascades to the child FK.
+    const parent = s().createEntity(); s().renameEntity(parent, "Customer");
+    const pk = s().addField(parent)!;
+    s().updateField(parent, pk, { name: "id", type: "uuid", primaryKey: true });
+    const child = s().createEntity(); s().renameEntity(child, "Order");
+    s().createRelationship({ parentEntity: parent, childEntity: child, cardinality: "one-to-many" });
+    const plan = parsePlan({
+      summary: "x",
+      actions: [
+        { kind: "create_domain", name: "Ref", type: "string" },
+        { kind: "bind_domain", domain: "Ref" }, // every column, including the PK
+      ],
+    });
+    if (!plan.ok) return;
+    const noticesBefore = s().notices.length;
+    executePlan(plan.value);
+    // The whole bulk bind adds at most a single reconcile notice, not one per column.
+    expect(s().notices.length - noticesBefore).toBeLessThanOrEqual(1);
+  });
 });
 
 import { useWorkspaceStore } from "../store/workspaceStore";

@@ -8,6 +8,7 @@ import {
   Download,
   FileInput,
   FilePlus2,
+  FileUp,
   FolderOpen,
   Grid3x3,
   History,
@@ -176,12 +177,14 @@ function FileTab(props: Props) {
   const wsPath = useWorkspaceStore((s) => s.path);
   const activeId = useWorkspaceStore((s) => s.activeId);
   const duplicateModel = useWorkspaceStore((s) => s.duplicateModel);
+  const openModelFilePicker = useWorkspaceStore((s) => s.openModelFilePicker);
   const level = useModelStore((s) => s.model.level);
   const exportReason = exportDisabledReason(level);
   return (
     <>
       <RGroup title="Model">
         <RibbonButton Icon={FilePlus2} label="New model" onClick={props.onNewModel} disabled={!wsPath} />
+        <RibbonButton Icon={FileUp} label="Open model" title="Open a .model.json file directly" onClick={() => void openModelFilePicker()} />
         <RibbonButton Icon={Copy} label="Duplicate" onClick={() => activeId && duplicateModel(activeId)} disabled={!wsPath || !activeId} />
         <RibbonButton Icon={FileInput} label="Import SQL" title="Reverse-engineer a model from SQL DDL" onClick={props.onImport} disabled={!wsPath} />
       </RGroup>

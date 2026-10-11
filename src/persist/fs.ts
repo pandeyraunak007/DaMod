@@ -28,6 +28,13 @@ export function baseName(dir: string): string {
   return parts[parts.length - 1] || dir;
 }
 
+/** The parent directory of a path (everything before the last separator). */
+export function dirName(filePath: string): string {
+  const trimmed = filePath.replace(/\/+$/, "");
+  const idx = trimmed.lastIndexOf("/");
+  return idx <= 0 ? "/" : trimmed.slice(0, idx);
+}
+
 export async function pickWorkspaceFolder(): Promise<string | null> {
   const res = await open({ directory: true, multiple: false, title: "Open workspace folder" });
   return typeof res === "string" ? res : null;

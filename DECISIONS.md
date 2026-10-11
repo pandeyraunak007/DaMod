@@ -5,6 +5,52 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — "Open model file…" (open a .model.json directly, not just a folder)
+
+The author reported launch "doesn't allow to open the models saved in json format." Root
+cause wasn't a bug — DaMod is **folder-based**: the only open paths were "Open workspace"
+(a folder) and the tab-bar `+` (reopen within the already-open folder). There was no way to
+point at a single `.model.json` and open it. (Confirmed the files/metadata were fine: both
+the author's workspaces have correct `workspace.json` with `openModels`/`activeModel`, and
+models are correctly named `*.model.json`.)
+
+Added a file-oriented open path:
+- `fs.ts`: `dirName(path)` helper; reused the existing `pickFile(["json"], …)`.
+- `workspaceStore.openModelFilePicker()`: pick a `.json`, reject non-`.model.json` with a
+  notice, derive the parent dir, `openWorkspace(dir)` if it isn't already the active
+  workspace, then `openModelFile(fileName)` to add/activate the chosen model (reuses the
+  same path as the `+` reopen picker). So picking a loose model file "just works" — its
+  folder becomes the workspace.
+- **File ribbon**: new "Open model" button (not gated on an open workspace).
+- **Welcome screen**: third action "Open model file…" beside New model / Open workspace.
+
+Tauri note: the dialog filter matches the trailing extension only, so `pickFile(["json"])`
+lists every `*.json` (incl. workspace/links/semantic) — `isModelFile` guards the pick. The
+dialog→read pattern is already proven by Import SQL. tsc/build clean, 543 tests green
+(UI-interaction author-verified per the usual Tauri limits).
+
+## 2026-10-11 — Copilot bind_domain: batch binds (no toast storm) + prompt guard
+
+Follow-up to the `bind_domain` action below. Binding a domain to "all columns" fired the
+executor's per-field `bindFieldDomain` in a loop; every PK bind re-ran FK reconciliation and
+pushed its **own** "Updated N foreign keys…" notice → dozens of toasts stacked across the
+screen (author screenshot). It also set every column to the domain's type (inherent to
+binding one domain to all columns, but the toast flood made it look broken).
+
+- **Store**: new `bindFieldsToDomain(targets, domainId)` — binds the whole batch in ONE
+  `set`/history step, reconciles FKs **once**, emits **at most one** notice. Returns the
+  bound count. The executor now collects targets and calls it once instead of N times
+  (also one `structuredClone`, not N).
+- **Prompt**: added a guard — binding OVERWRITES each column's type, so bind a domain only
+  to columns it semantically fits (Money→amount/price, Code→*_code), and do NOT bind one
+  domain to every column unless the user explicitly says "all columns". Steers the LLM away
+  from the destructive blanket bind that produced the screenshot.
+- **Test**: regression asserting a bulk bind across a PK+FK adds ≤1 notice. 543 green.
+
+Not changed: the semantics of an explicit "all columns" bind (still allowed — it's the
+user's call, reviewed/approved). No auto-dismiss/stacking cap on toasts generally (separate
+concern; one notice per op is enough here).
+
 ## 2026-10-11 — Copilot: `bind_domain` action (domain ≠ data type)
 
 Asking the Copilot to "create domains and add them to all columns" failed plan validation:

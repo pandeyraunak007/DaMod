@@ -47,9 +47,11 @@ import {
   appStateSet,
   baseName,
   deleteFile,
+  dirName,
   fileMtime,
   joinPath,
   listWorkspace,
+  pickFile,
   pickWorkspaceFolder,
   readTextFile,
   writeFile,
@@ -105,6 +107,9 @@ interface WorkspaceState {
 
   openWorkspacePicker: () => Promise<void>;
   openWorkspace: (path: string) => Promise<void>;
+  /** Pick a single .model.json file; open its folder as the workspace (if not already
+   *  open) and activate that model — the file-oriented alternative to opening a folder. */
+  openModelFilePicker: () => Promise<void>;
   restoreLastWorkspace: () => Promise<void>;
   newModel: (name: string, level?: ModelLevel, dialect?: DbDialect) => Promise<string | null>;
   importModel: (model: Model, name: string) => Promise<string | null>;
@@ -253,6 +258,21 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     openWorkspacePicker: async () => {
       const dir = await pickWorkspaceFolder();
       if (dir) await get().openWorkspace(dir);
+    },
+
+    openModelFilePicker: async () => {
+      const filePath = await pickFile(["json"], "Open model file (.model.json)");
+      if (!filePath) return;
+      const fileName = baseName(filePath);
+      if (!isModelFile(fileName)) {
+        useModelStore.getState().pushNotice(`“${fileName}” is not a .model.json file`);
+        return;
+      }
+      // A model lives inside a workspace folder: open that folder (unless already open),
+      // then open/activate the chosen model via the same path as the + reopen picker.
+      const dir = dirName(filePath);
+      if (get().path !== dir) await get().openWorkspace(dir);
+      await get().openModelFile(fileName);
     },
 
     openWorkspace: async (path) => {

@@ -178,6 +178,13 @@ interface ModelStore {
   updateDomain: (id: string, patch: Partial<Domain>) => void;
   deleteDomain: (id: string) => void;
   bindFieldDomain: (entityId: string, fieldId: string, domainId: string | null) => void;
+  /** Bind many fields to one domain in a SINGLE history step, reconciling FKs once and
+   *  emitting at most one notice (avoids a toast storm when binding across many columns).
+   *  Returns the number of fields actually bound. */
+  bindFieldsToDomain: (
+    targets: Array<{ entityId: string; fieldId: string }>,
+    domainId: string,
+  ) => number;
   /** Transient: id of a domain whose deletion is awaiting user resolution (UI only,
    *  not part of undo/model). The confirm dialog reads this. */
   domainDeletePending: string | null;
@@ -965,6 +972,35 @@ export const useModelStore = create<ModelStore>((set, get) => {
           : s.notices;
         return { past: pushPast(s.past, s.model), model: next, future: [], notices };
       });
+    },
+
+    bindFieldsToDomain: (targets, domainId) => {
+      let bound = 0;
+      set((s) => {
+        const next = structuredClone(s.model);
+        const domain = (next.domains ?? []).find((d) => d.id === domainId);
+        if (!domain) return {};
+        for (const t of targets) {
+          const entity = findEntity(next, t.entityId);
+          const field = entity ? findField(entity, t.fieldId) : undefined;
+          if (!entity || !field) continue;
+          field.domainId = domainId;
+          applyDomainType(field, domain);
+          if ((field.default == null || field.default === "") && domain.default) {
+            field.default = domain.default;
+          }
+          bound++;
+        }
+        if (bound === 0) return {};
+        // Reconcile once for the whole batch → a single notice, not one per column.
+        const changes = reconcileForeignKeyTypes(next);
+        next.updatedAt = nowIso();
+        const notices = changes.length
+          ? [...s.notices, { id: newId("field"), message: typeNoticeMessage(changes) }]
+          : s.notices;
+        return { past: pushPast(s.past, s.model), model: next, future: [], notices };
+      });
+      return bound;
     },
 
     openRelationshipDraft: (source, target) =>

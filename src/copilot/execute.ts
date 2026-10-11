@@ -232,22 +232,21 @@ function applyAction(action: CopilotAction): ActionResult {
       // Scope: a named entity (else all entities) × a named attribute (else all columns).
       const entities = action.entity ? [entityByName(model(), action.entity)] : model().entities;
       if (action.entity && !entities[0]) return fail(`Entity “${action.entity}” not found`);
-      let bound = 0;
+      const targets: Array<{ entityId: string; fieldId: string }> = [];
       for (const e of entities) {
         if (!e) continue;
         const fields = action.attribute
           ? ([fieldByName(e, action.attribute)].filter(Boolean) as Field[])
           : e.fields;
-        for (const f of fields) {
-          store.bindFieldDomain(e.id, f.id, domain.id);
-          bound++;
-        }
+        for (const f of fields) targets.push({ entityId: e.id, fieldId: f.id });
       }
-      if (bound === 0) {
+      if (targets.length === 0) {
         return action.attribute
           ? fail(`Attribute “${action.attribute}” not found`)
           : skip("no columns to bind");
       }
+      // ONE batched store op → a single FK-reconcile notice, not one toast per column.
+      const bound = store.bindFieldsToDomain(targets, domain.id);
       const scope = action.attribute
         ? `${action.entity}.${action.attribute}`
         : action.entity
