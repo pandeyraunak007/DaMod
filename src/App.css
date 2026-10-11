@@ -2543,3 +2543,19 @@ body,
 }
 .copilot__send:disabled { opacity: 0.4; cursor: default; }
 .copilot__send:hover:not(:disabled) { background: #1d4ed8; }
+
+/* ETL Designer workspace (Phase 3). Fills the app body; canvas needs a real height. */
+.etl { display: flex; flex-direction: column; width: 100%; min-width: 0; }
+.etl__body { display: flex; flex: 1; min-height: 0; }
+.etl__left { width: 220px; border-right: 1px solid var(--border, #e2e8f0); overflow: auto; flex-shrink: 0; }
+.etl__right { width: 280px; border-left: 1px solid var(--border, #e2e8f0); overflow: auto; flex-shrink: 0; padding-bottom: 0.5rem; }
+.etl__center { position: relative; flex: 1; min-width: 0; }
+.etl__diagnostics { border-top: 1px solid var(--border, #e2e8f0); max-height: 160px; overflow: auto; padding: 0.4rem 0.75rem; }
+.etl__list { list-style: none; margin: 0; padding: 0.25rem; }
+.etl__list-item { display: block; width: 100%; text-align: left; border: none; background: none; padding: 0.35rem 0.5rem; border-radius: 4px; cursor: pointer; font: inherit; }
+.etl__list-item:hover { background: var(--hover, #f1f5f9); }
+.etl__list-item--active { background: var(--accent-soft, #e0ebff); font-weight: 600; }
+.etl__schema { padding: 0.25rem 0.75rem; }
+.etl__field { display: flex; justify-content: space-between; gap: 0.5rem; padding: 0.15rem 0; }
+.etl__issues { list-style: none; margin: 0.25rem 0 0; padding: 0; font-size: 0.8rem; }
+.etl-node { font-size: 0.8rem; }

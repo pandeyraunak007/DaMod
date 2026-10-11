@@ -10,6 +10,7 @@ import { ModelExplorer } from "./explorer/ModelExplorer";
 import { Welcome } from "./workspace/Welcome";
 import { ValidationPanel } from "./validation/ValidationPanel";
 import { SemanticView } from "./semantic/SemanticView";
+import { EtlDesigner } from "./etl/EtlDesigner";
 import { WorkspaceMap } from "./links/WorkspaceMap";
 import { ExportDialog } from "./export/ExportDialog";
 import { Canvas } from "./canvas/Canvas";
@@ -75,6 +76,7 @@ export default function App() {
   const showProperties = useUiStore((s) => s.showProperties);
   const showValidation = useUiStore((s) => s.showValidation);
   const copilotOpen = useUiStore((s) => s.copilotOpen);
+  const etlDesignerOpen = useUiStore((s) => s.etlDesignerOpen);
   const explorerWidth = useUiStore((s) => s.explorerWidth);
   const propertiesWidth = useUiStore((s) => s.propertiesWidth);
   const copilotWidth = useUiStore((s) => s.copilotWidth);
@@ -208,6 +210,10 @@ export default function App() {
       {!wsPath ? (
         <div className="app__body">
           <Welcome onNewModel={() => setNewModelOpen(true)} />
+        </div>
+      ) : etlDesignerOpen ? (
+        <div className="app__body">
+          <EtlDesigner />
         </div>
       ) : semanticOpen ? (
         <div className="app__body">

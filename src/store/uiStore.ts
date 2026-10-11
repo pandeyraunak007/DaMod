@@ -21,6 +21,8 @@ export interface UiPrefs {
   snapToGrid: boolean;
   /** Copilot drawer visibility (persisted, like the other panels). */
   copilotOpen: boolean;
+  /** ETL Designer workspace open (top-level view swap, like the Semantic view). */
+  etlDesignerOpen: boolean;
   explorerWidth: number;
   propertiesWidth: number;
   copilotWidth: number;
@@ -36,6 +38,7 @@ export function defaultUiPrefs(): UiPrefs {
     showGrid: true,
     snapToGrid: false,
     copilotOpen: false,
+    etlDesignerOpen: false,
     explorerWidth: 260,
     propertiesWidth: 340,
     copilotWidth: 360,
@@ -74,6 +77,7 @@ export function mergePrefs(raw: unknown): UiPrefs {
     showGrid: bool(r.showGrid, d.showGrid),
     snapToGrid: bool(r.snapToGrid, d.snapToGrid),
     copilotOpen: bool(r.copilotOpen, d.copilotOpen),
+    etlDesignerOpen: bool(r.etlDesignerOpen, d.etlDesignerOpen),
     explorerWidth: width(r.explorerWidth, d.explorerWidth),
     propertiesWidth: width(r.propertiesWidth, d.propertiesWidth),
     copilotWidth: width(r.copilotWidth, d.copilotWidth),
@@ -91,6 +95,7 @@ export function pickPersisted(s: UiPrefs): UiPrefs {
     showGrid: s.showGrid,
     snapToGrid: s.snapToGrid,
     copilotOpen: s.copilotOpen,
+    etlDesignerOpen: s.etlDesignerOpen,
     explorerWidth: s.explorerWidth,
     propertiesWidth: s.propertiesWidth,
     copilotWidth: s.copilotWidth,
@@ -157,6 +162,7 @@ interface UiStore extends UiPrefs {
   toggleSnap: () => void;
   toggleCopilot: () => void;
   setCopilotOpen: (open: boolean) => void;
+  setEtlDesignerOpen: (open: boolean) => void;
   setPanelWidth: (key: WidthKey, width: number) => void;
   applyLayout: (mode: LayoutMode) => void;
 }
@@ -176,6 +182,7 @@ export const useUiStore = create<UiStore>((set, get) => {
     toggleSnap: () => commit({ snapToGrid: !get().snapToGrid }),
     toggleCopilot: () => commit({ copilotOpen: !get().copilotOpen }),
     setCopilotOpen: (copilotOpen) => commit({ copilotOpen }),
+    setEtlDesignerOpen: (etlDesignerOpen) => commit({ etlDesignerOpen }),
     setPanelWidth: (key, width) => commit({ [key]: clampWidth(width) } as Partial<UiPrefs>),
     applyLayout: (mode) => commit(layoutVisibility(mode)),
   };

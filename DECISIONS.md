@@ -5,6 +5,35 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — ETL Phase 3 Slice B1: visual ETL Designer workspace (read-only canvas)
+
+The visual designer, built additively as a top-level workspace. Isolated from the
+modeling canvas/undo — a SEPARATE React-Flow instance reading only the pipeline spec.
+
+- **Workspace swap:** `uiStore.etlDesignerOpen` (persisted, like `copilotOpen`) +
+  `setEtlDesignerOpen`; `App.tsx` swaps to `<EtlDesigner/>` exactly like the Semantic view;
+  a **Designer** ribbon button in the Data tab's ETL group toggles it. No second app shell.
+- **`etl/PipelineCanvas.tsx`:** own `ReactFlowProvider`, derives RF nodes/edges from
+  `spec.nodes`/`spec.edges`, positions from `spec.layout` or `autoLayout`. Read-only this
+  slice (select/pan/zoom/fit); add/connect/configure = B2. Reads ONLY the spec — never
+  modelStore — so it can't destabilize modeling.
+- **`etl/EtlDesigner.tsx`:** left pipeline list · center canvas · right selected-node
+  schema (live `inferNodeSchemas`) · bottom graph validation. A **Create starter graph**
+  button seeds a DAG from a flat spec (`deriveStarterGraph`) via `upsertPipeline` so
+  existing flat pipelines have something to show/edit.
+- **`etl/graphBuild.ts` (pure):** `deriveStarterGraph` (index-stable source→target per
+  object) + `autoLayout` (left-to-right by topo depth, cycle-safe, deterministic).
+- Minimal ETL layout CSS (canvas needs a real height or React Flow renders 0px).
+
+**Deferred (next slices):** B2 canvas editing (add/connect/remove/configure nodes,
+persist dragged `layout`); Slice C graph-aware SQL generation; Slice D v2 migration making
+the DAG authoritative. The React-Flow canvas itself is author-verified (no RF render test
+in the repo, consistent with the modeling Canvas).
+
+- Tests +6 (`etl/graphBuild.test.ts` ×4 pure; `etl/EtlDesigner.render.test.tsx` ×2 shell
+  smoke — no-graph + empty states, avoiding a jsdom React-Flow mount). **518 TS tests pass;
+  tsc + build clean.**
+
 ## 2026-10-11 — ETL Phase 3 Slice A: transform-DAG model + schema-propagation engine
 
 Q2 decided = **full node/edge DAG** (richer, per-node schema inference). Building it in

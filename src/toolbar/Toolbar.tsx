@@ -21,6 +21,7 @@ import {
   Scan,
   Search,
   Shapes,
+  Share2,
   Sparkles,
   Star,
   Table,
@@ -317,6 +318,7 @@ function DataTab({
   onOpenSnapshot: () => void;
 }) {
   const wsPath = useWorkspaceStore((s) => s.path);
+  const openDesigner = useUiStore((s) => s.setEtlDesignerOpen);
   return (
     <>
       <RGroup title="Reverse-engineer">
@@ -326,6 +328,7 @@ function DataTab({
       </RGroup>
       <RGroup title="ETL">
         <RibbonButton Icon={Workflow} label="Pipelines" title="Design an ETL pipeline" onClick={onOpenPipelines} disabled={!wsPath} />
+        <RibbonButton Icon={Share2} label="Designer" title="Open the visual ETL Designer workspace" onClick={() => openDesigner(true)} disabled={!wsPath} />
       </RGroup>
     </>
   );
