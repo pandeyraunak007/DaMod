@@ -20,7 +20,7 @@ import { validateIdentifier } from "../model/identifiers";
 import type { Entity, Field } from "../model/model";
 import { componentFor, entityKey, linksTouching } from "../links/links";
 import { newId } from "../lib/ids";
-import { ViewEditor, IndexEditor, SequenceEditor, RawObjectEditor, SchemaEditor, SnowflakeObjectEditor } from "./DbObjectEditors";
+import { ViewEditor, IndexEditor, SequenceEditor, RawObjectEditor, SchemaEditor, SnowflakeObjectEditor, GovernanceObjectEditor } from "./DbObjectEditors";
 
 // An input for identifier-valued names (entity/field). Keeps a local draft so the
 // field can be freely erased and retyped; commits to the store only when the value
@@ -100,7 +100,9 @@ export function SidePanel({ onCollapse }: { onCollapse: () => void }) {
                 ? "Schema"
                 : selection?.kind === "snowflakeObject"
                   ? "Snowflake object"
-                  : "Properties";
+                  : selection?.kind === "governanceObject"
+                    ? "Governance object"
+                    : "Properties";
 
   return (
     <aside className="side">
@@ -127,6 +129,8 @@ export function SidePanel({ onCollapse }: { onCollapse: () => void }) {
         <SchemaEditor id={selection.id} onGone={clear} />
       ) : selection?.kind === "snowflakeObject" ? (
         <SnowflakeObjectEditor id={selection.id} onGone={clear} />
+      ) : selection?.kind === "governanceObject" ? (
+        <GovernanceObjectEditor id={selection.id} onGone={clear} />
       ) : (
         <div className="side__empty">
           <p>Nothing selected.</p>

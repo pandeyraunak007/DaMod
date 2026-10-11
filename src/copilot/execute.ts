@@ -290,6 +290,36 @@ function applyAction(action: CopilotAction): ActionResult {
       return ok(`Created metric “${action.name}”`);
     }
 
+    case "create_snowflake_object": {
+      if (validateIdentifier(action.name)) return fail(`“${action.name}”: invalid name`);
+      if ((model().dialect ?? "postgres") !== "snowflake") {
+        return skip(`Snowflake objects need a Snowflake model (this model targets ${model().dialect ?? "postgres"})`);
+      }
+      if ((model().snowflakeObjects ?? []).some((o) => o.name.toLowerCase() === action.name.toLowerCase())) {
+        return skip(`Snowflake object “${action.name}” already exists`);
+      }
+      const { kind: _k, objectKind, name, ...rest } = action;
+      void _k;
+      const id = store.createSnowflakeObject(objectKind);
+      store.updateSnowflakeObject(id, { name, ...rest });
+      return ok(`Created ${objectKind} “${action.name}”`);
+    }
+
+    case "create_governance_object": {
+      if (validateIdentifier(action.name)) return fail(`“${action.name}”: invalid name`);
+      if ((model().dialect ?? "postgres") !== "snowflake") {
+        return skip(`Governance objects need a Snowflake model (this model targets ${model().dialect ?? "postgres"})`);
+      }
+      if ((model().governanceObjects ?? []).some((o) => o.name.toLowerCase() === action.name.toLowerCase())) {
+        return skip(`Governance object “${action.name}” already exists`);
+      }
+      const { kind: _k, objectKind, name, ...rest } = action;
+      void _k;
+      const id = store.createGovernanceObject(objectKind);
+      store.updateGovernanceObject(id, { name, ...rest });
+      return ok(`Created ${objectKind} “${action.name}”`);
+    }
+
     case "delete_entity": {
       const e = entityByName(model(), action.entity);
       if (!e) return skip(`“${action.entity}” already gone`);

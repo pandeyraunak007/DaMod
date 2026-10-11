@@ -36,6 +36,8 @@ Action is one of:
 - { "kind": "create_term", "name": string, "definition"?: string, "synonyms"?: string[] }   // SEMANTIC LAYER: a business term/glossary entry
 - { "kind": "create_dimension", "name": string, "description"?: string, "entity"?: string }   // SEMANTIC LAYER: an analysis dimension, optionally bound to an entity
 - { "kind": "create_metric", "name": string, "aggregate"?: "sum"|"count"|"count_distinct"|"avg"|"min"|"max", "entity"?: string, "field"?: string, "description"?: string }   // SEMANTIC LAYER: a measure, e.g. sum of Order.total
+- { "kind": "create_snowflake_object", "objectKind": "stage"|"fileFormat"|"pipe"|"stream"|"task"|"dynamicTable", "name": string, ... }   // SNOWFLAKE ONLY data-engineering object. Per kind: stage(stageType,url,fileFormat), fileFormat(formatType,options), pipe(copyStatement,autoIngest), stream(sourceObject,streamType), task(warehouse,schedule,sql,after), dynamicTable(targetLag,warehouse,sql). NEVER include credentials/secrets.
+- { "kind": "create_governance_object", "objectKind": "role"|"grant"|"tag"|"maskingPolicy"|"rowAccessPolicy"|"share", "name": string, ... }   // SNOWFLAKE ONLY governance object. Per kind: role(grantedRoles[]), grant(privilege,onObject,toRole), tag(allowedValues[]), maskingPolicy(argType,returnType,body), rowAccessPolicy(signature,body), share(shareObjects[],accounts[]). Policy bodies are author-provided expressions, never secrets.
 - { "kind": "delete_entity", "entity": string }
 - { "kind": "delete_attribute", "entity": string, "field": string }
 - { "kind": "delete_relationship", "parent": string, "child": string }
@@ -46,6 +48,7 @@ Rules:
 - Do NOT invent uniqueness/mandatory/business rules unless the user asked or it is an obvious key; put any guess in "assumptions".
 - Only use the modeling terminology shown in the context's level for TABLE/COLUMN edits.
 - Semantic-layer actions (create_term/create_dimension/create_metric) and subject areas, schemas, views, indexes, sequences, domains and check constraints are available at ANY modeling level — use them when asked.
+- Snowflake data-engineering (create_snowflake_object) and governance (create_governance_object) objects apply ONLY when the model targets Snowflake. NEVER put credentials, secret values, or sensitive policy content in any field.
 - Keep the plan minimal and grounded in the given model; do not reference objects that are not in the context.`;
 
 export interface PlanRequestResult {

@@ -341,6 +341,10 @@ function describeAction(a: CopilotPlan["actions"][number]): string {
       return `+ dimension ${a.name}${a.entity ? ` (${a.entity})` : ""}`;
     case "create_metric":
       return `+ metric ${a.name}${a.aggregate ? ` (${a.aggregate}${a.field ? ` ${a.entity}.${a.field}` : ""})` : ""}`;
+    case "create_snowflake_object":
+      return `+ ${a.objectKind} ${a.name}`;
+    case "create_governance_object":
+      return `+ ${a.objectKind} ${a.name}`;
     case "delete_entity":
       return `🗑 delete table ${a.entity}`;
     case "delete_attribute":

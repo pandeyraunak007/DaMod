@@ -84,6 +84,13 @@ export function buildContext(
   if (model.subjectAreas?.length) {
     lines.push(`Subject areas (${model.subjectAreas.length}): ${model.subjectAreas.map((a) => a.name).join(", ")}`);
   }
+  // Snowflake-specific objects (names only — bodies/credentials never go to the LLM).
+  if (model.snowflakeObjects?.length) {
+    lines.push(`Snowflake data-engineering objects (${model.snowflakeObjects.length}): ${model.snowflakeObjects.map((o) => `${o.name} [${o.kind}]`).join(", ")}`);
+  }
+  if (model.governanceObjects?.length) {
+    lines.push(`Snowflake governance objects (${model.governanceObjects.length}): ${model.governanceObjects.map((o) => `${o.name} [${o.kind}]`).join(", ")}`);
+  }
   // Semantic layer is workspace-wide (always available regardless of level) — list
   // what exists so the AI references rather than duplicates it.
   if (semantic && (semantic.terms.length || semantic.dimensions.length || semantic.metrics.length)) {

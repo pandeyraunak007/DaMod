@@ -4,8 +4,8 @@ import { useModelStore } from "../store/modelStore";
 import { useWorkspaceStore } from "../store/workspaceStore";
 import { fieldTypeLabel } from "../model/fieldDisplay";
 import { displayName } from "../model/presentation";
-import type { Model, SnowflakeObjectKind } from "../model/model";
-import { SNOWFLAKE_OBJECT_KINDS } from "../model/model";
+import type { Model, SnowflakeObjectKind, GovernanceObjectKind } from "../model/model";
+import { SNOWFLAKE_OBJECT_KINDS, GOVERNANCE_OBJECT_KINDS } from "../model/model";
 import {
   type LevelTerms,
   type ModelLevel,
@@ -44,6 +44,15 @@ const SF_KIND_LABELS: Record<SnowflakeObjectKind, string> = {
   stream: "Streams",
   task: "Tasks",
   dynamicTable: "Dynamic tables",
+};
+
+const GOV_KIND_LABELS: Record<GovernanceObjectKind, string> = {
+  role: "Roles",
+  grant: "Grants",
+  tag: "Tags",
+  maskingPolicy: "Masking policies",
+  rowAccessPolicy: "Row-access policies",
+  share: "Shares",
 };
 
 interface MenuItem {
@@ -251,16 +260,21 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
     useModelStore.getState().createSnowflakeObject(kind);
     expand(`m:${tabId}:sf:${kind}`);
   };
+  const addGovernanceObject = async (tabId: string, kind: GovernanceObjectKind) => {
+    await ensureActive(tabId);
+    useModelStore.getState().createGovernanceObject(kind);
+    expand(`m:${tabId}:gov:${kind}`);
+  };
   const selectObject = async (
     tabId: string,
-    sel: { kind: "view" | "index" | "sequence" | "rawObject" | "schema" | "snowflakeObject"; id: string },
+    sel: { kind: "view" | "index" | "sequence" | "rawObject" | "schema" | "snowflakeObject" | "governanceObject"; id: string },
   ) => {
     await ensureActive(tabId);
     useModelStore.getState().select(sel);
   };
   const deleteObject = async (
     tabId: string,
-    kind: "view" | "index" | "sequence" | "rawObject" | "schema" | "snowflakeObject",
+    kind: "view" | "index" | "sequence" | "rawObject" | "schema" | "snowflakeObject" | "governanceObject",
     oid: string,
   ) => {
     await ensureActive(tabId);
@@ -270,6 +284,7 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
     else if (kind === "sequence") st.deleteSequence(oid);
     else if (kind === "schema") st.deleteSchema(oid);
     else if (kind === "snowflakeObject") st.deleteSnowflakeObject(oid);
+    else if (kind === "governanceObject") st.deleteGovernanceObject(oid);
     else st.deleteRawObject(oid);
   };
 
@@ -371,6 +386,7 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
             onAddSequence={() => addSequence(activeEntry.tabId)}
             onAddRaw={() => addRaw(activeEntry.tabId)}
             onAddSnowflakeObject={(kind) => addSnowflakeObject(activeEntry.tabId, kind)}
+            onAddGovernanceObject={(kind) => addGovernanceObject(activeEntry.tabId, kind)}
             onSelectObject={(sel) => selectObject(activeEntry.tabId, sel)}
             onDeleteObject={(kind, oid) => deleteObject(activeEntry.tabId, kind, oid)}
             onDuplicateModel={() => duplicateModel(activeEntry.tabId)}
@@ -465,6 +481,7 @@ function ModelBranch({
   onAddSequence,
   onAddRaw,
   onAddSnowflakeObject,
+  onAddGovernanceObject,
   onSelectObject,
   onDeleteObject,
   onDuplicateModel,
@@ -490,8 +507,9 @@ function ModelBranch({
   onAddSequence: () => void;
   onAddRaw: () => void;
   onAddSnowflakeObject: (kind: SnowflakeObjectKind) => void;
-  onSelectObject: (sel: { kind: "view" | "index" | "sequence" | "rawObject" | "schema" | "snowflakeObject"; id: string }) => void;
-  onDeleteObject: (kind: "view" | "index" | "sequence" | "rawObject" | "schema" | "snowflakeObject", id: string) => void;
+  onAddGovernanceObject: (kind: GovernanceObjectKind) => void;
+  onSelectObject: (sel: { kind: "view" | "index" | "sequence" | "rawObject" | "schema" | "snowflakeObject" | "governanceObject"; id: string }) => void;
+  onDeleteObject: (kind: "view" | "index" | "sequence" | "rawObject" | "schema" | "snowflakeObject" | "governanceObject", id: string) => void;
   onDuplicateModel: () => void;
   onDeleteModel: () => void;
 }) {
@@ -689,6 +707,22 @@ function ModelBranch({
                     items={(model.snowflakeObjects ?? []).filter((o) => o.kind === kind).filter((v) => !filtering || matches(v.name, q))}
                     onSelect={(id) => onSelectObject({ kind: "snowflakeObject", id })}
                     onDelete={(id) => onDeleteObject("snowflakeObject", id)}
+                    openMenu={openMenu}
+                  />
+                ))}
+              {/* Snowflake governance objects (Req 23 Phase 5) — Snowflake models only. */}
+              {model.dialect === "snowflake" &&
+                GOVERNANCE_OBJECT_KINDS.map((kind) => (
+                  <ObjectGroup
+                    key={kind}
+                    open={isOpen(`m:${tabId}:gov:${kind}`)}
+                    onToggle={() => toggle(`m:${tabId}:gov:${kind}`)}
+                    name={GOV_KIND_LABELS[kind]}
+                    count={(model.governanceObjects ?? []).filter((o) => o.kind === kind).length}
+                    onAdd={() => onAddGovernanceObject(kind)}
+                    items={(model.governanceObjects ?? []).filter((o) => o.kind === kind).filter((v) => !filtering || matches(v.name, q))}
+                    onSelect={(id) => onSelectObject({ kind: "governanceObject", id })}
+                    onDelete={(id) => onDeleteObject("governanceObject", id)}
                     openMenu={openMenu}
                   />
                 ))}

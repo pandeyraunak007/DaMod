@@ -139,6 +139,47 @@ const zCreateMetric = z.object({
   description: z.string().optional(),
 });
 
+// ---- Snowflake data-engineering + governance objects (Req 23 Phase 4/5) ------
+// Create-only, like the other object actions. A credential/secret is never a
+// field here, so the Copilot can never set one.
+const zCreateSnowflakeObject = z.object({
+  kind: z.literal("create_snowflake_object"),
+  objectKind: z.enum(["stage", "fileFormat", "pipe", "stream", "task", "dynamicTable"]),
+  name: z.string(),
+  comment: z.string().optional(),
+  stageType: z.enum(["internal", "external"]).optional(),
+  url: z.string().optional(),
+  fileFormat: z.string().optional(),
+  formatType: z.string().optional(),
+  options: z.string().optional(),
+  copyStatement: z.string().optional(),
+  autoIngest: z.boolean().optional(),
+  sourceObject: z.string().optional(),
+  streamType: z.enum(["standard", "append_only", "insert_only"]).optional(),
+  warehouse: z.string().optional(),
+  schedule: z.string().optional(),
+  sql: z.string().optional(),
+  after: z.string().optional(),
+  targetLag: z.string().optional(),
+});
+const zCreateGovernanceObject = z.object({
+  kind: z.literal("create_governance_object"),
+  objectKind: z.enum(["role", "grant", "tag", "maskingPolicy", "rowAccessPolicy", "share"]),
+  name: z.string(),
+  comment: z.string().optional(),
+  grantedRoles: z.array(z.string()).optional(),
+  privilege: z.string().optional(),
+  onObject: z.string().optional(),
+  toRole: z.string().optional(),
+  allowedValues: z.array(z.string()).optional(),
+  argType: z.string().optional(),
+  returnType: z.string().optional(),
+  signature: z.string().optional(),
+  body: z.string().optional(),
+  shareObjects: z.array(z.string()).optional(),
+  accounts: z.array(z.string()).optional(),
+});
+
 const zDeleteEntity = z.object({ kind: z.literal("delete_entity"), entity: z.string() });
 const zDeleteAttribute = z.object({
   kind: z.literal("delete_attribute"),
@@ -169,6 +210,8 @@ export const zAction = z.discriminatedUnion("kind", [
   zCreateTerm,
   zCreateDimension,
   zCreateMetric,
+  zCreateSnowflakeObject,
+  zCreateGovernanceObject,
   zDeleteEntity,
   zDeleteAttribute,
   zDeleteRelationship,
@@ -221,6 +264,8 @@ const STRUCTURAL = new Set([
   "create_term",
   "create_dimension",
   "create_metric",
+  "create_snowflake_object",
+  "create_governance_object",
 ]);
 export function requiresApproval(plan: CopilotPlan): boolean {
   const mutating = plan.actions.length;

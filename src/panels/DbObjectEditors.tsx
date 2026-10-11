@@ -1,6 +1,6 @@
 import { useModelStore } from "../store/modelStore";
 import { validateIdentifier } from "../model/identifiers";
-import type { DbDialect, SnowflakeObject } from "../model/model";
+import type { DbDialect, SnowflakeObject, GovernanceObject } from "../model/model";
 
 // Side-panel editors for the non-table database objects (FR-8 extensions):
 // views, indexes, sequences and raw dialect-specific objects.
@@ -369,6 +369,89 @@ export function SnowflakeObjectEditor({ id, onGone }: { id: string; onGone: () =
           {field("Target lag", obj.targetLag, "targetLag")}
           {field("Warehouse", obj.warehouse, "warehouse")}
           {field("Query", obj.sql, "sql", true)}
+        </>
+      )}
+
+      <div className="editor__section">
+        <label className="editor__label">Comment</label>
+        <textarea className="editor__input" rows={2} value={obj.comment ?? ""} onChange={(e) => set({ comment: e.target.value || undefined })} />
+      </div>
+      <button className="btn btn--danger btn--small" onClick={() => (del(id), onGone())}>Delete {obj.kind}</button>
+    </div>
+  );
+}
+
+// Snowflake governance object editor (Req 23 Phase 5) — roles, grants, tags,
+// masking/row-access policies, shares. Policy bodies are author-owned local
+// content; there is NO credential/secret field on this type, so nothing secret
+// can be surfaced here (§5/§6).
+export function GovernanceObjectEditor({ id, onGone }: { id: string; onGone: () => void }) {
+  const obj = useModelStore((s) => s.model.governanceObjects?.find((o) => o.id === id));
+  const update = useModelStore((s) => s.updateGovernanceObject);
+  const del = useModelStore((s) => s.deleteGovernanceObject);
+  if (!obj) return null;
+  const set = (p: Partial<GovernanceObject>) => update(id, p);
+  const csv = (v: string[] | undefined) => (v ?? []).join(", ");
+  const parseCsv = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolean);
+
+  const text = (label: string, value: string | undefined, key: keyof GovernanceObject, mono = false) => (
+    <div className="editor__section">
+      <label className="editor__label">{label}</label>
+      {mono ? (
+        <textarea className="editor__input" rows={3} style={{ fontFamily: "ui-monospace, monospace" }} value={value ?? ""} onChange={(e) => set({ [key]: e.target.value } as Partial<GovernanceObject>)} />
+      ) : (
+        <input className="editor__input" value={value ?? ""} onChange={(e) => set({ [key]: e.target.value } as Partial<GovernanceObject>)} />
+      )}
+    </div>
+  );
+  const list = (label: string, value: string[] | undefined, key: keyof GovernanceObject, hint?: string) => (
+    <div className="editor__section">
+      <label className="editor__label">{label}</label>
+      <input className="editor__input" value={csv(value)} onChange={(e) => set({ [key]: parseCsv(e.target.value) } as Partial<GovernanceObject>)} />
+      {hint && <p className="field__hint">{hint}</p>}
+    </div>
+  );
+
+  return (
+    <div className="editor">
+      <div className="editor__section">
+        <label className="editor__label">Name</label>
+        <input className="editor__input" value={obj.name} onChange={(e) => !validateIdentifier(e.target.value) && set({ name: e.target.value })} />
+      </div>
+
+      {obj.kind === "role" && list("Granted roles", obj.grantedRoles, "grantedRoles", "Roles granted into this role (comma-separated).")}
+
+      {obj.kind === "grant" && (
+        <>
+          {text("Privilege", obj.privilege, "privilege")}
+          {text("On object", obj.onObject, "onObject")}
+          {text("To role", obj.toRole, "toRole")}
+        </>
+      )}
+
+      {obj.kind === "tag" && list("Allowed values", obj.allowedValues, "allowedValues", "Optional; comma-separated.")}
+
+      {obj.kind === "maskingPolicy" && (
+        <>
+          {text("Argument type", obj.argType, "argType")}
+          {text("Return type", obj.returnType, "returnType")}
+          {text("Masking expression", obj.body, "body", true)}
+          <p className="field__hint">Author-owned expression — never imported from a live account.</p>
+        </>
+      )}
+
+      {obj.kind === "rowAccessPolicy" && (
+        <>
+          {text("Signature", obj.signature, "signature")}
+          {text("Policy expression (→ BOOLEAN)", obj.body, "body", true)}
+          <p className="field__hint">Author-owned expression — never imported from a live account.</p>
+        </>
+      )}
+
+      {obj.kind === "share" && (
+        <>
+          {list("Shared objects", obj.shareObjects, "shareObjects", "e.g. DATABASE analytics, SCHEMA analytics.public")}
+          {list("Accounts", obj.accounts, "accounts", "Consumer accounts (comma-separated).")}
         </>
       )}
 

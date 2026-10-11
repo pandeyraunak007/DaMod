@@ -314,6 +314,44 @@ function snowflakeObjectDDL(d: Dialect, o: NonNullable<Model["snowflakeObjects"]
   }
 }
 
+function sqlStringList(items: string[]): string {
+  return items.map((v) => sqlString(v)).join(", ");
+}
+
+function governanceObjectDDL(d: Dialect, o: NonNullable<Model["governanceObjects"]>[number]): string {
+  const q = d.quote;
+  const name = q(o.name);
+  const comment = o.comment ? ` COMMENT = ${sqlString(o.comment)}` : "";
+  switch (o.kind) {
+    case "role": {
+      const grants = (o.grantedRoles ?? [])
+        .filter((r) => r.trim())
+        .map((r) => `GRANT ROLE ${q(r)} TO ROLE ${name};`);
+      return [`CREATE ROLE ${name}${comment};`, ...grants].join("\n");
+    }
+    case "grant":
+      return `GRANT ${o.privilege ?? "SELECT"} ON ${o.onObject ?? "<object>"} TO ROLE ${o.toRole ? q(o.toRole) : "<role>"};`;
+    case "tag": {
+      const allowed = o.allowedValues?.length ? ` ALLOWED_VALUES ${sqlStringList(o.allowedValues)}` : "";
+      return `CREATE TAG ${name}${allowed}${comment};`;
+    }
+    case "maskingPolicy": {
+      const arg = o.argType ?? "STRING";
+      const ret = o.returnType ?? arg;
+      return `CREATE MASKING POLICY ${name} AS (val ${arg}) RETURNS ${ret} ->\n  ${(o.body ?? "val").trim()};`;
+    }
+    case "rowAccessPolicy":
+      return `CREATE ROW ACCESS POLICY ${name} AS ${o.signature ?? "(val STRING)"} RETURNS BOOLEAN ->\n  ${(o.body ?? "TRUE").trim()};`;
+    case "share": {
+      const grants = (o.shareObjects ?? [])
+        .filter((s) => s.trim())
+        .map((s) => `GRANT USAGE ON ${s} TO SHARE ${name};`);
+      const accounts = o.accounts?.length ? [`ALTER SHARE ${name} ADD ACCOUNTS = ${o.accounts.join(", ")};`] : [];
+      return [`CREATE SHARE ${name}${comment};`, ...grants, ...accounts].join("\n");
+    }
+  }
+}
+
 function rawObjectDDL(d: Dialect, o: NonNullable<Model["rawObjects"]>[number]): string | null {
   if (o.dialect !== d.id || !o.sql.trim()) return null;
   return `-- ${o.name}${o.kind ? ` (${o.kind})` : ""}\n${o.sql.trim()}`;
@@ -342,6 +380,12 @@ function objectBlocks(model: Model, d: Dialect, schema?: string): { pre: string[
   if (sfObjs.length) {
     if (d.id === "snowflake") post.push(sfObjs.map((o) => snowflakeObjectDDL(d, o)).join("\n\n"));
     else post.push(`-- ${sfObjs.length} Snowflake data-engineering object(s) omitted for ${d.label}`);
+  }
+  // Snowflake governance objects (Req 23 Phase 5) — Snowflake dialect only.
+  const govObjs = model.governanceObjects ?? [];
+  if (govObjs.length) {
+    if (d.id === "snowflake") post.push(govObjs.map((o) => governanceObjectDDL(d, o)).join("\n\n"));
+    else post.push(`-- ${govObjs.length} Snowflake governance object(s) omitted for ${d.label}`);
   }
   return { pre, post };
 }

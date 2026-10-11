@@ -7,6 +7,8 @@ import {
   type Field,
   type Index,
   type Model,
+  type GovernanceObject,
+  type GovernanceObjectKind,
   type Notation,
   type Position,
   type SchemaObj,
@@ -26,6 +28,7 @@ import {
   newIndex,
   newModel,
   newRawObject,
+  newGovernanceObject,
   newSchemaObject,
   newSnowflakeObject,
   newSubjectArea,
@@ -67,6 +70,7 @@ export type Selection =
   | { kind: "domain"; id: string }
   | { kind: "schema"; id: string }
   | { kind: "snowflakeObject"; id: string }
+  | { kind: "governanceObject"; id: string }
   | null;
 
 export interface Notice {
@@ -134,6 +138,11 @@ interface ModelStore {
   createSnowflakeObject: (kind: SnowflakeObjectKind) => string;
   updateSnowflakeObject: (id: string, patch: Partial<SnowflakeObject>) => void;
   deleteSnowflakeObject: (id: string) => void;
+
+  // Snowflake governance objects (Req 23 Phase 5)
+  createGovernanceObject: (kind: GovernanceObjectKind) => string;
+  updateGovernanceObject: (id: string, patch: Partial<GovernanceObject>) => void;
+  deleteGovernanceObject: (id: string) => void;
 
   // subject areas (Req 21 §6) — database-agnostic: any model can group its entities.
   createSubjectArea: (name: string, entities?: string[], product?: string) => string;
@@ -689,6 +698,27 @@ export const useModelStore = create<ModelStore>((set, get) => {
         m.snowflakeObjects = (m.snowflakeObjects ?? []).filter((o) => o.id !== id);
       });
       set((s) => (s.selection?.kind === "snowflakeObject" && s.selection.id === id ? { selection: null } : {}));
+    },
+
+    createGovernanceObject: (kind) => {
+      const taken = new Set((get().model.governanceObjects ?? []).map((o) => o.name));
+      const obj = newGovernanceObject(kind, uniqueName(`new_${kind.toLowerCase()}`, taken));
+      commit((m) => {
+        m.governanceObjects = [...(m.governanceObjects ?? []), obj];
+      });
+      set({ selection: { kind: "governanceObject", id: obj.id } });
+      return obj.id;
+    },
+    updateGovernanceObject: (id, patch) => {
+      commit((m) => {
+        m.governanceObjects = (m.governanceObjects ?? []).map((o) => (o.id === id ? { ...o, ...patch } : o));
+      });
+    },
+    deleteGovernanceObject: (id) => {
+      commit((m) => {
+        m.governanceObjects = (m.governanceObjects ?? []).filter((o) => o.id !== id);
+      });
+      set((s) => (s.selection?.kind === "governanceObject" && s.selection.id === id ? { selection: null } : {}));
     },
 
     createRawObject: (dialect) => {

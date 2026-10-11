@@ -43,3 +43,33 @@ describe("snowflake object store ops", () => {
     expect(s().model.snowflakeObjects ?? []).toHaveLength(0);
   });
 });
+
+describe("governance object store ops", () => {
+  beforeEach(() => {
+    useModelStore.getState().loadModel(newModel("m", "2026-01-01T00:00:00Z", "Physical", "snowflake"));
+  });
+
+  it("creates a grant with its default privilege and selects it", () => {
+    const id = s().createGovernanceObject("grant");
+    const obj = s().model.governanceObjects![0];
+    expect(obj.kind).toBe("grant");
+    expect(obj.privilege).toBe("SELECT");
+    expect(s().selection).toEqual({ kind: "governanceObject", id });
+  });
+
+  it("updates array fields and deletes clearing selection", () => {
+    const id = s().createGovernanceObject("role");
+    s().updateGovernanceObject(id, { grantedRoles: ["READER", "WRITER"] });
+    expect(s().model.governanceObjects![0].grantedRoles).toEqual(["READER", "WRITER"]);
+    s().deleteGovernanceObject(id);
+    expect(s().model.governanceObjects).toHaveLength(0);
+    expect(s().selection).toBeNull();
+  });
+
+  it("is undoable", () => {
+    s().createGovernanceObject("maskingPolicy");
+    expect(s().model.governanceObjects).toHaveLength(1);
+    s().undo();
+    expect(s().model.governanceObjects ?? []).toHaveLength(0);
+  });
+});

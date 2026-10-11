@@ -271,3 +271,59 @@ describe("Copilot model-object actions (Req 19)", () => {
     expect(m.entities[0].stereotype).toBe("fact");
   });
 });
+
+describe("create_snowflake_object + create_governance_object actions (Req 23 Phase 4/5)", () => {
+  beforeEach(() => {
+    useModelStore.getState().loadModel(newModel("sf", "2026-01-01T00:00:00Z", "Physical", "snowflake"));
+  });
+
+  it("creates a pipe and a masking policy through the store ops", () => {
+    const plan = parsePlan({
+      summary: "sf de+gov",
+      actions: [
+        { kind: "create_snowflake_object", objectKind: "pipe", name: "INGEST", copyStatement: "COPY INTO t FROM @s", autoIngest: true },
+        { kind: "create_governance_object", objectKind: "maskingPolicy", name: "MASK_EMAIL", argType: "STRING", body: "CASE WHEN current_role() = 'ADMIN' THEN val ELSE '***' END" },
+      ],
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    const res = executePlan(plan.value);
+    expect(res.applied).toBe(2);
+    const pipe = s().model.snowflakeObjects!.find((o) => o.name === "INGEST")!;
+    expect(pipe.kind).toBe("pipe");
+    expect(pipe.autoIngest).toBe(true);
+    const pol = s().model.governanceObjects!.find((o) => o.name === "MASK_EMAIL")!;
+    expect(pol.kind).toBe("maskingPolicy");
+    expect(pol.body).toContain("current_role()");
+  });
+
+  it("skips Snowflake objects when the model does not target Snowflake", () => {
+    useModelStore.getState().loadModel(newModel("pg", "2026-01-01T00:00:00Z", "Physical", "postgres"));
+    const plan = parsePlan({
+      summary: "x",
+      actions: [{ kind: "create_governance_object", objectKind: "role", name: "ANALYST" }],
+    });
+    if (!plan.ok) return;
+    const res = executePlan(plan.value);
+    expect(res.applied).toBe(0);
+    expect(res.skipped).toBe(1);
+    expect(s().model.governanceObjects ?? []).toHaveLength(0);
+  });
+
+  it("applies the whole plan as one undo step", () => {
+    const plan = parsePlan({
+      summary: "x",
+      actions: [
+        { kind: "create_snowflake_object", objectKind: "stage", name: "LAND" },
+        { kind: "create_governance_object", objectKind: "role", name: "ANALYST" },
+      ],
+    });
+    if (!plan.ok) return;
+    executePlan(plan.value);
+    expect(s().model.snowflakeObjects).toHaveLength(1);
+    expect(s().model.governanceObjects).toHaveLength(1);
+    s().undo();
+    expect(s().model.snowflakeObjects ?? []).toHaveLength(0);
+    expect(s().model.governanceObjects ?? []).toHaveLength(0);
+  });
+});

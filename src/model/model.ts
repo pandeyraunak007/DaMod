@@ -283,6 +283,38 @@ export interface SnowflakeObject {
   targetLag?: string; // dynamicTable
 }
 
+/** Snowflake governance objects (Req 23 Phase 5): roles, grants, tags, masking +
+ *  row-access policies, shares. Same kind-discriminated design as SnowflakeObject —
+ *  one collection, one editor, one DDL function. Policy bodies are **author-owned
+ *  local content** (the model never discovers/imports them from a live account), so
+ *  editing them in the Inspector exposes nothing that wasn't typed here. No secret
+ *  or credential field exists on this type. */
+export const GOVERNANCE_OBJECT_KINDS = ["role", "grant", "tag", "maskingPolicy", "rowAccessPolicy", "share"] as const;
+export type GovernanceObjectKind = (typeof GOVERNANCE_OBJECT_KINDS)[number];
+
+export interface GovernanceObject {
+  id: string;
+  kind: GovernanceObjectKind;
+  name: string;
+  comment?: string;
+  // role: roles granted into this one (hierarchy)
+  grantedRoles?: string[];
+  // grant
+  privilege?: string; // SELECT / INSERT / ALL / USAGE …
+  onObject?: string; // e.g. "TABLE orders" / "WAREHOUSE wh"
+  toRole?: string;
+  // tag
+  allowedValues?: string[];
+  // maskingPolicy / rowAccessPolicy
+  argType?: string; // masking: the masked column's type
+  returnType?: string; // masking: return type (defaults to argType)
+  signature?: string; // row-access: "(region STRING)"
+  body?: string; // the policy expression (author-written)
+  // share
+  shareObjects?: string[];
+  accounts?: string[];
+}
+
 export type DbDialect = "postgres" | "snowflake" | "databricks" | "oracle" | "sqlserver" | "mysql" | "bigquery";
 
 /** A free-form, dialect-specific object (Snowflake stage/stream/task, Databricks
@@ -317,6 +349,7 @@ export interface Model {
   schemas?: SchemaObj[];
   subjectAreas?: SubjectArea[];
   snowflakeObjects?: SnowflakeObject[];
+  governanceObjects?: GovernanceObject[];
   views?: View[];
   indexes?: Index[];
   sequences?: Sequence[];
@@ -390,6 +423,13 @@ export function newSnowflakeObject(kind: SnowflakeObjectKind, name: string): Sno
   if (kind === "stage") base.stageType = "internal";
   if (kind === "fileFormat") base.formatType = "CSV";
   if (kind === "stream") base.streamType = "standard";
+  return base;
+}
+
+export function newGovernanceObject(kind: GovernanceObjectKind, name: string): GovernanceObject {
+  const base: GovernanceObject = { id: newId("governanceObject"), kind, name };
+  if (kind === "grant") base.privilege = "SELECT";
+  if (kind === "maskingPolicy") base.argType = "STRING";
   return base;
 }
 

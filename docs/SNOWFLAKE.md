@@ -42,8 +42,8 @@ mock, awaits a live adapter · **Live** = needs a Snowflake account · **Deferre
 | Constraint enforcement (declared vs enforced, §4.2) | **Done** | `Relationship.enforced`; Snowflake standard/transient/external tables export PK/UNIQUE/FK as `NOT ENFORCED`, hybrid tables as enforced — so DDL never implies enforcement Snowflake doesn't provide. A validation rule warns when a FK is marked enforced on a non-hybrid Snowflake table. |
 | Secure/materialized views distinction | **Partial** | Views modeled (materialized flag exists); secure-view flag deferred. |
 | Data engineering objects (stages/file formats/pipes/streams/tasks/dynamic tables) | **Done** | `Model.snowflakeObjects` (unified `SnowflakeObject`, kind-discriminated); Explorer groups (Snowflake-only), kind-adaptive Inspector editor, Snowflake DDL (`CREATE STAGE/FILE FORMAT/PIPE/STREAM/TASK/DYNAMIC TABLE`), omitted with a count comment on other dialects, validation warnings (pipe→COPY, stream→source, task/dynamic→SQL, external stage→URL). **Stage credentials are never stored or shown** (§5). |
-| Governance (roles/grants/tags/masking/row-access policies/shares) | **Deferred** | Phase 5. |
-| Copilot Snowflake context + reviewed actions | **Partial** | The generic Copilot create-actions (tables/columns/subject areas/semantic) work on a Snowflake model; Snowflake-object-specific actions are later. |
+| Governance (roles/grants/tags/masking/row-access policies/shares) | **Done** | `Model.governanceObjects` (unified `GovernanceObject`, kind-discriminated); Explorer groups (Snowflake-only), kind-adaptive Inspector editor, Snowflake DDL (`CREATE ROLE`/`GRANT`/`CREATE TAG`/`MASKING POLICY`/`ROW ACCESS POLICY`/`SHARE`), omitted with a count comment on other dialects, validation warnings (grant→object/role, policy→body, share→objects). **Policy bodies are author-owned local content** (never imported from a live account); **no credential/secret field exists** on the type (§5). |
+| Copilot Snowflake context + reviewed actions | **Done** | `create_snowflake_object` + `create_governance_object` actions (create-only, reviewed/approved, one undo group) — skip unless the model targets Snowflake; context summarizes both object sets by name/kind only (never bodies/credentials). |
 | Live Snowflake adapter (account/warehouse/role + key-pair/OAuth) | **Deferred** | Needs an account to verify. |
 
 ## Delivered files (this increment)
@@ -64,10 +64,14 @@ mock, awaits a live adapter · **Live** = needs a Snowflake account · **Deferre
   store ops → serialize/Zod → validation → Snowflake DDL → Explorer category → kind-
   adaptive Inspector). Stage credentials are never stored or displayed. Discovering
   these from a live account is a connector enhancement (needs an account).
-- **Phase 5 (governance):** roles/grants, tags, masking + row-access policies, shares —
-  with policy↔object compatibility checks; kept separate from live privilege admin.
-- **Phase 6:** Snowflake-specific Copilot actions + Snowflake-aware schema-comparison
-  nuances.
+- **Phase 5 (governance):** *DONE.* Roles/grants, tags, masking + row-access policies,
+  shares as one kind-discriminated `GovernanceObject` (same pipeline as Phase 4). Policy
+  bodies are author-written; no secret field exists. *Remaining:* policy↔object
+  attachment (which policy guards which column/table) and compatibility checks; kept
+  separate from live privilege admin.
+- **Phase 6:** *Copilot actions DONE* (`create_snowflake_object`/`create_governance_object`).
+  *Remaining:* Snowflake-aware schema-comparison nuances; update/delete Copilot actions
+  for these objects (create-only today).
 - **Live adapter:** mirror `pg.rs` → Snowflake metadata via `SHOW`/`DESCRIBE`/
   `INFORMATION_SCHEMA`/`GET_DDL`; register it for `snowflake`. Needs an account + auth.
 

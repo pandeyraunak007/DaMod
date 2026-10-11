@@ -5,6 +5,42 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Req 23 Phase 5: Snowflake governance objects + Snowflake Copilot actions
+
+Completed the last two deferred Snowflake items: governance objects, and Copilot actions
+for both the Phase 4 data-engineering objects and these new governance ones.
+
+**Governance objects** (`Model.governanceObjects: GovernanceObject[]`, id prefix `z_`):
+- One kind-discriminated type (role/grant/tag/maskingPolicy/rowAccessPolicy/share), same
+  as Phase 4 — one collection, one serializer/Zod (string + array fields, omit-empty),
+  one Explorer group set (Snowflake-only), one kind-adaptive Inspector editor, undo-
+  tracked store ops. DDL: `CREATE ROLE` + `GRANT ROLE`, `GRANT …`, `CREATE TAG`,
+  `CREATE MASKING POLICY`, `CREATE ROW ACCESS POLICY`, `CREATE SHARE` + grants/accounts;
+  other dialects get a single count-comment (no Snowflake equivalent).
+- **Security (§5/§6):** there is deliberately **no credential/secret field** on the type,
+  so nothing secret can be stored, shown, exported, or sent to the LLM. Policy bodies are
+  **author-owned local content** (the model has no live-discovery path for governance, so
+  a body only ever contains what the user typed) — the editor documents this. This squares
+  the "never expose sensitive policy expressions" constraint with needing to model the
+  policy at all: what's shown is the user's own input, not a discovered secret.
+- Validation (warnings, WIP-friendly): grant needs object+role; masking/row-access need a
+  body; share needs objects.
+
+**Copilot actions** `create_snowflake_object` + `create_governance_object` (create-only,
+Zod-validated, reviewed→approved, one undo group via the existing `execute.ts` path):
+- Both **skip unless `model.dialect === "snowflake"`** (returns a clear skip message), so
+  they can't create objects that would be invisible on a non-Snowflake model.
+- Context (`context.ts`) now lists both object sets **by name + kind only** — never policy
+  bodies or any field that could carry a secret, honoring "never send business data/creds
+  to the LLM". Prompt (`orchestrate.ts`) documents the actions with an explicit
+  no-credentials rule.
+
+**Note:** reused the `z_` id prefix; updated `ids.test.ts` which had used `z_` as its
+"unknown prefix" example (now a valid prefix) → switched to `u_`.
+
+- 413 TS tests (+15: `export/governanceObjects.test.ts` ×9, `store` governance ×3,
+  `copilot/execute` ×3); tsc/build clean.
+
 ## 2026-10-11 — Req 23 Phase 4: Snowflake data-engineering objects
 
 Modeled stages, file formats, pipes, streams, tasks and dynamic tables as first-class

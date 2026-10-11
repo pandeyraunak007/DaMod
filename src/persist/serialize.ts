@@ -11,6 +11,7 @@ import type {
   Domain,
   Entity,
   Field,
+  GovernanceObject,
   Index,
   Model,
   RawObject,
@@ -169,6 +170,24 @@ function serializeSnowflakeObject(o: SnowflakeObject): Record<string, unknown> {
   return out;
 }
 
+const GOV_OBJ_STRING_KEYS = [
+  "privilege", "onObject", "toRole", "argType", "returnType", "signature", "body",
+] as const;
+const GOV_OBJ_ARRAY_KEYS = ["grantedRoles", "allowedValues", "shareObjects", "accounts"] as const;
+function serializeGovernanceObject(o: GovernanceObject): Record<string, unknown> {
+  const out: Record<string, unknown> = { id: o.id, kind: o.kind, name: o.name };
+  for (const k of GOV_OBJ_STRING_KEYS) {
+    const v = o[k];
+    if (v !== undefined && v !== "") out[k] = v;
+  }
+  for (const k of GOV_OBJ_ARRAY_KEYS) {
+    const v = o[k];
+    if (v && v.length) out[k] = [...v];
+  }
+  if (o.comment) out.comment = o.comment;
+  return out;
+}
+
 function serializeSchema(s: SchemaObj): Record<string, unknown> {
   const out: Record<string, unknown> = { id: s.id, name: s.name };
   if (s.owner) out.owner = s.owner;
@@ -202,6 +221,9 @@ export function modelToPlain(model: Model): Record<string, unknown> {
   if (model.schemas && model.schemas.length) out.schemas = model.schemas.map(serializeSchema);
   if (model.snowflakeObjects && model.snowflakeObjects.length) {
     out.snowflakeObjects = model.snowflakeObjects.map(serializeSnowflakeObject);
+  }
+  if (model.governanceObjects && model.governanceObjects.length) {
+    out.governanceObjects = model.governanceObjects.map(serializeGovernanceObject);
   }
   if (model.subjectAreas && model.subjectAreas.length) {
     out.subjectAreas = model.subjectAreas.map((a) => {

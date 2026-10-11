@@ -699,6 +699,29 @@ function snowflakeObjectIssues(ctx: ValidationContext): Issue[] {
   return issues;
 }
 
+// Snowflake governance objects need the clause that makes their DDL valid
+// (Req 23 Phase 5). Warnings, not errors — a model can be a work in progress.
+function governanceObjectIssues(ctx: ValidationContext): Issue[] {
+  const issues: Issue[] = [];
+  const add = (modelId: string, objId: string, suffix: string, message: string) =>
+    issues.push({ id: `gov:${modelId}:${objId}:${suffix}`, rule: "governanceObjectIssues", severity: "warning", message, target: { model: modelId } });
+  for (const { id, model } of ctx.models) {
+    for (const obj of model.governanceObjects ?? []) {
+      if (obj.kind === "grant") {
+        if (!obj.onObject) add(id, obj.id, "on", `Grant "${obj.name}" needs a target object`);
+        if (!obj.toRole) add(id, obj.id, "to", `Grant "${obj.name}" needs a role to grant to`);
+      }
+      if ((obj.kind === "maskingPolicy" || obj.kind === "rowAccessPolicy") && !obj.body?.trim()) {
+        add(id, obj.id, "body", `${obj.kind === "maskingPolicy" ? "Masking" : "Row-access"} policy "${obj.name}" needs an expression`);
+      }
+      if (obj.kind === "share" && !(obj.shareObjects ?? []).length) {
+        add(id, obj.id, "objs", `Share "${obj.name}" has no shared objects`);
+      }
+    }
+  }
+  return issues;
+}
+
 const RULES: ((ctx: ValidationContext) => Issue[])[] = [
   duplicateEntityNames,
   duplicateFieldNames,
@@ -722,6 +745,7 @@ const RULES: ((ctx: ValidationContext) => Issue[])[] = [
   subjectAreaIssues,
   snowflakeEnforcement,
   snowflakeObjectIssues,
+  governanceObjectIssues,
 ];
 
 /** Run every rule over the workspace and return all issues (FR-10.1). */

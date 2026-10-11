@@ -138,6 +138,24 @@ const zSnowflakeObject = z.object({
   targetLag: z.string().optional(),
 });
 
+const zGovernanceObject = z.object({
+  id: z.string(),
+  kind: z.enum(["role", "grant", "tag", "maskingPolicy", "rowAccessPolicy", "share"]),
+  name: z.string(),
+  comment: z.string().optional(),
+  grantedRoles: z.array(z.string()).optional(),
+  privilege: z.string().optional(),
+  onObject: z.string().optional(),
+  toRole: z.string().optional(),
+  allowedValues: z.array(z.string()).optional(),
+  argType: z.string().optional(),
+  returnType: z.string().optional(),
+  signature: z.string().optional(),
+  body: z.string().optional(),
+  shareObjects: z.array(z.string()).optional(),
+  accounts: z.array(z.string()).optional(),
+});
+
 const zIndex = z.object({
   id: z.string(),
   name: z.string(),
@@ -192,6 +210,7 @@ const zModel = z.object({
   schemas: z.array(zSchema).optional(),
   subjectAreas: z.array(zSubjectArea).optional(),
   snowflakeObjects: z.array(zSnowflakeObject).optional(),
+  governanceObjects: z.array(zGovernanceObject).optional(),
   views: z.array(zView).optional(),
   indexes: z.array(zIndex).optional(),
   sequences: z.array(zSequence).optional(),
