@@ -63,7 +63,7 @@ export function DomainsDialog({ onClose }: { onClose: () => void }) {
 
 function DomainProps({ domain, usage }: { domain: Domain; usage: number }) {
   const updateDomain = useModelStore((s) => s.updateDomain);
-  const deleteDomain = useModelStore((s) => s.deleteDomain);
+  const requestDomainDelete = useModelStore((s) => s.requestDomainDelete);
   const patch = (p: Partial<Domain>) => updateDomain(domain.id, p);
   const shape = paramShape(domain.type);
 
@@ -142,7 +142,7 @@ function DomainProps({ domain, usage }: { domain: Domain; usage: number }) {
         />
       </div>
       <div className="modal__actions">
-        <button className="btn btn--danger btn--small" onClick={() => deleteDomain(domain.id)}>
+        <button className="btn btn--danger btn--small" onClick={() => requestDomainDelete(domain.id)}>
           Delete domain
         </button>
       </div>

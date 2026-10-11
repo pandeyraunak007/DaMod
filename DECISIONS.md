@@ -5,6 +5,46 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Domains feature audit + Phase 1 Slices 1–2 (erwin-standards roadmap)
+
+Ran a full read-only audit (5 parallel explorers) of Domains, Naming, Data Types,
+Copilot, and the validation/persistence/engineering plumbing, then started the
+approved roadmap. Audit verdict: engine/plumbing solid; **Domains ~70% done** (model/
+store/Zod/serialize/validation/tests ✅) with the real gaps being discoverability and
+deletion UX; **Naming Standards and Data Type Standards don't exist as reusable objects**
+(only identifier validation + manual dual-naming + a fixed type catalog). Full
+assessment lives in the conversation; roadmap: Domains → Naming → Type Standards →
+Copilot standards actions → hardening.
+
+**Slice 1 — Domains discoverable & bindable (shipped):**
+- Model Explorer now has a **Domains group** (list/count/add/select/delete) and the
+  **docked SidePanel** gained a domain selector on physical fields (previously only the
+  modal PropertiesDialog had one). Shared `DomainSelect` component so both inspectors
+  bind identically; a docked `DomainEditor` mirrors the modal domain fields.
+- Purely additive over existing store ops — **no serialization/schema/engine change, no
+  migration**; old files load unchanged. Zustand selector rule honored (stable ref +
+  derive outside) to avoid the getSnapshot loop.
+
+**Slice 2 — dependency-aware domain deletion (shipped):**
+- Deleting a domain now routes through a **confirm dialog** that lists the bound columns
+  and requires an explicit resolution: **detach** (keep each column's current type — the
+  legacy behaviour) or **reassign** to another domain (rebinds + applies its type). No
+  silent conversion. New store op `deleteDomainResolved(id, mode, replacementId?)` runs as
+  **one undo entry** (reassign also realigns FK types via `reconcileForeignKeyTypes`).
+- Delete UX is centralized via a transient `domainDeletePending` flag in modelStore
+  (precedent: `propertiesOpen`), so all three delete entry points (Explorer tree, docked
+  DomainEditor, modal DomainsDialog) funnel into one `DomainDeleteDialog` mounted in App —
+  no prop threading, no uiStore/localStorage persistence of transient state. Legacy
+  `deleteDomain` kept (still used by tests / as the detach primitive).
+
+**Not done (deferred, per plan):** Postgres `CREATE DOMAIN` DDL emit + reverse-eng of
+domains (Phase 1d/e, gated on decision Q1 — changes DDL output, needs `ddl.test.ts`
+updates); Naming/Type Standards (Phases 2–3); Copilot domain apply/replace/detach +
+read-only compliance actions (Phase 4).
+
+- Tests +11 (Slice 1: `domainBinding.render` ×4, `domainsExplorer.render` ×1; Slice 2:
+  `domainDelete` store ×3, `domainDelete.render` ×3). **424 TS tests pass; tsc + build clean.**
+
 ## 2026-10-11 — Req 23 Phase 5: Snowflake governance objects + Snowflake Copilot actions
 
 Completed the last two deferred Snowflake items: governance objects, and Copilot actions

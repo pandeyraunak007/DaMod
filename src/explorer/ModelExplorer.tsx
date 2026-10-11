@@ -291,7 +291,8 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
     else if (kind === "schema") st.deleteSchema(oid);
     else if (kind === "snowflakeObject") st.deleteSnowflakeObject(oid);
     else if (kind === "governanceObject") st.deleteGovernanceObject(oid);
-    else if (kind === "domain") st.deleteDomain(oid);
+    else if (kind === "domain") st.requestDomainDelete(oid); // Slice 2: resolve dependents first
+
     else st.deleteRawObject(oid);
   };
 

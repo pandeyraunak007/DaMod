@@ -17,6 +17,7 @@ import { SidePanel } from "./panels/SidePanel";
 import { RelationshipDialog } from "./panels/RelationshipDialog";
 import { PropertiesDialog } from "./panels/PropertiesDialog";
 import { DomainsDialog } from "./panels/DomainsDialog";
+import { DomainDeleteDialog } from "./panels/DomainDeleteDialog";
 import { ImportDialog } from "./import/ImportDialog";
 import { ConnectionsDialog } from "./connectors/ui/ConnectionsDialog";
 import { PipelineDialog } from "./connectors/pipeline/PipelineDialog";
@@ -253,6 +254,7 @@ export default function App() {
       {mapOpen && <WorkspaceMap onClose={() => setMapOpen(false)} />}
       {exportOpen && <ExportDialog onClose={() => setExportOpen(false)} />}
       {domainsOpen && <DomainsDialog onClose={() => setDomainsOpen(false)} />}
+      <DomainDeleteDialog />
       {importOpen && <ImportDialog onClose={() => setImportOpen(false)} />}
       {connectionsOpen && (
         <ConnectionsDialog

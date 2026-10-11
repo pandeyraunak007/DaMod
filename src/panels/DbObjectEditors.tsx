@@ -469,11 +469,12 @@ export function GovernanceObjectEditor({ id, onGone }: { id: string; onGone: () 
 // Reusable-domain editor for the docked inspector (Slice 1). Mirrors the modal
 // DomainsDialog fields and reuses updateDomain/deleteDomain, so editing a domain
 // propagates its type to every bound field (and delete unbinds them).
-export function DomainEditor({ id, onGone }: { id: string; onGone: () => void }) {
+export function DomainEditor({ id, onGone: _onGone }: { id: string; onGone: () => void }) {
+  void _onGone; // deletion is resolved via the dependency-aware dialog (Slice 2)
   const domain = useModelStore((s) => s.model.domains?.find((d) => d.id === id));
   const entities = useModelStore((s) => s.model.entities);
   const update = useModelStore((s) => s.updateDomain);
-  const del = useModelStore((s) => s.deleteDomain);
+  const requestDelete = useModelStore((s) => s.requestDomainDelete);
   if (!domain) return null;
   const patch = (p: Partial<Domain>) => update(id, p);
   const shape = paramShape(domain.type);
@@ -535,7 +536,7 @@ export function DomainEditor({ id, onGone }: { id: string; onGone: () => void })
           ? `Changing this type updates ${usage} bound field(s). Deleting unbinds them (they keep this type).`
           : "Not used by any field yet."}
       </p>
-      <button className="btn btn--danger btn--small" onClick={() => (del(id), onGone())}>Delete domain</button>
+      <button className="btn btn--danger btn--small" onClick={() => requestDelete(id)}>Delete domain</button>
     </div>
   );
 }

@@ -172,6 +172,15 @@ interface ModelStore {
   updateDomain: (id: string, patch: Partial<Domain>) => void;
   deleteDomain: (id: string) => void;
   bindFieldDomain: (entityId: string, fieldId: string, domainId: string | null) => void;
+  /** Transient: id of a domain whose deletion is awaiting user resolution (UI only,
+   *  not part of undo/model). The confirm dialog reads this. */
+  domainDeletePending: string | null;
+  requestDomainDelete: (id: string) => void;
+  cancelDomainDelete: () => void;
+  /** Delete a domain, resolving its bound fields: "detach" keeps each field's
+   *  current type (the legacy behaviour); "reassign" rebinds them to another domain
+   *  (applying its type). One undo entry. */
+  deleteDomainResolved: (id: string, mode: "detach" | "reassign", replacementId?: string) => void;
 
   // relationships
   openRelationshipDraft: (source: string, target: string) => void;
@@ -301,6 +310,7 @@ export const useModelStore = create<ModelStore>((set, get) => {
     linkDraft: null,
     canvasMode: "select",
     propertiesOpen: false,
+    domainDeletePending: null,
     activeDiagram: null,
     _dragSnapshot: null,
 
@@ -788,6 +798,37 @@ export const useModelStore = create<ModelStore>((set, get) => {
         s.selection?.kind === "domain" && s.selection.id === id ? { selection: null } : {},
       );
     },
+    requestDomainDelete: (id) => set({ domainDeletePending: id }),
+    cancelDomainDelete: () => set({ domainDeletePending: null }),
+    deleteDomainResolved: (id, mode, replacementId) => {
+      commit((m) => {
+        const replacement =
+          mode === "reassign" && replacementId
+            ? (m.domains ?? []).find((d) => d.id === replacementId)
+            : undefined;
+        for (const e of m.entities) {
+          for (const f of e.fields) {
+            if (f.domainId !== id) continue;
+            if (replacement) {
+              f.domainId = replacement.id;
+              applyDomainType(f, replacement);
+              if ((f.default == null || f.default === "") && replacement.default) {
+                f.default = replacement.default;
+              }
+            } else {
+              delete f.domainId;
+            }
+          }
+        }
+        m.domains = (m.domains ?? []).filter((d) => d.id !== id);
+        // Reassignment may change a PK's type → realign dependent FK columns.
+        if (replacement) reconcileForeignKeyTypes(m);
+      });
+      set((s) => ({
+        domainDeletePending: null,
+        ...(s.selection?.kind === "domain" && s.selection.id === id ? { selection: null } : {}),
+      }));
+    },
     bindFieldDomain: (entityId, fieldId, domainId) => {
       set((s) => {
         const next = structuredClone(s.model);
@@ -1007,6 +1048,7 @@ export const useModelStore = create<ModelStore>((set, get) => {
         linkDraft: null,
         canvasMode: "select",
         propertiesOpen: false,
+        domainDeletePending: null,
       }),
   };
 });
