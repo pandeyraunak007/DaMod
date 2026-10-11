@@ -5,6 +5,29 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — ETL G-AI Phase 1: Copilot can create pipelines + is pipeline-aware
+
+First Copilot ETL action, through the existing action→execute→approve path:
+
+- **Action** `create_pipeline { name, target, sourceModel?, schema?, entities? }` — plans a
+  full-load pipeline from a source MODEL to a target platform via the existing
+  `planFullLoad`. `sourceModel` defaults to the active model; `entities` default to all
+  tables (unknown names are dropped; none-match → fail). Idempotent by pipeline name
+  (duplicate → skip). In STRUCTURAL (needs approval). DESIGN-TIME only — generates a
+  spec/SQL, never moves data; no credential/secret is a field.
+- **Executor** routes through `workspaceStore.upsertPipeline` (fire-and-forget disk write,
+  state updates synchronously — same pattern as the semantic actions), so it's outside the
+  model undo group and lands in the pipeline's own history (G-UNDO).
+- **Context** — `buildContext` now takes `pipelines` and summarizes them (name, source→
+  target, object/node counts), with a `pipelines` category. So the Copilot can discuss/
+  reference pipelines and won't re-create an existing one. Threaded from `CopilotPanel`.
+- Prompt catalog + `describeAction` + 3 tests (`execute.test.ts`: create-from-active,
+  table-restrict + duplicate-skip, no-match-fail). 554 green, tsc/build clean.
+
+Scoped to `create_pipeline` (well-defined, no NL graph-wiring). **Deferred to G-AI Phase 2:**
+transform-node actions (`add_transform_node`/`suggest_mapping`) — adding/wiring DAG nodes
+via natural language, which is a larger, riskier design.
+
 ## 2026-10-11 — ETL G-UNDO: per-pipeline undo/redo in the Designer
 
 Pipeline edits persisted via `upsertPipeline` with no history (model undo is a separate

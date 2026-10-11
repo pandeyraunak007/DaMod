@@ -8,6 +8,7 @@ import { checkNaming, checkTypes } from "../model/model";
 import { fieldTypeLabel } from "../model/fieldDisplay";
 import { levelTerms } from "../model/levels";
 import type { SemanticDoc } from "../semantic/semantic";
+import type { PipelineSpec } from "../connectors/pipeline/spec";
 
 export type ContextScope = "selection" | "model";
 
@@ -49,6 +50,7 @@ export function buildContext(
   scope: ContextScope,
   selectedEntityId?: string | null,
   semantic?: SemanticDoc,
+  pipelines?: PipelineSpec[],
 ): BuiltContext {
   const terms = levelTerms(model.level);
   const inScope: Entity[] =
@@ -111,6 +113,18 @@ export function buildContext(
         `metrics: ${semantic.metrics.map((m) => m.name).join(", ") || "none"}`,
     );
   }
+  // ETL pipelines are workspace-wide; summarise names/source→target so the AI can
+  // reference them (and not re-create an existing one). No credentials ever appear here.
+  if (pipelines && pipelines.length) {
+    lines.push(
+      `ETL pipelines (${pipelines.length}):`,
+      ...pipelines.map(
+        (p) =>
+          `- ${p.name}: ${p.source.modelName} → ${p.target.platform}` +
+          ` (${p.objects.length} object(s)${p.nodes?.length ? `, ${p.nodes.length} graph node(s)` : ""})`,
+      ),
+    );
+  }
 
   const categories = ["objectNames", "dataTypes", "relationships"];
   const hasSensitive = inScope.some((e) => e.description) || true; // names are sensitive
@@ -118,6 +132,7 @@ export function buildContext(
   if (model.domains?.length) categories.push("domains");
   if (model.namingStandards?.length) categories.push("namingStandards");
   if ((model.namingStandards?.length ?? 0) + (model.typeStandards?.length ?? 0) > 0) categories.push("validation");
+  if (pipelines?.length) categories.push("pipelines");
 
   return {
     text: lines.join("\n"),

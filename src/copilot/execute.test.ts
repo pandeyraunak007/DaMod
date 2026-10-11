@@ -440,3 +440,57 @@ describe("create_snowflake_object + create_governance_object actions (Req 23 Pha
     expect(s().model.governanceObjects ?? []).toHaveLength(0);
   });
 });
+
+describe("Copilot create_pipeline action (G-AI)", () => {
+  beforeEach(() => {
+    // A source model with two tables + a FK, registered as the active tab so allModels()
+    // (which iterates tabs) can resolve it. path:null → upsertPipeline stays in memory.
+    s().loadModel(newModel("sales", "2026-01-01T00:00:00Z", "Physical"));
+    const c = s().createEntity(); s().renameEntity(c, "Customer");
+    const cPk = s().addField(c)!; s().updateField(c, cPk, { name: "id", type: "uuid", primaryKey: true });
+    const o = s().createEntity(); s().renameEntity(o, "Order");
+    const oPk = s().addField(o)!; s().updateField(o, oPk, { name: "id", type: "uuid", primaryKey: true });
+    const m = s().model;
+    useWorkspaceStore.setState({
+      pipelines: [],
+      pipelineHistory: {},
+      path: null,
+      activeId: m.id,
+      tabs: [{ id: m.id, fileName: "sales.model.json", model: m, lastSavedText: serializeModel(m), savedMtime: 0, externalChange: false, loadError: null }],
+    });
+  });
+
+  it("creates a full-load pipeline from the active model to a target", () => {
+    const plan = parsePlan({ summary: "x", actions: [{ kind: "create_pipeline", name: "sales_to_wh", target: "snowflake" }] });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    const res = executePlan(plan.value);
+    expect(res.applied).toBe(1);
+    const pipes = useWorkspaceStore.getState().pipelines;
+    expect(pipes).toHaveLength(1);
+    expect(pipes[0].name).toBe("sales_to_wh");
+    expect(pipes[0].target.platform).toBe("snowflake");
+    expect(pipes[0].objects.length).toBe(2); // both tables by default
+  });
+
+  const run = (actions: unknown[]) => {
+    const p = parsePlan({ summary: "x", actions });
+    if (!p.ok) throw new Error(p.error);
+    return executePlan(p.value);
+  };
+
+  it("restricts to the named tables and skips a duplicate name", () => {
+    run([{ kind: "create_pipeline", name: "p", target: "postgres", entities: ["Order"] }]);
+    const pipes = useWorkspaceStore.getState().pipelines;
+    expect(pipes[0].objects.length).toBe(1);
+    // Re-running the same name is idempotent (skipped).
+    expect(run([{ kind: "create_pipeline", name: "p", target: "postgres" }]).skipped).toBe(1);
+    expect(useWorkspaceStore.getState().pipelines).toHaveLength(1);
+  });
+
+  it("fails when no table matches", () => {
+    const res = run([{ kind: "create_pipeline", name: "p2", target: "postgres", entities: ["Ghost"] }]);
+    expect(res.failed).toBe(1);
+    expect(useWorkspaceStore.getState().pipelines).toHaveLength(0);
+  });
+});

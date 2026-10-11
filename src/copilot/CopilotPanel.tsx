@@ -78,7 +78,8 @@ export function CopilotPanel({ onClose }: { onClose: () => void }) {
     try {
       const model = useModelStore.getState().model;
       const selId = scope === "selection" && selection?.kind === "entity" ? selection.id : null;
-      const ctx = buildContext(model, scope, selId, useWorkspaceStore.getState().semantic);
+      const ws = useWorkspaceStore.getState();
+      const ctx = buildContext(model, scope, selId, ws.semantic, ws.pipelines);
       const res = await requestPlan(provider(), text, ctx, {
         policy: config.privacyPolicy,
         status: config.noTraining,
@@ -343,6 +344,8 @@ function describeAction(a: CopilotPlan["actions"][number]): string {
       return `+ dimension ${a.name}${a.entity ? ` (${a.entity})` : ""}`;
     case "create_metric":
       return `+ metric ${a.name}${a.aggregate ? ` (${a.aggregate}${a.field ? ` ${a.entity}.${a.field}` : ""})` : ""}`;
+    case "create_pipeline":
+      return `+ pipeline ${a.name} (${a.sourceModel ?? "active model"} → ${a.target}${a.entities?.length ? `, ${a.entities.length} table(s)` : ""})`;
     case "create_snowflake_object":
       return `+ ${a.objectKind} ${a.name}`;
     case "create_governance_object":

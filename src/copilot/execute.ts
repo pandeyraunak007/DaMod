@@ -13,6 +13,8 @@ import type { Entity, Field, Model, TypeRule } from "../model/model";
 import type { CopilotAction, CopilotPlan } from "./actions";
 import { type DataTypeKind, withTypeDefaults } from "../model/dataTypes";
 import { newTerm, newDimension, newMetric } from "../semantic/semantic";
+import { planFullLoad } from "../connectors/pipeline/planner";
+import type { DialectId } from "../export/dialects";
 
 export interface ActionResult {
   action: CopilotAction;
@@ -319,6 +321,36 @@ function applyAction(action: CopilotAction): ActionResult {
       }
       ws.addMetric(metric);
       return ok(`Created metric “${action.name}”`);
+    }
+
+    case "create_pipeline": {
+      const ws = useWorkspaceStore.getState();
+      if (ws.pipelines.some((p) => p.name.toLowerCase() === action.name.toLowerCase())) {
+        return skip(`pipeline “${action.name}” already exists`);
+      }
+      // Resolve the source model by name, else the active model.
+      const models = ws.allModels();
+      const src = action.sourceModel
+        ? models.find((m) => m.name.toLowerCase() === action.sourceModel!.toLowerCase())
+        : models.find((m) => m.id === model().id);
+      if (!src) return fail(`Source model “${action.sourceModel ?? model().name}” not found`);
+      if (src.model.entities.length === 0) return fail(`Source model “${src.name}” has no tables`);
+      // Validate requested tables against the model; default to all.
+      const known = new Map(src.model.entities.map((e) => [e.name.toLowerCase(), e.name]));
+      let entityNames = src.model.entities.map((e) => e.name);
+      if (action.entities?.length) {
+        const resolved = action.entities.map((n) => known.get(n.toLowerCase())).filter(Boolean) as string[];
+        if (resolved.length === 0) return fail(`None of the requested tables exist in “${src.name}”`);
+        entityNames = resolved;
+      }
+      const spec = planFullLoad(src.model, entityNames, action.target as DialectId, {
+        name: action.name,
+        ...(action.schema ? { schema: action.schema } : {}),
+      });
+      // Fire-and-forget the disk write (state updates synchronously), matching the
+      // semantic-action pattern; this is a workspace op, outside the model undo group.
+      void ws.upsertPipeline(spec);
+      return ok(`Created pipeline “${action.name}” (${entityNames.length} table(s) → ${action.target})`);
     }
 
     case "create_snowflake_object": {

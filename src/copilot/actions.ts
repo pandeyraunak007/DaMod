@@ -6,6 +6,7 @@
 
 import { z } from "zod";
 import { DATA_TYPE_KINDS } from "../model/dataTypes";
+import { DIALECT_IDS } from "../export/dialects";
 
 const zNewField = z.object({
   name: z.string(),
@@ -149,6 +150,22 @@ const zCreateMetric = z.object({
   description: z.string().optional(),
 });
 
+// ---- ETL pipeline (connector framework / G-AI) ------------------------------
+// Create a full-load ETL pipeline from a source MODEL to a target platform. Design-time
+// only — this plans a spec, it NEVER moves data. No credentials/secrets are fields here.
+const zCreatePipeline = z.object({
+  kind: z.literal("create_pipeline"),
+  name: z.string(),
+  /** Source model name; defaults to the active model when omitted. */
+  sourceModel: z.string().optional(),
+  /** Target database platform for the generated load. */
+  target: z.enum(DIALECT_IDS as unknown as [string, ...string[]]),
+  /** Target schema (optional). */
+  schema: z.string().optional(),
+  /** Tables to include; omitted/empty = every table in the source model. */
+  entities: z.array(z.string()).optional(),
+});
+
 // ---- Snowflake data-engineering + governance objects (Req 23 Phase 4/5) ------
 // Create-only, like the other object actions. A credential/secret is never a
 // field here, so the Copilot can never set one.
@@ -265,6 +282,7 @@ export const zAction = z.discriminatedUnion("kind", [
   zCreateTerm,
   zCreateDimension,
   zCreateMetric,
+  zCreatePipeline,
   zCreateSnowflakeObject,
   zCreateGovernanceObject,
   zCreateNamingStandard,
@@ -324,6 +342,7 @@ const STRUCTURAL = new Set([
   "create_term",
   "create_dimension",
   "create_metric",
+  "create_pipeline",
   "create_snowflake_object",
   "create_governance_object",
   "create_naming_standard",
