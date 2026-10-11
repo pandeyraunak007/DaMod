@@ -1737,6 +1737,52 @@ body,
   max-height: 120px;
   overflow: auto;
 }
+/* Table browse list (reverse-engineering): schemas grouped, each with its tables. */
+.conn__browse {
+  max-height: 240px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+}
+.conn__browse-group + .conn__browse-group {
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border);
+}
+.conn__browse-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.conn__browse-schema {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+.conn__browse-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding-left: 0.6rem;
+  font-size: 0.82rem;
+}
+.conn__browse-kind {
+  font-size: 0.62rem;
+  color: var(--muted);
+  background: #eef1f5;
+  border-radius: 4px;
+  padding: 0.02rem 0.25rem;
+}
+.btn--ghost {
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  padding: 0 0.2rem;
+}
 /* Checkboxes sit inside a .field, so neutralise the `.field input { width:100% }`
    rule that would otherwise stretch them over their labels. */
 .checkbox input[type="checkbox"] {
@@ -2064,6 +2110,13 @@ body,
   padding: 0.3rem 0.6rem;
   min-height: 56px;
   overflow-x: auto;
+}
+.ribbon__empty {
+  display: flex;
+  align-items: center;
+  padding: 0 0.6rem;
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 .rgroup {
   display: flex;

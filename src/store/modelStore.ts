@@ -980,6 +980,7 @@ export const useModelStore = create<ModelStore>((set, get) => {
         const next = structuredClone(s.model);
         const domain = (next.domains ?? []).find((d) => d.id === domainId);
         if (!domain) return {};
+        let boundAnyPk = false;
         for (const t of targets) {
           const entity = findEntity(next, t.entityId);
           const field = entity ? findField(entity, t.fieldId) : undefined;
@@ -989,11 +990,20 @@ export const useModelStore = create<ModelStore>((set, get) => {
           if ((field.default == null || field.default === "") && domain.default) {
             field.default = domain.default;
           }
+          if (field.primaryKey) boundAnyPk = true;
           bound++;
         }
         if (bound === 0) return {};
-        // Reconcile once for the whole batch → a single notice, not one per column.
-        const changes = reconcileForeignKeyTypes(next);
+        // Reconcile once (and only when a PK was bound — matching the single-field op) so
+        // dependent FK types follow the PK's new domain type → a single notice, not one per
+        // column. An FK whose type reconcile forces away from a domain we just bound is now
+        // mismatched; detach its domain (same ERwin override rule as a manual type edit).
+        const changes = boundAnyPk ? reconcileForeignKeyTypes(next) : [];
+        for (const c of changes) {
+          const e = findEntity(next, c.entityId);
+          const f = e ? findField(e, c.fieldId) : undefined;
+          if (f && f.domainId && f.type !== domain.type) delete f.domainId;
+        }
         next.updatedAt = nowIso();
         const notices = changes.length
           ? [...s.notices, { id: newId("field"), message: typeNoticeMessage(changes) }]

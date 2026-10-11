@@ -276,6 +276,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     },
 
     openWorkspace: async (path) => {
+      // Persist unsaved edits in the outgoing workspace before we replace all state
+      // (covers both the folder picker and "Open model file…"). No-op on first launch.
+      if (get().isActiveDirty()) await get().saveActive(false);
       const listing = await listWorkspace(path);
 
       // Ensure the workspace always has the full FR-5.1 shape.
@@ -549,7 +552,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       if (get().activeId === id) {
         const next = remaining.find((t) => !t.loadError) ?? remaining[0];
         set({ activeId: next?.id ?? null });
-        if (next?.model) useModelStore.getState().loadModel(next.model);
+        if (next?.model) {
+          useModelStore.getState().loadModel(next.model);
+        } else {
+          // No tab left: reset the model store to a fresh blank so nothing renders or
+          // edits the just-closed model (loadModel clears selection/propertiesOpen/notices).
+          // The ribbon's model tabs are gated on activeId, so this blank is never editable.
+          useModelStore.getState().loadModel(createModel("untitled", nowIso()));
+        }
       }
       await writeWorkspaceMeta(); // openModels shrinks → the closed tab stays closed on reopen
     },

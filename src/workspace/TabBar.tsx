@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useModelStore } from "../store/modelStore";
 import { useWorkspaceStore } from "../store/workspaceStore";
 import { serializeModel } from "../persist/serialize";
@@ -25,6 +25,21 @@ export function TabBar({ onDeleteModel }: { onDeleteModel: (id: string, name: st
   const openModelFile = useWorkspaceStore((s) => s.openModelFile);
   const model = useModelStore((s) => s.model);
   const [openMenu, setOpenMenu] = useState(false);
+
+  // Dismiss the reopen menu on Escape or any click outside it (not just mouse-leave).
+  useEffect(() => {
+    if (!openMenu) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpenMenu(false);
+    const onDown = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest(".tab-open")) setOpenMenu(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDown);
+    };
+  }, [openMenu]);
 
   // Models in the folder that aren't currently open as tabs.
   const openFiles = new Set(tabs.map((t) => t.fileName));
@@ -90,16 +105,19 @@ export function TabBar({ onDeleteModel }: { onDeleteModel: (id: string, name: st
           <button
             className="tab-open__btn"
             title="Open another model from this workspace"
+            aria-haspopup="menu"
+            aria-expanded={openMenu}
             onClick={() => setOpenMenu((v) => !v)}
           >
             +
           </button>
           {openMenu && (
-            <div className="tab-open__menu" onMouseLeave={() => setOpenMenu(false)}>
+            <div className="tab-open__menu" role="menu">
               {closedFiles.map((f) => (
                 <button
                   key={f}
                   className="tab-open__item"
+                  role="menuitem"
                   onClick={() => {
                     setOpenMenu(false);
                     void openModelFile(f);

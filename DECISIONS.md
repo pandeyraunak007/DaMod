@@ -5,6 +5,68 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Reverse-engineering: browse schemas/tables before importing (§6.B)
+
+The reverse-engineer panel auto-discovered the WHOLE source on open (all schemas) and only
+let you narrow by re-discovering on each schema toggle — bad for a large/production DB and
+no visibility into what you're pulling. Replaced with a two-step browse (`ReversePanelBrowse`
+in `ConnectionsDialog.tsx`):
+
+1. **Choose schemas** — on open, only `listSchemas` runs (no full-DB pull). The user ticks
+   which schemas to discover (`public` pre-selected if present). "Browse tables →" discovers
+   just those, metadata-only, via the existing `discover(profile, {schemas})` (both the mock
+   and the Rust PG connector already honor `options.schemas`).
+2. **Choose tables** — the discovered objects are grouped by schema with per-table checkboxes
+   (and an all/none per schema), so the user sees exactly what's there and can exclude
+   tables/views. A live preview shows the resulting table/relationship counts.
+
+Table exclusion is a pure metadata prune (`connectors/browseFilter.ts`:
+`filterMetadataToTables` + `tableKey`) applied before `metadataToModelForSource`; FKs that
+point at an excluded table are skipped by `toModel` with a warning (no FK rewriting needed).
+The saved snapshot uses the FILTERED metadata so refresh/compare stays honest about what was
+imported. No new connector capability or Rust change — reuses `listSchemas`/`discover`.
+
+Removed the old auto-discover-all `ReversePanel` (dead once the browse panel took over;
+`noUnusedLocals` enforced it). New tests: `browseFilter.test.ts` (prune keeps chosen
+objects, downstream model drops the rest + warns on dangling FKs, empty set → empty model).
+547 tests green, tsc/build clean. Deferred: per-schema table COUNTS in step 1 (would need a
+light `listTables` capability or a count query — not worth a Rust change yet); table search/
+filter box for very wide schemas. UI click-through is author-verified (native-window limit).
+
+## 2026-10-11 — UX hardening pass on this session's tab/open/bind commits
+
+A review agent audited commits cf8211e / 6f91ee3 / 1d4ee12 against concrete failure
+scenarios; fixed the real findings (2 high, 2 med, 1 low):
+
+- **#1 (high) phantom model after closing the last tab.** `closeTab` set `activeId:null` but
+  left `modelStore.model` holding the closed model, and the ribbon Home/Diagram tabs (model
+  name, level, add-entity, undo/redo) render whenever `wsPath` is set — so you could edit a
+  model with no backing tab/file and silently lose it. Fix: `closeTab`'s no-next branch now
+  `loadModel`s a fresh blank (clears selection/propertiesOpen/notices, drops the closed
+  model's data), AND the Home/Diagram ribbon tabs are gated on `activeId` (show a
+  `RibbonNoModel` hint when none open). File tab + tab-bar `+` stay available.
+- **#2 (high) unsaved edits lost on workspace switch.** `openWorkspace` replaced all state
+  without saving the outgoing dirty model (hit via "Open model file…" to another folder, and
+  the pre-existing folder picker). Fix: `openWorkspace` now `saveActive(false)` if dirty
+  first — one place covers both pickers. No-op on first launch.
+- **#3 (med) bind batch vs single divergence on FKs.** `bindFieldsToDomain` always
+  reconciled, which could force a bound FK's type back to its parent PK and leave it
+  bound-but-mismatched (domainId set, type ≠ domain). Fix: reconcile only when a PK was
+  bound (matches the single-field op), and detach the domain from any FK reconcile reverts
+  (same ERwin override rule as a manual type edit). New targeted test.
+- **#4 (med) `+` reopen menu dismissal.** Closed only on mouse-leave; no keyboard/outside-
+  click. Fix: Escape + outside-mousedown listeners, `role="menu"`/`menuitem`,
+  `aria-haspopup`/`aria-expanded`.
+- **#5 (low) Properties dialog stayed open on the orphaned model** — resolved by #1's
+  `loadModel(blank)` (resets `selection`/`propertiesOpen`).
+- **#6 (low) dirty-dot re-serializes the model every TabBar render** — left as-is
+  (pre-existing, bounded to the active tab; revisit if it shows on large models).
+
+Scenarios the review cleared (no change): `openModelFilePicker` guards non-`.model.json`
+picks; autosave never writes a closed/absent model; `openWorkspace` "opens-all" caveat and
+stale `meta.openModels`→deleted-files are handled; `deleteModel` reordering is correct;
+phantom model can't be parked back into a tab. 544 tests green, tsc/build clean.
+
 ## 2026-10-11 — "Open model file…" (open a .model.json directly, not just a folder)
 
 The author reported launch "doesn't allow to open the models saved in json format." Root

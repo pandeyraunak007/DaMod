@@ -13,7 +13,8 @@ import { metadataToModelForSource } from "../buildModel";
 import { computeDrift, applyDrift, type DriftChange } from "../drift";
 import type { ModelDiff } from "../../export/migrate";
 import type { Model } from "../../model/model";
-import type { CanonicalMetadata, SourceSystemType } from "../metadata";
+import { allObjects, type CanonicalMetadata, type CanonicalObject, type SourceSystemType } from "../metadata";
+import { filterMetadataToTables, tableKey } from "../browseFilter";
 import { parseMetadataFile, type SourceSnapshot } from "../snapshot";
 import { pickFile, readTextFile } from "../../persist/fs";
 import type { Connector, DiscoveryResult } from "../connector";
@@ -203,7 +204,7 @@ export function ConnectionsDialog({
                 onRefresh={() => setMode("refresh")}
               />
             ) : mode === "reverse" ? (
-              <ReversePanel profile={selected} onBack={() => setMode("edit")} onClose={onClose} />
+              <ReversePanelBrowse profile={selected} onBack={() => setMode("edit")} onClose={onClose} />
             ) : (
               <RefreshPanel profile={selected} onBack={() => setMode("edit")} onClose={onClose} />
             )}
@@ -394,10 +395,11 @@ function ConnectionEditor({
   );
 }
 
-// Streamlined reverse-engineering: opening the panel auto-discovers the whole
-// source (all user schemas); the user sees a live preview and clicks Import.
-// Narrowing to specific schemas is optional (re-discovers on toggle).
-function ReversePanel({
+// Reverse-engineering with a BROWSE flow (§6.B): list schemas first (no full-DB pull
+// up front), let the user choose which schemas to discover, then browse the discovered
+// tables and pick which to import. Discovery is metadata-only and scoped to the chosen
+// schemas. Table exclusions prune the metadata before building the model.
+function ReversePanelBrowse({
   profile,
   onBack,
   onClose,
@@ -409,49 +411,31 @@ function ReversePanel({
   const importModel = useWorkspaceStore((s) => s.importModel);
   const saveSnapshot = useWorkspaceStore((s) => s.saveSnapshot);
   const [schemas, setSchemas] = useState<string[] | null>(null);
-  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [pickedSchemas, setPickedSchemas] = useState<Set<string>>(new Set());
   const [discovery, setDiscovery] = useState<DiscoveryResult | null>(null);
+  const [keepTables, setKeepTables] = useState<Set<string>>(new Set());
   const [modelName, setModelName] = useState(profile.params.database || "imported");
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const runDiscover = async (sel: Set<string>) => {
-    const c = connectorFor(profile);
-    if (!c) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await c.discover(profile, {
-        schemas: [...sel],
-        includeViews: true,
-        includeIndexes: true,
-      });
-      setDiscovery(res);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // Auto-discover everything on open.
+  // Step 1 — list schemas only (no discovery yet). Pre-pick `public` if present.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const c = connectorFor(profile);
-      if (!c) return;
+      if (!c) {
+        setBusy(false);
+        return;
+      }
       try {
         const list = await c.listSchemas(profile);
         if (cancelled) return;
         setSchemas(list);
-        const all = new Set(list);
-        setPicked(all);
-        await runDiscover(all);
+        setPickedSchemas(new Set(list.includes("public") ? ["public"] : list.slice(0, 1)));
       } catch (e) {
-        if (!cancelled) {
-          setError((e as Error).message);
-          setBusy(false);
-        }
+        if (!cancelled) setError((e as Error).message);
+      } finally {
+        if (!cancelled) setBusy(false);
       }
     })();
     return () => {
@@ -461,24 +445,74 @@ function ReversePanel({
   }, []);
 
   const toggleSchema = (s: string) => {
-    const next = new Set(picked);
+    const next = new Set(pickedSchemas);
     next.has(s) ? next.delete(s) : next.add(s);
-    setPicked(next);
-    if (next.size) void runDiscover(next);
-    else setDiscovery(null);
+    setPickedSchemas(next);
+    setDiscovery(null); // the selection changed → require a fresh discover before import
   };
 
-  const preview = discovery
-    ? buildModel(profile, discovery.metadata, modelName || "imported", new Date().toISOString())
+  // Step 2 — discover the chosen schemas (metadata only), default to keeping every table.
+  const runDiscover = async () => {
+    const c = connectorFor(profile);
+    if (!c || !pickedSchemas.size) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await c.discover(profile, {
+        schemas: [...pickedSchemas],
+        includeViews: true,
+        includeIndexes: true,
+      });
+      setDiscovery(res);
+      setKeepTables(
+        new Set(allObjects(res.metadata).map(({ schema, object }) => tableKey(schema, object.name))),
+      );
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleTable = (key: string) => {
+    const next = new Set(keepTables);
+    next.has(key) ? next.delete(key) : next.add(key);
+    setKeepTables(next);
+  };
+
+  // Group discovered objects by schema for the browse list.
+  const grouped: Array<[string, CanonicalObject[]]> = (() => {
+    if (!discovery) return [];
+    const m = new Map<string, CanonicalObject[]>();
+    for (const { schema, object } of allObjects(discovery.metadata)) {
+      if (!m.has(schema)) m.set(schema, []);
+      m.get(schema)!.push(object);
+    }
+    return [...m.entries()];
+  })();
+  const totalDiscovered = grouped.reduce((n, [, objs]) => n + objs.length, 0);
+  const setSchemaTables = (schema: string, objs: CanonicalObject[], on: boolean) => {
+    const next = new Set(keepTables);
+    for (const o of objs) {
+      const k = tableKey(schema, o.name);
+      on ? next.add(k) : next.delete(k);
+    }
+    setKeepTables(next);
+  };
+
+  const filteredMd = discovery ? filterMetadataToTables(discovery.metadata, keepTables) : null;
+  const preview = filteredMd
+    ? buildModel(profile, filteredMd, modelName || "imported", new Date().toISOString())
     : null;
   const nameError = validateIdentifier(modelName);
 
   const doImport = async () => {
-    if (!preview || !discovery) return;
+    if (!preview || !discovery || !filteredMd) return;
     setBusy(true);
     const err = await importModel(preview.model, modelName);
     if (!err) {
-      const snap = buildSnapshot(profile.id, discovery);
+      // Snapshot what was actually imported (filtered) so refresh/compare stays honest.
+      const snap = buildSnapshot(profile.id, { ...discovery, metadata: filteredMd });
       await saveSnapshot(profile.name, snap); // for refresh/compare (keyed by connection)
       await saveSnapshot(modelName, snap); // for the Source-snapshot browser (keyed by model)
     }
@@ -493,19 +527,67 @@ function ReversePanel({
       <h3 className="modal__subtitle">Reverse-engineer “{profile.name}”</h3>
 
       {error && <p className="field__hint field__hint--warn">{error}</p>}
-      {busy && !preview && <p className="field__hint">Discovering the database…</p>}
+      {busy && !schemas && <p className="field__hint">Reading schemas…</p>}
 
-      {/* Optional: narrow to specific schemas (only when there's more than one). */}
-      {schemas && schemas.length > 1 && (
+      {/* Step 1: choose schemas to discover. */}
+      {schemas && (
         <div className="field">
-          <label>Schemas {busy && <span className="field__hint">· discovering…</span>}</label>
+          <label>
+            1. Choose schemas{" "}
+            <span className="field__hint">({pickedSchemas.size} of {schemas.length} selected)</span>
+          </label>
           <div className="conn__schemas">
             {schemas.map((s) => (
               <label key={s} className="checkbox">
-                <input type="checkbox" checked={picked.has(s)} onChange={() => toggleSchema(s)} />
+                <input type="checkbox" checked={pickedSchemas.has(s)} onChange={() => toggleSchema(s)} />
                 {s}
               </label>
             ))}
+          </div>
+          <button
+            className="btn btn--small"
+            onClick={() => void runDiscover()}
+            disabled={busy || pickedSchemas.size === 0}
+          >
+            {busy && schemas ? "Discovering…" : discovery ? "Re-discover selected" : "Browse tables →"}
+          </button>
+        </div>
+      )}
+
+      {/* Step 2: browse discovered tables and pick which to import. */}
+      {discovery && (
+        <div className="field">
+          <label>
+            2. Choose tables{" "}
+            <span className="field__hint">({keepTables.size} of {totalDiscovered} selected)</span>
+          </label>
+          <div className="conn__browse">
+            {grouped.map(([schema, objs]) => {
+              const allOn = objs.every((o) => keepTables.has(tableKey(schema, o.name)));
+              return (
+                <div key={schema} className="conn__browse-group">
+                  <div className="conn__browse-head">
+                    <span className="conn__browse-schema">{schema}</span>
+                    <button
+                      className="btn btn--small btn--ghost"
+                      onClick={() => setSchemaTables(schema, objs, !allOn)}
+                    >
+                      {allOn ? "none" : "all"}
+                    </button>
+                  </div>
+                  {objs.map((o) => {
+                    const k = tableKey(schema, o.name);
+                    return (
+                      <label key={k} className="checkbox conn__browse-item">
+                        <input type="checkbox" checked={keepTables.has(k)} onChange={() => toggleTable(k)} />
+                        {o.name}
+                        {o.kind !== "table" && <span className="conn__browse-kind">{o.kind}</span>}
+                      </label>
+                    );
+                  })}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -524,8 +606,8 @@ function ReversePanel({
                 </>
               )}
             </p>
-            {discovery && isEbs(profile) && <EbsApplicationLine metadata={discovery.metadata} />}
-            {discovery && isFusion(profile) && <FusionApiLine metadata={discovery.metadata} />}
+            {isEbs(profile) && <EbsApplicationLine metadata={discovery!.metadata} />}
+            {isFusion(profile) && <FusionApiLine metadata={discovery!.metadata} />}
             {preview.warnings.length > 0 && (
               <details>
                 <summary className="field__hint">{preview.warnings.length} note(s)</summary>

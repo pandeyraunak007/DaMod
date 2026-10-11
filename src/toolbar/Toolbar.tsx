@@ -114,8 +114,20 @@ export function Toolbar(props: Props) {
 
       <div className="ribbon__content" role="tabpanel">
         {tab === "File" && <FileTab {...props} />}
-        {tab === "Home" && <HomeTab onOpenDomains={props.onOpenDomains} onOpenNaming={props.onOpenNaming} onOpenTypes={props.onOpenTypes} />}
-        {tab === "Diagram" && <DiagramTab onOpenMap={props.onOpenMap} onToggleSemantic={onToggleSemantic} semanticActive={semanticActive} />}
+        {/* Home/Diagram edit the active model directly — gate them so they can't operate
+            on a closed/absent model (no phantom editing when no tab is open). */}
+        {tab === "Home" &&
+          (activeId ? (
+            <HomeTab onOpenDomains={props.onOpenDomains} onOpenNaming={props.onOpenNaming} onOpenTypes={props.onOpenTypes} />
+          ) : (
+            <RibbonNoModel />
+          ))}
+        {tab === "Diagram" &&
+          (activeId ? (
+            <DiagramTab onOpenMap={props.onOpenMap} onToggleSemantic={onToggleSemantic} semanticActive={semanticActive} />
+          ) : (
+            <RibbonNoModel />
+          ))}
         {tab === "Data" && (
           <DataTab
             onOpenConnections={props.onOpenConnections}
@@ -172,6 +184,15 @@ function RGroup({ title, children }: { title: string; children: React.ReactNode 
 }
 
 // ---- tabs -------------------------------------------------------------------
+
+// Shown in place of the Home/Diagram ribbon groups when no model tab is open.
+function RibbonNoModel() {
+  return (
+    <div className="ribbon__empty">
+      No model open — create or open one from the <strong>File</strong> tab (or the + in the tab bar).
+    </div>
+  );
+}
 
 function FileTab(props: Props) {
   const wsPath = useWorkspaceStore((s) => s.path);

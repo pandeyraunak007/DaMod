@@ -32,9 +32,12 @@ SQL parser (no second model engine). Connection profiles persist in
 `connections.json` (`connectionsPersist.ts`, deterministic, credential-free — a
 guard refuses to write/read secrets). The `ConnectionsDialog`
 (`connectors/ui/`) manages connections (create/test/save/delete, password → OS
-keychain) and runs the reverse-engineering workflow: discover schemas → pick →
-discover objects → preview (entity/relationship counts + warnings) → import as a
-new model via the existing `importModel` (opens on the canvas, saved offline).
+keychain) and runs the reverse-engineering workflow: list schemas → pick which to
+discover → browse the discovered tables/views (grouped by schema, per-table
+checkboxes) → preview (entity/relationship counts + warnings) → import as a new
+model via the existing `importModel` (opens on the canvas, saved offline). Table
+exclusions are a pure metadata prune (`browseFilter.ts`) applied before
+`metadataToModelForSource`; the saved snapshot reflects the filtered import.
 
 PostgreSQL connector (Phase 2): the live driver (`tokio-postgres`, pure-Rust) runs
 in `src-tauri/src/pg.rs`, exposing `pg_test_connection` / `pg_list_schemas` /

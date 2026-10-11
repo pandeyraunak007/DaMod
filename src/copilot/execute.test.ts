@@ -246,6 +246,36 @@ describe("bind_domain action (apply a reusable domain to columns)", () => {
     expect(res.applied).toBe(0);
   });
 
+  it("detaches the domain from an FK whose type reconcile reverts (no bound-but-mismatched column)", () => {
+    // C(id:uuid PK) ← B(id PK, c_id FK). Binding a decimal domain to B's PK + its FK:
+    // the FK must follow C's uuid PK, so reconcile reverts it — and it must NOT stay
+    // bound to the decimal domain (that would be an inconsistent bound-but-mismatched column).
+    const cEnt = s().createEntity(); s().renameEntity(cEnt, "Ccat");
+    const cPk = s().addField(cEnt)!;
+    s().updateField(cEnt, cPk, { name: "id", type: "uuid", primaryKey: true });
+    const bEnt = s().createEntity(); s().renameEntity(bEnt, "Bchild");
+    const bPk = s().addField(bEnt)!;
+    s().updateField(bEnt, bPk, { name: "id", type: "uuid", primaryKey: true });
+    s().createRelationship({ parentEntity: cEnt, childEntity: bEnt, cardinality: "one-to-many" });
+
+    const did = s().createDomain();
+    s().updateDomain(did, { name: "Money", type: "decimal", precision: 12, scale: 2 });
+
+    const b = () => s().model.entities.find((e) => e.name === "Bchild")!;
+    const fk = b().fields.find((f) => !f.primaryKey)!; // the auto-created FK column
+    const bound = s().bindFieldsToDomain(
+      [{ entityId: bEnt, fieldId: bPk }, { entityId: bEnt, fieldId: fk.id }],
+      did,
+    );
+    expect(bound).toBe(2);
+    const fkAfter = b().fields.find((f) => f.id === fk.id)!;
+    expect(fkAfter.type).toBe("uuid"); // reverted to follow C's PK
+    expect(fkAfter.domainId).toBeUndefined(); // and detached, not left mismatched
+    const pkAfter = b().fields.find((f) => f.id === bPk)!;
+    expect(pkAfter.domainId).toBe(did); // B's own PK stays bound (decimal)
+    expect(pkAfter.type).toBe("decimal");
+  });
+
   it("emits AT MOST ONE FK-reconcile notice for a bulk bind (no toast storm)", () => {
     // Parent/child with a FK so re-typing the parent PK cascades to the child FK.
     const parent = s().createEntity(); s().renameEntity(parent, "Customer");
