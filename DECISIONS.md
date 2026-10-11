@@ -5,6 +5,28 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — ETL: aggregate node (G-AGG)
+
+Added an `aggregate` transform node to the DAG — the first gap from the ETL playbook's
+gap register, closed end to end (model → schema → SQL → UI → tests → docs).
+
+- `spec.ts`: `NODE_KINDS` += `aggregate`; `AGG_FNS` = sum/count/count_distinct/avg/min/max;
+  node fields `groupBy?: string[]` + `aggregates?: {fn, column?, as}[]`; deterministic
+  serialize (omit-empty).
+- `graph.ts` `inferNodeSchemas`: aggregate output = group-by columns (input types) + one
+  column per measure, typed by `aggType` (count/count_distinct→bigint, avg→decimal,
+  sum→preserve decimal input else bigint/decimal, min/max→input type). Validates single
+  input, group-by/measure columns exist, `count` may omit its column (COUNT(*)), non-empty
+  `as`, no duplicate outputs.
+- `graphSql.ts`: `SELECT <groups>, <FN(col)|COUNT(*)|COUNT(DISTINCT col) AS as> FROM <in>
+  GROUP BY <groups>` (GROUP BY omitted when no keys).
+- `etl/NodeInspector.tsx`: aggregate config — group-by multiselect + measure rows
+  (fn/column/as) with input-schema column pickers.
+- Docs: playbook + capability matrix (C12 ✅) + gap register (G-AGG done) updated.
+
+Flat path untouched; additive to the DAG. Tests +4 (graph schema+validation, graphSql
+GROUP BY). **534 TS tests pass; tsc + build clean.**
+
 ## 2026-10-11 — ETL: wire graph SQL into the pipeline dialog's output tabs
 
 The flat PipelineDialog (tabular editor) now shares the graph-based SQL, so the two UIs

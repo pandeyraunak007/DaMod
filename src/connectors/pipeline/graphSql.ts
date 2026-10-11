@@ -79,6 +79,20 @@ export function graphSql(spec: PipelineSpec, model: Model): { sql: string; unsup
         const on = (n.on ?? []).map((o) => `${cte(l)}.${q(o.leftColumn)} = ${cte(r)}.${q(o.rightColumn)}`);
         return `SELECT ${cte(l)}.*, ${cte(r)}.* FROM ${cte(l)} ${(n.joinKind ?? "inner").toUpperCase()} JOIN ${cte(r)} ON ${on.length ? on.join(" AND ") : "1=1"}`;
       }
+      case "aggregate": {
+        if (!inCte) return null;
+        const groups = (n.groupBy ?? []).map((g) => q(g));
+        const measures = (n.aggregates ?? []).map((a) => {
+          const expr =
+            a.fn === "count" && !a.column ? "COUNT(*)"
+              : a.fn === "count_distinct" ? `COUNT(DISTINCT ${q(a.column ?? "")})`
+                : `${a.fn.toUpperCase()}(${q(a.column ?? "")})`;
+          return `${expr} AS ${q(a.as)}`;
+        });
+        const cols = [...groups, ...measures];
+        const groupBy = groups.length ? `\nGROUP BY ${groups.join(", ")}` : "";
+        return `SELECT ${cols.length ? cols.join(", ") : "*"} FROM ${inCte}${groupBy}`;
+      }
       case "target":
         return inCte ? `SELECT * FROM ${inCte}` : null;
     }

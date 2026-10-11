@@ -18,7 +18,7 @@ external tool (DaMod emits the artifact) · **C** blocked by a product gap.
 | C9 | Flat source→target **field mapping** (rename/type/transform/drop/add, filters, joins) | ✅ | A | `pipeline/MappingEditor.tsx`, `planner.validatePipeline` | tabular editor |
 | C10 | **Visual DAG designer** (Data ribbon → **Designer**) | ✅ | A | `etl/EtlDesigner.tsx`, `etl/PipelineCanvas.tsx` | separate React-Flow canvas |
 | C11 | Transform nodes: source, filter, select, derive, cast, join, target | ✅ | A | `pipeline/spec.ts` `NODE_KINDS`, `etl/NodeInspector.tsx` | join = inner/left |
-| C12 | Transform nodes: **aggregate / group-by** | 🟥 | C | — | G-AGG |
+| C12 | Transform nodes: **aggregate / group-by** | ✅ | A | `pipeline/spec.ts` `AGG_FNS`, `graph.ts` (schema+validate), `graphSql.ts` (GROUP BY), `etl/NodeInspector.tsx` | sum/count/count_distinct/avg/min/max; G-AGG **done** |
 | C13 | Transform nodes: **dedup / union / lookup / SCD** | 🟥 | C | — | G-XFORM |
 | C14 | **Per-node schema propagation** | ✅ | A | `pipeline/graph.ts` `inferNodeSchemas` | names+types flow downstream |
 | C15 | Graph **validation** (dangling edge, cycle, arity, unknown refs, type/required) | ✅ | A | `pipeline/graph.ts` `validateGraph`, `planner.validatePipeline` | warnings/errors, non-blocking |
@@ -36,4 +36,4 @@ external tool (DaMod emits the artifact) · **C** blocked by a product gap.
 | C27 | **Copilot ETL actions** (explain pipeline, suggest mapping, propose transform) | 🟥 | C | no ETL actions in `copilot/actions.ts` | G-AI |
 | C28 | Secrets kept out of JSON (keychain only) | ✅ | A | `connectors/connection.ts` `findSecretLeaks` | no creds in `pipelines.json` |
 
-**Bottom line:** DaMod supports the **design-time** retail pipeline end to end (reverse-engineer → model → DAG design → map/transform → validate → generate SQL + DDL → save/reopen). **Execution is external** (Category B). Aggregation, incremental/CDC, pipeline undo, and Copilot ETL actions are **product gaps** (Category C).
+**Bottom line:** DaMod supports the **design-time** retail pipeline end to end (reverse-engineer → model → DAG design → map/transform/**aggregate** → validate → generate SQL + DDL → save/reopen). **Execution is external** (Category B). Incremental/CDC, pipeline undo, dedup/union/lookup/SCD, and Copilot ETL actions remain **product gaps** (Category C). (G-AGG implemented — aggregate node added.)

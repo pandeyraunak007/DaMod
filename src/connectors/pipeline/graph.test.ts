@@ -112,6 +112,35 @@ describe("validation", () => {
   });
 });
 
+describe("aggregate node (G-AGG)", () => {
+  it("outputs group-by columns + one typed column per measure", () => {
+    const nodes: PipelineNode[] = [
+      { id: "s", kind: "source", sourceObject: "Order" },
+      { id: "a", kind: "aggregate", groupBy: ["id"], aggregates: [{ fn: "sum", column: "total", as: "total_sum" }, { fn: "count", as: "n" }] },
+      { id: "t", kind: "target" },
+    ];
+    const edges: PipelineEdge[] = [{ id: "e1", from: "s", to: "a" }, { id: "e2", from: "a", to: "t" }];
+    const { schemas, issues } = inferNodeSchemas(specWith(nodes, edges), model());
+    expect(issues.filter((i) => i.severity === "error")).toHaveLength(0);
+    const agg = schemas.get("a")!;
+    expect(agg.map((f) => f.name)).toEqual(["id", "total_sum", "n"]);
+    expect(agg.find((f) => f.name === "total_sum")!.type!.type).toBe("decimal");
+    expect(agg.find((f) => f.name === "n")!.type!.type).toBe("bigint");
+  });
+
+  it("flags unknown group-by / measure columns and a missing output name", () => {
+    const nodes: PipelineNode[] = [
+      { id: "s", kind: "source", sourceObject: "Order" },
+      { id: "a", kind: "aggregate", groupBy: ["nope"], aggregates: [{ fn: "sum", column: "ghost", as: "" }] },
+    ];
+    const edges: PipelineEdge[] = [{ id: "e1", from: "s", to: "a" }];
+    const issues = validateGraph(specWith(nodes, edges), model());
+    expect(issues.some((i) => i.message.includes("Group-by column"))).toBe(true);
+    expect(issues.some((i) => i.message.includes("unknown column"))).toBe(true);
+    expect(issues.some((i) => i.message.includes("needs a name"))).toBe(true);
+  });
+});
+
 describe("node/edge serialization round-trip", () => {
   it("serializes nodes+edges deterministically (sorted by id) and round-trips", () => {
     const nodes: PipelineNode[] = [

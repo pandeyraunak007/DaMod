@@ -5,7 +5,19 @@
 // optional `nodes`/`edges` graph.
 
 import type { Model } from "../../model/model";
-import { filterNeedsValue, type PipelineSpec, type PipelineNode, type SpecType } from "./spec";
+import { filterNeedsValue, type AggFn, type PipelineSpec, type PipelineNode, type SpecType } from "./spec";
+
+/** The output type of an aggregate function given its input column (if any). count →
+ *  bigint; avg → decimal; sum → preserve a decimal input else bigint/decimal; min/max →
+ *  the input column's type. */
+function aggType(fn: AggFn, input?: { type?: SpecType }): SpecType | undefined {
+  if (fn === "count" || fn === "count_distinct") return { type: "bigint" };
+  if (fn === "min" || fn === "max") return input?.type;
+  if (fn === "avg") return { type: "decimal" };
+  if (input?.type?.type === "decimal") return input.type;
+  if (input?.type?.type === "integer" || input?.type?.type === "bigint") return { type: "bigint" };
+  return { type: "decimal" };
+}
 
 /** A field flowing along an edge: name + (optional) type + nullability. */
 export interface GraphField {
@@ -151,6 +163,28 @@ export function inferNodeSchemas(spec: PipelineSpec, model: Model): GraphResult 
         }
         out = [...left, ...right];
         for (const d of dupNames(out)) issues.push({ severity: "warning", nodeId: id, message: `Join output has duplicate column “${d}” (qualify or rename downstream)` });
+        break;
+      }
+      case "aggregate": {
+        if (inputs.length !== 1) issues.push({ severity: "error", nodeId: id, message: "Aggregate node needs exactly one input" });
+        const inp = inputSchema(inputs[0]);
+        // Output = group-by columns (input types) + one column per aggregate.
+        const groupOut: GraphField[] = [];
+        for (const g of node.groupBy ?? []) {
+          const f = inp.find((x) => x.name.toLowerCase() === g.toLowerCase());
+          if (!f) issues.push({ severity: "error", nodeId: id, message: `Group-by column “${g}” not found` });
+          else groupOut.push(f);
+        }
+        const aggOut: GraphField[] = [];
+        for (const a of node.aggregates ?? []) {
+          if (!a.as.trim()) issues.push({ severity: "error", nodeId: id, message: "Aggregate output column needs a name" });
+          if (a.fn !== "count" && !a.column) issues.push({ severity: "error", nodeId: id, message: `${a.fn} needs a column` });
+          if (a.column && !has(inp, a.column)) issues.push({ severity: "error", nodeId: id, message: `Aggregate over unknown column “${a.column}”` });
+          aggOut.push({ name: a.as, type: aggType(a.fn, a.column ? inp.find((x) => x.name.toLowerCase() === a.column!.toLowerCase()) : undefined) });
+        }
+        if ((node.aggregates ?? []).length === 0) issues.push({ severity: "warning", nodeId: id, message: "Aggregate node has no measures" });
+        out = [...groupOut, ...aggOut];
+        for (const d of dupNames(out)) issues.push({ severity: "error", nodeId: id, message: `Aggregate output has duplicate column “${d}”` });
         break;
       }
       case "target": {

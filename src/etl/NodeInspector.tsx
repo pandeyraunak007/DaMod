@@ -1,5 +1,5 @@
 import { DATA_TYPE_KINDS, type DataTypeKind } from "../model/dataTypes";
-import { FILTER_OPS, JOIN_KINDS, type PipelineNode, type SpecType } from "../connectors/pipeline/spec";
+import { AGG_FNS, FILTER_OPS, JOIN_KINDS, type PipelineNode, type SpecType } from "../connectors/pipeline/spec";
 import type { GraphField } from "../connectors/pipeline/graph";
 import type { Model } from "../model/model";
 
@@ -128,6 +128,37 @@ export function NodeInspector({
             </div>
           ))}
           <button className="btn btn--small" onClick={() => onChange({ casts: [...casts, { column: cols[0] ?? "", type: { type: "text" } }] })}>+ cast</button>
+        </div>
+      );
+    }
+
+    case "aggregate": {
+      const groupBy = node.groupBy ?? [];
+      const aggs = node.aggregates ?? [];
+      const toggleGroup = (c: string) => onChange({ groupBy: groupBy.includes(c) ? groupBy.filter((g) => g !== c) : [...groupBy, c] });
+      const setAgg = (i: number, p: Partial<(typeof aggs)[number]>) => onChange({ aggregates: aggs.map((a, j) => (j === i ? { ...a, ...p } : a)) });
+      return (
+        <div className="field">
+          <label>Group by</label>
+          {cols.map((c) => (
+            <label key={c} className="checkbox"><input type="checkbox" checked={groupBy.includes(c)} onChange={() => toggleGroup(c)} />{c}</label>
+          ))}
+          {cols.length === 0 && <p className="field__hint">No input columns yet — connect a source upstream.</p>}
+          <label>Measures</label>
+          {aggs.map((a, i) => (
+            <div key={i} className="attr-row">
+              <select value={a.fn} onChange={(e) => setAgg(i, { fn: e.target.value as (typeof AGG_FNS)[number] })}>
+                {AGG_FNS.map((f) => <option key={f} value={f}>{f}</option>)}
+              </select>
+              <select value={a.column ?? ""} onChange={(e) => setAgg(i, { column: e.target.value || undefined })}>
+                <option value="">{a.fn === "count" ? "(all rows)" : "col"}</option>
+                {cols.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <input placeholder="as" value={a.as} onChange={(e) => setAgg(i, { as: e.target.value })} />
+              <button className="field-row__del" onClick={() => onChange({ aggregates: aggs.filter((_, j) => j !== i) })}>✕</button>
+            </div>
+          ))}
+          <button className="btn btn--small" onClick={() => onChange({ aggregates: [...aggs, { fn: "sum", column: cols[0], as: "" }] })}>+ measure</button>
         </div>
       );
     }

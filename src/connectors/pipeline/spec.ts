@@ -78,8 +78,14 @@ export type PipelineJoin = z.infer<typeof zJoin>;
 // node (same style as SnowflakeObject/GovernanceObject); the engine (graph.ts) enforces
 // per-kind semantics and infers each node's output schema. Becomes authoritative in a
 // later slice (spec v2 + migration); for now it is optional and non-breaking.
-export const NODE_KINDS = ["source", "filter", "select", "derive", "cast", "join", "target"] as const;
+export const NODE_KINDS = ["source", "filter", "select", "derive", "cast", "join", "aggregate", "target"] as const;
 export type NodeKind = (typeof NODE_KINDS)[number];
+
+/** Aggregate functions for the aggregate node (G-AGG). `count` may omit its column
+ *  (COUNT(*)); the rest require one. */
+export const AGG_FNS = ["sum", "count", "count_distinct", "avg", "min", "max"] as const;
+export type AggFn = (typeof AGG_FNS)[number];
+const zAggregate = z.object({ fn: z.enum(AGG_FNS), column: z.string().optional(), as: z.string() });
 
 const zGraphNode = z.object({
   id: z.string(),
@@ -93,6 +99,8 @@ const zGraphNode = z.object({
   casts: z.array(z.object({ column: z.string(), type: zType })).optional(), // cast
   joinKind: z.enum(JOIN_KINDS).optional(), // join
   on: z.array(z.object({ leftColumn: z.string(), rightColumn: z.string() })).optional(), // join
+  groupBy: z.array(z.string()).optional(), // aggregate: group keys
+  aggregates: z.array(zAggregate).optional(), // aggregate: measures
   targetObject: z.string().optional(), // target
 });
 export type PipelineNode = z.infer<typeof zGraphNode>;
@@ -165,6 +173,15 @@ function graphNodeToPlain(n: PipelineNode): Record<string, unknown> {
   if (n.casts && n.casts.length) out.casts = n.casts.map((c) => ({ column: c.column, type: typeToPlain(c.type) }));
   if (n.joinKind) out.joinKind = n.joinKind;
   if (n.on && n.on.length) out.on = n.on.map((o) => ({ leftColumn: o.leftColumn, rightColumn: o.rightColumn }));
+  if (n.groupBy && n.groupBy.length) out.groupBy = [...n.groupBy];
+  if (n.aggregates && n.aggregates.length) {
+    out.aggregates = n.aggregates.map((a) => {
+      const o: Record<string, unknown> = { fn: a.fn };
+      if (a.column) o.column = a.column;
+      o.as = a.as;
+      return o;
+    });
+  }
   if (n.targetObject) out.targetObject = n.targetObject;
   return out;
 }

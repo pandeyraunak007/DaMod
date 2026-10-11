@@ -92,6 +92,19 @@ describe("graphSql", () => {
     expect(graphSql(s, m).sql).toContain("`src` AS (\n  SELECT * FROM `Customer`\n)");
   });
 
+  it("aggregate → SELECT group cols + measures with GROUP BY", () => {
+    const { spec: s, model: m } = spec(
+      [
+        { id: "src", kind: "source", sourceObject: "Order" },
+        { id: "agg", kind: "aggregate", groupBy: ["id"], aggregates: [{ fn: "sum", column: "total", as: "total_sum" }, { fn: "count", as: "n" }] },
+        { id: "tgt", kind: "target" },
+      ],
+      [{ id: "e1", from: "src", to: "agg" }, { id: "e2", from: "agg", to: "tgt" }],
+    );
+    const { sql } = graphSql(s, m);
+    expect(sql).toContain('SELECT "id", SUM("total") AS "total_sum", COUNT(*) AS "n" FROM "src"\nGROUP BY "id"');
+  });
+
   it("reports a node with no input as unsupported (no SQL for that target)", () => {
     const { spec: s, model: m } = spec(
       [{ id: "flt", kind: "filter" }], // filter with no upstream
