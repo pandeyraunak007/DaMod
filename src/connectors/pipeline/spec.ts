@@ -73,6 +73,38 @@ const zJoin = z.object({
 });
 export type PipelineJoin = z.infer<typeof zJoin>;
 
+// ---- Node/edge DAG (Phase 3, Q2=DAG). Additive + optional: a pipeline MAY carry a
+// visual transform graph alongside the flat objects/joins. Kind-discriminated flat
+// node (same style as SnowflakeObject/GovernanceObject); the engine (graph.ts) enforces
+// per-kind semantics and infers each node's output schema. Becomes authoritative in a
+// later slice (spec v2 + migration); for now it is optional and non-breaking.
+export const NODE_KINDS = ["source", "filter", "select", "derive", "cast", "join", "target"] as const;
+export type NodeKind = (typeof NODE_KINDS)[number];
+
+const zGraphNode = z.object({
+  id: z.string(),
+  kind: z.enum(NODE_KINDS),
+  label: z.string().optional(),
+  sourceObject: z.string().optional(), // source
+  filters: z.array(zFilter).optional(), // filter
+  keep: z.array(z.string()).optional(), // select: columns to keep (empty = all)
+  renames: z.array(z.object({ from: z.string(), to: z.string() })).optional(), // select
+  derive: z.array(z.object({ name: z.string(), expression: z.string(), type: zType })).optional(), // derive
+  casts: z.array(z.object({ column: z.string(), type: zType })).optional(), // cast
+  joinKind: z.enum(JOIN_KINDS).optional(), // join
+  on: z.array(z.object({ leftColumn: z.string(), rightColumn: z.string() })).optional(), // join
+  targetObject: z.string().optional(), // target
+});
+export type PipelineNode = z.infer<typeof zGraphNode>;
+
+const zEdge = z.object({
+  id: z.string(),
+  from: z.string(), // upstream node id
+  to: z.string(), // downstream node id
+  toPort: z.enum(["left", "right"]).optional(), // which join input (join nodes only)
+});
+export type PipelineEdge = z.infer<typeof zEdge>;
+
 /** Optional canvas layout for the visual designer (Phase 3): node positions keyed by
  *  stable node id. Purely presentational — absent layouts auto-arrange. Approach-
  *  agnostic (works whether the canvas is a projection of the flat spec or a DAG). */
@@ -98,6 +130,9 @@ const zSpec = z.object({
   objects: z.array(zPipelineObject),
   /** Cross-object joins describing how the source objects relate (Req 22 §8.6). */
   joins: z.array(zJoin).default([]),
+  /** Optional transform DAG (Phase 3, Q2=DAG). Additive; absent for flat specs. */
+  nodes: z.array(zGraphNode).optional(),
+  edges: z.array(zEdge).optional(),
   /** Optional visual-designer layout (Phase 3). Additive; absent for older specs. */
   layout: zLayout.optional(),
 });
@@ -109,6 +144,28 @@ function typeToPlain(t?: SpecType): Record<string, unknown> | undefined {
   if (t.length !== undefined) out.length = t.length;
   if (t.precision !== undefined) out.precision = t.precision;
   if (t.scale !== undefined) out.scale = t.scale;
+  return out;
+}
+
+/** Deterministic plain form of a DAG node (fixed key order, omit-empty). */
+function graphNodeToPlain(n: PipelineNode): Record<string, unknown> {
+  const out: Record<string, unknown> = { id: n.id, kind: n.kind };
+  if (n.label) out.label = n.label;
+  if (n.sourceObject) out.sourceObject = n.sourceObject;
+  if (n.filters && n.filters.length) {
+    out.filters = n.filters.map((f) => {
+      const o: Record<string, unknown> = { column: f.column, op: f.op };
+      if (f.value !== undefined) o.value = f.value;
+      return o;
+    });
+  }
+  if (n.keep && n.keep.length) out.keep = [...n.keep];
+  if (n.renames && n.renames.length) out.renames = n.renames.map((r) => ({ from: r.from, to: r.to }));
+  if (n.derive && n.derive.length) out.derive = n.derive.map((d) => ({ name: d.name, expression: d.expression, type: typeToPlain(d.type) }));
+  if (n.casts && n.casts.length) out.casts = n.casts.map((c) => ({ column: c.column, type: typeToPlain(c.type) }));
+  if (n.joinKind) out.joinKind = n.joinKind;
+  if (n.on && n.on.length) out.on = n.on.map((o) => ({ leftColumn: o.leftColumn, rightColumn: o.rightColumn }));
+  if (n.targetObject) out.targetObject = n.targetObject;
   return out;
 }
 
@@ -159,6 +216,18 @@ export function specToPlain(spec: PipelineSpec): Record<string, unknown> {
           joins: [...spec.joins]
             .sort((a, b) => `${a.leftObject}.${a.leftColumn}`.localeCompare(`${b.leftObject}.${b.leftColumn}`))
             .map((j) => ({ leftObject: j.leftObject, leftColumn: j.leftColumn, rightObject: j.rightObject, rightColumn: j.rightColumn, kind: j.kind })),
+        }
+      : {}),
+    ...(spec.nodes && spec.nodes.length ? { nodes: [...spec.nodes].sort((a, b) => a.id.localeCompare(b.id)).map(graphNodeToPlain) } : {}),
+    ...(spec.edges && spec.edges.length
+      ? {
+          edges: [...spec.edges]
+            .sort((a, b) => a.id.localeCompare(b.id))
+            .map((e) => {
+              const out: Record<string, unknown> = { id: e.id, from: e.from, to: e.to };
+              if (e.toPort) out.toPort = e.toPort;
+              return out;
+            }),
         }
       : {}),
     // Layout last; emitted only when it has nodes, sorted by id (deterministic).

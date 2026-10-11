@@ -5,6 +5,32 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — ETL Phase 3 Slice A: transform-DAG model + schema-propagation engine
+
+Q2 decided = **full node/edge DAG** (richer, per-node schema inference). Building it in
+safe slices; this first slice is the data model + pure engine, **no UI, no rewrite of the
+flat path**. Additive + optional (nodes/edges absent on existing specs) — `specVersion`
+stays 1 for now; it bumps to 2 with a migration only when the graph becomes authoritative
+(a later slice). The proven flat objects/joins/MappingEditor/planner path is untouched.
+
+- `spec.ts`: `PipelineNode` (kind-discriminated flat object, same style as SnowflakeObject
+  — kinds source/filter/select/derive/cast/join/target) + `PipelineEdge` ({from,to,toPort})
+  as optional `spec.nodes?`/`spec.edges?`; deterministic serialize (`graphNodeToPlain`,
+  omit-empty, nodes/edges sorted by id) → round-trip byte-identical.
+- `graph.ts` (new, PURE): `inferNodeSchemas(spec, model)` topologically propagates each
+  node's OUTPUT schema (field names+types) and validates — source(model entity), filter
+  (passthrough + col check), select (keep+rename), derive (append, dup check), cast (retype),
+  join (merge left+right by port, dup-column warning), target (terminal, dup error). Plus
+  structural checks: dangling edges, cycles, wrong input arity, unknown source object.
+  `validateGraph` returns the issues. No mutation, no execution.
+
+**Deferred (next slices):** the visual `PipelineCanvas`/`EtlDesigner` workspace (consumes
+inferNodeSchemas for live per-node schemas); graph-aware SQL generation; the v2 migration
+that derives a graph from flat specs and makes the DAG authoritative.
+
+- Tests +8 (`pipeline/graph.test.ts`: linear-chain propagation, join merge+dup warning,
+  validation ×5, node/edge serialize round-trip). **512 TS tests pass; tsc + build clean.**
+
 ## 2026-10-11 — ETL Phase 2: pipeline persistence hardening + layout field
 
 Prerequisite infrastructure before the visual designer (Phase 3). Additive + backward-
