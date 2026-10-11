@@ -35,8 +35,11 @@ See the top DECISIONS entries:
   type; added the missing **connector to discover FROM Snowflake** (`snowflake` mock) +
   `mapSnowflakeType` (VARIANT/GEOGRAPHY/… preserved as native). End-to-end path works:
   "+ Snowflake (mock)" → discover → reverse-engineer → Snowflake DDL → compare. Data-
-  engineering objects (stages/pipes/streams/tasks/dynamic tables), governance, table
-  variants + enforcement flags, and the live adapter are deferred (`docs/SNOWFLAKE.md`).
+  engineering objects (stages/pipes/streams/tasks/dynamic tables), governance, and the
+  live adapter are deferred (`docs/SNOWFLAKE.md`). **Table variants** (`Entity.tableKind`)
+  + **constraint enforcement** (`Relationship.enforced`, §4.2) are DONE — Snowflake emits
+  `CREATE TRANSIENT/HYBRID TABLE` + `NOT ENFORCED` on non-hybrid tables; a validation rule
+  warns on enforced-FK-on-non-hybrid.
 - **Req 22 (Fusion Cloud, offline/mock):** `oracle-fusion` mock connector (Financials),
   `mapFusionType`, `fusionSnapshotToModel`, `metadata.fusion` (REST resources + extract
   data stores), `source.apiVersion`, connector-generic Connections UI, and a

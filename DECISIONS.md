@@ -5,6 +5,24 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Req 23 §4.1/§4.2: table variants + constraint-enforcement flag
+
+The §4.2 declared-vs-enforced distinction is correctness-sensitive — Snowflake standard
+tables DECLARE but do NOT enforce PK/UNIQUE/FK; only hybrid tables enforce. Modeled it.
+
+- **`Entity.tableKind`** (standard/temporary/transient/external/hybrid) + **`Relationship.
+  enforced`** — optional, backward-compatible, deterministic serialize + Zod, undo via the
+  existing ops. Inspector: a Table-kind selector (entity General) + an "Enforced by the
+  database" checkbox (relationship RI tab).
+- **DDL (`ddl.ts`):** `tableKindKeyword` emits `CREATE TRANSIENT/HYBRID/TEMPORARY TABLE`
+  (TRANSIENT/HYBRID/EXTERNAL are Snowflake-only; TEMPORARY is broad; other dialects ignore
+  the Snowflake-only kinds). For Snowflake, PK/UNIQUE/FK get **`NOT ENFORCED`** on
+  non-hybrid tables, enforced on hybrid — so the DDL never implies enforcement Snowflake
+  doesn't provide. Postgres etc. never emit NOT ENFORCED.
+- **Validation:** `snowflakeEnforcement` warns when a FK is marked enforced on a non-hybrid
+  Snowflake table (contradiction).
+- 384 TS tests (+6: `export/tableVariants.test.ts`); tsc/build/cargo clean.
+
 ## 2026-10-11 — Req 23 (Phase 1–2): Snowflake connector + end-to-end discovery path
 
 Snowflake was already a DDL dialect + target + source-system type, but there was **no

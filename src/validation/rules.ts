@@ -641,6 +641,27 @@ function subjectAreaIssues(ctx: ValidationContext): Issue[] {
   return issues;
 }
 
+function snowflakeEnforcement(ctx: ValidationContext): Issue[] {
+  const issues: Issue[] = [];
+  for (const { id, model } of ctx.models) {
+    if (model.dialect !== "snowflake") continue; // only when explicitly targeting Snowflake
+    for (const rel of model.relationships) {
+      if (!rel.enforced) continue;
+      const child = model.entities.find((e) => e.id === rel.childEntity);
+      if (child && child.tableKind !== "hybrid") {
+        issues.push({
+          id: `sfEnforce:${id}:${rel.id}`,
+          rule: "snowflakeEnforcement",
+          severity: "warning",
+          message: `Snowflake only enforces foreign keys on hybrid tables; this relationship is marked enforced but ${child.name} is a ${child.tableKind ?? "standard"} table`,
+          target: { model: id, relationship: rel.id },
+        });
+      }
+    }
+  }
+  return issues;
+}
+
 const RULES: ((ctx: ValidationContext) => Issue[])[] = [
   duplicateEntityNames,
   duplicateFieldNames,
@@ -662,6 +683,7 @@ const RULES: ((ctx: ValidationContext) => Issue[])[] = [
   checkConstraintIssues,
   schemaIssues,
   subjectAreaIssues,
+  snowflakeEnforcement,
 ];
 
 /** Run every rule over the workspace and return all issues (FR-10.1). */

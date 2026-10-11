@@ -38,7 +38,8 @@ mock, awaits a live adapter · **Live** = needs a Snowflake account · **Deferre
 | Schema comparison + migration | **Done (generic)** | `migrate.diffModels` + Snowflake DDL; Snowflake-specific migration nuances are later. |
 | Pipeline planning from Snowflake | **Done (generic)** | source-to-target mapper → Snowflake target DDL. |
 | Snowflake-specific types as first-class modeling types | **Partial** | VARIANT/OBJECT/ARRAY/GEOGRAPHY/VECTOR are preserved as **native types**, not added to the fixed canonical type set (same policy as Oracle/Fusion) — avoids forking the one type engine. |
-| Table variants (transient/external/hybrid), enforcement flags | **Deferred** | Needs model fields for table kind + constraint-enforcement (§4.2 declared-vs-enforced). |
+| Table variants (temporary/transient/external/hybrid) | **Done** | `Entity.tableKind`; DDL emits `CREATE TRANSIENT/HYBRID/TEMPORARY TABLE` (Snowflake keywords); Table-kind selector in the Inspector. Discovering the variant from a live source is a connector enhancement. |
+| Constraint enforcement (declared vs enforced, §4.2) | **Done** | `Relationship.enforced`; Snowflake standard/transient/external tables export PK/UNIQUE/FK as `NOT ENFORCED`, hybrid tables as enforced — so DDL never implies enforcement Snowflake doesn't provide. A validation rule warns when a FK is marked enforced on a non-hybrid Snowflake table. |
 | Secure/materialized views distinction | **Partial** | Views modeled (materialized flag exists); secure-view flag deferred. |
 | Data engineering objects (stages/file formats/pipes/streams/tasks/dynamic tables) | **Deferred** | Phase 4 — new object types (model + DDL + inspector), or carry as `rawObjects` today. |
 | Governance (roles/grants/tags/masking/row-access policies/shares) | **Deferred** | Phase 5. |
@@ -55,9 +56,9 @@ mock, awaits a live adapter · **Live** = needs a Snowflake account · **Deferre
 
 ## Roadmap — deferred phases (Req 23 §13)
 
-- **Phase 3 (modeling):** table variants (transient/external/hybrid) + a **constraint-
-  enforcement flag** so relationships never imply enforcement Snowflake doesn't do (§4.2);
-  secure-view flag; clustering keys.
+- **Phase 3 (modeling):** *DONE:* table variants (`Entity.tableKind`) + the **constraint-
+  enforcement flag** (`Relationship.enforced`, §4.2). *Remaining:* secure-view flag;
+  clustering keys; discovering the table variant from a live source.
 - **Phase 4 (data engineering):** stages, file formats, pipes, streams, tasks, dynamic
   tables — each a real model object (type + factory → store ops → serialize/Zod →
   validation → Snowflake DDL → Explorer category → Inspector), mirroring the Req 19

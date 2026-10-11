@@ -15,7 +15,7 @@ import {
 import { foreignKeys, tableDDL } from "../export/ddl";
 import { DIALECTS, type DialectId } from "../export/dialects";
 import type { Entity, Field, FieldRole, RiAction, Udp } from "../model/model";
-import { modelDialect } from "../model/model";
+import { modelDialect, TABLE_KINDS } from "../model/model";
 
 const RI_ACTIONS: RiAction[] = ["no action", "cascade", "restrict", "set null", "set default"];
 
@@ -150,6 +150,23 @@ function EntityProperties({ entity, onClose }: { entity: Entity; onClose: () => 
               />
             </div>
             {caps.ddl && <EntitySchemaField entity={entity} onPatch={patch} />}
+            {caps.ddl && (
+              <div className="field">
+                <label>Table kind</label>
+                <select
+                  value={entity.tableKind ?? "standard"}
+                  onChange={(e) => patch({ tableKind: (e.target.value === "standard" ? undefined : e.target.value) as Entity["tableKind"] })}
+                >
+                  {TABLE_KINDS.map((k) => (
+                    <option key={k} value={k}>{k}</option>
+                  ))}
+                </select>
+                <p className="field__hint">
+                  Snowflake: hybrid tables enforce keys; standard/transient/external do not —
+                  declared constraints export as <code>NOT ENFORCED</code>.
+                </p>
+              </div>
+            )}
             {entity.source && <EntitySourceInfo source={entity.source} />}
             <div className="field">
               <label>Dimensional modeling (Kimball)</label>
@@ -612,7 +629,17 @@ function RelationshipProperties({ relId, onClose }: { relId: string; onClose: ()
                 ))}
               </select>
             </div>
-            <p className="field__hint">Exported as ON DELETE / ON UPDATE on the Postgres foreign key.</p>
+            <div className="field">
+              <label className="checkbox">
+                <input type="checkbox" checked={!!rel.enforced} onChange={(e) => patch({ enforced: e.target.checked || undefined })} />
+                Enforced by the database
+              </label>
+              <p className="field__hint">
+                Snowflake standard tables DECLARE but do not ENFORCE foreign keys (only hybrid
+                tables enforce). Leave off unless the target DB truly enforces this relationship.
+              </p>
+            </div>
+            <p className="field__hint">Exported as ON DELETE / ON UPDATE on the foreign key.</p>
           </>
         )}
         {tab === "Definition" && (

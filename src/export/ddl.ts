@@ -129,6 +129,17 @@ function tableRef(d: Dialect, name: string, schema?: string): string {
   return schema ? `${d.quote(schema)}.${d.quote(name)}` : d.quote(name);
 }
 
+/** The CREATE-statement table-variant keyword for a dialect (Req 23 §4.1). Returns
+ *  a trailing-space keyword ("TRANSIENT ") or "" for a standard table. TRANSIENT /
+ *  HYBRID / EXTERNAL are Snowflake-specific; TEMPORARY is broadly supported. */
+function tableKindKeyword(d: Dialect, kind?: Entity["tableKind"]): string {
+  if (!kind || kind === "standard") return "";
+  if (kind === "temporary") return d.id === "sqlserver" ? "" : "TEMPORARY ";
+  // transient / external / hybrid are Snowflake concepts.
+  if (d.id === "snowflake") return `${kind.toUpperCase()} `;
+  return "";
+}
+
 export function tableDDL(
   d: Dialect,
   entity: Entity,
@@ -138,7 +149,12 @@ export function tableDDL(
 ): string {
   const q = d.quote;
   const ref = tableRef(d, entity.name, schema);
-  const create = opts.ifNotExists ? "CREATE TABLE IF NOT EXISTS" : "CREATE TABLE";
+  const kindKw = tableKindKeyword(d, entity.tableKind);
+  const create = `CREATE ${kindKw}TABLE${opts.ifNotExists ? " IF NOT EXISTS" : ""}`;
+  // Snowflake declares but does NOT enforce PK/UNIQUE/FK on standard tables; only
+  // hybrid tables enforce (Req 23 §4.2). Emit NOT ENFORCED so the DDL never implies
+  // enforcement Snowflake doesn't provide.
+  const notEnforced = d.id === "snowflake" && entity.tableKind !== "hybrid" ? " NOT ENFORCED" : "";
   const lines: string[] = [];
   for (const f of entity.fields) {
     let line = `  ${q(f.name)} ${d.type(f)}`;
@@ -148,16 +164,16 @@ export function tableDDL(
     lines.push(line);
   }
   const pks = primaryKeyFields(entity);
-  if (pks.length) lines.push(`  PRIMARY KEY (${pks.map((p) => q(p.name)).join(", ")})`);
+  if (pks.length) lines.push(`  PRIMARY KEY (${pks.map((p) => q(p.name)).join(", ")})${notEnforced}`);
   for (const f of entity.fields) {
-    if (f.unique && !f.primaryKey) lines.push(`  UNIQUE (${q(f.name)})`);
+    if (f.unique && !f.primaryKey) lines.push(`  UNIQUE (${q(f.name)})${notEnforced}`);
   }
   for (const fk of inlineFks.filter((x) => x.child.id === entity.id)) {
     const parentRef = tableRef(d, fk.parent.name, schema);
     lines.push(
       `  FOREIGN KEY (${fk.cols.map((c) => q(c.fk)).join(", ")}) REFERENCES ${parentRef} (${fk.cols
         .map((c) => q(c.pk))
-        .join(", ")})${riClause(d, fk)}`,
+        .join(", ")})${riClause(d, fk)}${notEnforced}`,
     );
   }
   // Table-level CHECK constraints (Req 19). Expression is exported verbatim.

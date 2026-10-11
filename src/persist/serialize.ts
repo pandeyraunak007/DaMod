@@ -96,6 +96,7 @@ function serializeEntity(e: Entity): Record<string, unknown> {
   if (e.tags && e.tags.length) out.tags = [...e.tags];
   if (e.stereotype) out.stereotype = e.stereotype;
   if (e.schema) out.schema = e.schema;
+  if (e.tableKind && e.tableKind !== "standard") out.tableKind = e.tableKind;
   out.position = { x: e.position.x, y: e.position.y };
   out.fields = e.fields.map(serializeField);
   if (e.checks && e.checks.length) {
@@ -125,6 +126,7 @@ function serializeRelationship(r: Relationship): Record<string, unknown> {
   if (r.childVerbPhrase) out.childVerbPhrase = r.childVerbPhrase;
   if (r.onDelete && r.onDelete !== "no action") out.onDelete = r.onDelete;
   if (r.onUpdate && r.onUpdate !== "no action") out.onUpdate = r.onUpdate;
+  if (r.enforced !== undefined) out.enforced = r.enforced;
   udpsOut(out, r.note, r.udps);
   return out;
 }

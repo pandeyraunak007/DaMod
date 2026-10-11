@@ -103,7 +103,7 @@ interface ModelStore {
   renameEntity: (id: string, name: string) => string | null;
   updateEntity: (
     id: string,
-    patch: Partial<Pick<Entity, "logicalName" | "description" | "tags" | "stereotype" | "note" | "udps" | "schema">>,
+    patch: Partial<Pick<Entity, "logicalName" | "description" | "tags" | "stereotype" | "note" | "udps" | "schema" | "tableKind">>,
   ) => void;
   deleteEntity: (id: string) => DeleteEntityResult;
 

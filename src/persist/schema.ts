@@ -62,6 +62,7 @@ const zEntity = z.object({
   tags: z.array(z.string()).optional(),
   stereotype: z.enum(["fact", "dimension"]).optional(),
   schema: z.string().optional(),
+  tableKind: z.enum(["standard", "temporary", "transient", "external", "hybrid"]).optional(),
   note: z.string().optional(),
   udps: z.array(zUdp).optional(),
   position: z.object({ x: z.number(), y: z.number() }),
@@ -86,6 +87,7 @@ const zRelationship = z.object({
   childVerbPhrase: z.string().optional(),
   onDelete: zRiAction.optional(),
   onUpdate: zRiAction.optional(),
+  enforced: z.boolean().optional(),
   note: z.string().optional(),
   udps: z.array(zUdp).optional(),
 });

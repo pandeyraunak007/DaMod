@@ -107,6 +107,12 @@ export interface ObjectSource {
   apiVersion?: string;
 }
 
+/** Physical table variant (Req 23 §4.1). Different kinds have different properties
+ *  and constraint-enforcement behavior (hybrid tables enforce keys; standard ones
+ *  don't). Undefined = a standard table. */
+export const TABLE_KINDS = ["standard", "temporary", "transient", "external", "hybrid"] as const;
+export type TableKind = (typeof TABLE_KINDS)[number];
+
 export interface Entity {
   id: string;
   /** Physical/identifier name (used for references and DDL). */
@@ -127,6 +133,8 @@ export interface Entity {
   udps?: Udp[];
   /** Owning schema name (Req 19). Default/undefined means the public schema. */
   schema?: string;
+  /** Physical table variant (Req 23 §4.1). Undefined = standard. */
+  tableKind?: TableKind;
   /** Table-level CHECK constraints (Req 19). */
   checks?: CheckConstraint[];
   /** Discovery provenance (Req 21 Phase 2); absent for hand-authored entities. */
@@ -165,6 +173,11 @@ export interface Relationship {
   /** Referential-integrity actions on the foreign key (ERwin RI). */
   onDelete?: RiAction;
   onUpdate?: RiAction;
+  /** Whether the FK is physically ENFORCED by the target DB (Req 23 §4.2). Snowflake
+   *  standard tables DECLARE but do NOT enforce FKs; only hybrid tables enforce. When
+   *  unset, enforcement is derived from the child table's kind. Never imply a
+   *  relationship is enforced when the target DB does not enforce it. */
+  enforced?: boolean;
   note?: string;
   udps?: Udp[];
 }
