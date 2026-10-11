@@ -1,6 +1,8 @@
 import { useModelStore } from "../store/modelStore";
 import { validateIdentifier } from "../model/identifiers";
-import type { DbDialect, SnowflakeObject, GovernanceObject } from "../model/model";
+import { DATA_TYPE_KINDS, paramShape, type DataTypeKind } from "../model/dataTypes";
+import { LOGICAL_TYPE_KINDS } from "../model/levels";
+import type { DbDialect, SnowflakeObject, GovernanceObject, Domain } from "../model/model";
 
 // Side-panel editors for the non-table database objects (FR-8 extensions):
 // views, indexes, sequences and raw dialect-specific objects.
@@ -460,6 +462,80 @@ export function GovernanceObjectEditor({ id, onGone }: { id: string; onGone: () 
         <textarea className="editor__input" rows={2} value={obj.comment ?? ""} onChange={(e) => set({ comment: e.target.value || undefined })} />
       </div>
       <button className="btn btn--danger btn--small" onClick={() => (del(id), onGone())}>Delete {obj.kind}</button>
+    </div>
+  );
+}
+
+// Reusable-domain editor for the docked inspector (Slice 1). Mirrors the modal
+// DomainsDialog fields and reuses updateDomain/deleteDomain, so editing a domain
+// propagates its type to every bound field (and delete unbinds them).
+export function DomainEditor({ id, onGone }: { id: string; onGone: () => void }) {
+  const domain = useModelStore((s) => s.model.domains?.find((d) => d.id === id));
+  const entities = useModelStore((s) => s.model.entities);
+  const update = useModelStore((s) => s.updateDomain);
+  const del = useModelStore((s) => s.deleteDomain);
+  if (!domain) return null;
+  const patch = (p: Partial<Domain>) => update(id, p);
+  const shape = paramShape(domain.type);
+  const usage = entities.reduce((n, e) => n + e.fields.filter((f) => f.domainId === id).length, 0);
+
+  return (
+    <div className="editor">
+      <div className="editor__section">
+        <label className="editor__label">Domain name</label>
+        <input
+          className="editor__input"
+          defaultValue={domain.name}
+          onChange={(e) => !validateIdentifier(e.target.value) && patch({ name: e.target.value })}
+        />
+      </div>
+      <div className="editor__section">
+        <label className="editor__label">Type</label>
+        <select className="editor__input" value={domain.type} onChange={(e) => patch({ type: e.target.value as DataTypeKind })}>
+          {DATA_TYPE_KINDS.map((k) => (
+            <option key={k} value={k}>{k}</option>
+          ))}
+        </select>
+      </div>
+      {shape === "length" && (
+        <div className="editor__section">
+          <label className="editor__label">Length</label>
+          <input type="number" min={1} className="editor__input" value={domain.length ?? 255} onChange={(e) => patch({ length: Number(e.target.value) })} />
+        </div>
+      )}
+      {shape === "decimal" && (
+        <div className="editor__section editor__section--row">
+          <label className="field-row__params">precision
+            <input type="number" min={1} value={domain.precision ?? 12} onChange={(e) => patch({ precision: Number(e.target.value) })} />
+          </label>
+          <label className="field-row__params">scale
+            <input type="number" min={0} value={domain.scale ?? 2} onChange={(e) => patch({ scale: Number(e.target.value) })} />
+          </label>
+        </div>
+      )}
+      <div className="editor__section">
+        <label className="editor__label">Logical type (optional)</label>
+        <select className="editor__input" value={domain.logicalType ?? ""} onChange={(e) => patch({ logicalType: (e.target.value || undefined) as Domain["logicalType"] })}>
+          <option value="">— none —</option>
+          {LOGICAL_TYPE_KINDS.map((k) => (
+            <option key={k} value={k}>{k}</option>
+          ))}
+        </select>
+      </div>
+      <div className="editor__section">
+        <label className="editor__label">Default (SQL)</label>
+        <input className="editor__input" defaultValue={domain.default ?? ""} onChange={(e) => patch({ default: e.target.value || undefined })} />
+      </div>
+      <div className="editor__section">
+        <label className="editor__label">Definition</label>
+        <textarea className="editor__input" rows={2} defaultValue={domain.description ?? ""} onChange={(e) => patch({ description: e.target.value || undefined })} />
+      </div>
+      <p className="field__hint">
+        {usage > 0
+          ? `Changing this type updates ${usage} bound field(s). Deleting unbinds them (they keep this type).`
+          : "Not used by any field yet."}
+      </p>
+      <button className="btn btn--danger btn--small" onClick={() => (del(id), onGone())}>Delete domain</button>
     </div>
   );
 }

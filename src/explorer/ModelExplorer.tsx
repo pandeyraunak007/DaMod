@@ -265,16 +265,22 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
     useModelStore.getState().createGovernanceObject(kind);
     expand(`m:${tabId}:gov:${kind}`);
   };
+  const addDomain = async (tabId: string) => {
+    await ensureActive(tabId);
+    useModelStore.getState().createDomain();
+    expand(`m:${tabId}`);
+    expand(`m:${tabId}:domains`);
+  };
   const selectObject = async (
     tabId: string,
-    sel: { kind: "view" | "index" | "sequence" | "rawObject" | "schema" | "snowflakeObject" | "governanceObject"; id: string },
+    sel: { kind: "view" | "index" | "sequence" | "rawObject" | "schema" | "snowflakeObject" | "governanceObject" | "domain"; id: string },
   ) => {
     await ensureActive(tabId);
     useModelStore.getState().select(sel);
   };
   const deleteObject = async (
     tabId: string,
-    kind: "view" | "index" | "sequence" | "rawObject" | "schema" | "snowflakeObject" | "governanceObject",
+    kind: "view" | "index" | "sequence" | "rawObject" | "schema" | "snowflakeObject" | "governanceObject" | "domain",
     oid: string,
   ) => {
     await ensureActive(tabId);
@@ -285,6 +291,7 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
     else if (kind === "schema") st.deleteSchema(oid);
     else if (kind === "snowflakeObject") st.deleteSnowflakeObject(oid);
     else if (kind === "governanceObject") st.deleteGovernanceObject(oid);
+    else if (kind === "domain") st.deleteDomain(oid);
     else st.deleteRawObject(oid);
   };
 
@@ -387,6 +394,7 @@ export function ModelExplorer({ onNewModel, onDeleteModel, onOpenSemantic, onCol
             onAddRaw={() => addRaw(activeEntry.tabId)}
             onAddSnowflakeObject={(kind) => addSnowflakeObject(activeEntry.tabId, kind)}
             onAddGovernanceObject={(kind) => addGovernanceObject(activeEntry.tabId, kind)}
+            onAddDomain={() => addDomain(activeEntry.tabId)}
             onSelectObject={(sel) => selectObject(activeEntry.tabId, sel)}
             onDeleteObject={(kind, oid) => deleteObject(activeEntry.tabId, kind, oid)}
             onDuplicateModel={() => duplicateModel(activeEntry.tabId)}
@@ -482,6 +490,7 @@ function ModelBranch({
   onAddRaw,
   onAddSnowflakeObject,
   onAddGovernanceObject,
+  onAddDomain,
   onSelectObject,
   onDeleteObject,
   onDuplicateModel,
@@ -508,8 +517,9 @@ function ModelBranch({
   onAddRaw: () => void;
   onAddSnowflakeObject: (kind: SnowflakeObjectKind) => void;
   onAddGovernanceObject: (kind: GovernanceObjectKind) => void;
-  onSelectObject: (sel: { kind: "view" | "index" | "sequence" | "rawObject" | "schema" | "snowflakeObject" | "governanceObject"; id: string }) => void;
-  onDeleteObject: (kind: "view" | "index" | "sequence" | "rawObject" | "schema" | "snowflakeObject" | "governanceObject", id: string) => void;
+  onAddDomain: () => void;
+  onSelectObject: (sel: { kind: "view" | "index" | "sequence" | "rawObject" | "schema" | "snowflakeObject" | "governanceObject" | "domain"; id: string }) => void;
+  onDeleteObject: (kind: "view" | "index" | "sequence" | "rawObject" | "schema" | "snowflakeObject" | "governanceObject" | "domain", id: string) => void;
   onDuplicateModel: () => void;
   onDeleteModel: () => void;
 }) {
@@ -628,6 +638,19 @@ function ModelBranch({
           {/* Physical-only objects — hidden at Conceptual/Logical (§4.1/§4.2). */}
           {showPhysical && (
             <>
+              {/* Reusable domains (Slice 1) — dialect-agnostic type definitions;
+                  shown wherever physical types (and thus binding) apply. */}
+              <ObjectGroup
+                open={isOpen(`m:${tabId}:domains`)}
+                onToggle={() => toggle(`m:${tabId}:domains`)}
+                name="Domains"
+                count={model.domains?.length ?? 0}
+                onAdd={onAddDomain}
+                items={(model.domains ?? []).filter((v) => !filtering || matches(v.name, q))}
+                onSelect={(id) => onSelectObject({ kind: "domain", id })}
+                onDelete={(id) => onDeleteObject("domain", id)}
+                openMenu={openMenu}
+              />
               <ObjectGroup
                 open={isOpen(`m:${tabId}:schemas`)}
                 onToggle={() => toggle(`m:${tabId}:schemas`)}

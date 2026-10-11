@@ -16,6 +16,7 @@ import { foreignKeys, tableDDL } from "../export/ddl";
 import { DIALECTS, type DialectId } from "../export/dialects";
 import type { Entity, Field, FieldRole, RiAction, Udp } from "../model/model";
 import { modelDialect, TABLE_KINDS } from "../model/model";
+import { DomainSelect } from "./DomainSelect";
 
 const RI_ACTIONS: RiAction[] = ["no action", "cascade", "restrict", "set null", "set default"];
 
@@ -516,12 +517,11 @@ function FieldDetail({ entityId, field, caps }: { entityId: string; field: Field
       {caps.physicalProps && domains.length > 0 && (
         <div className="field">
           <label>Domain</label>
-          <select value={field.domainId ?? ""} onChange={(e) => bindFieldDomain(entityId, field.id, e.target.value || null)}>
-            <option value="">— none (free type) —</option>
-            {domains.map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </select>
+          <DomainSelect
+            domains={domains}
+            value={field.domainId}
+            onChange={(id) => bindFieldDomain(entityId, field.id, id)}
+          />
         </div>
       )}
       {caps.physicalProps && (

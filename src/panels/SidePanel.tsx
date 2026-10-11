@@ -20,7 +20,8 @@ import { validateIdentifier } from "../model/identifiers";
 import type { Entity, Field } from "../model/model";
 import { componentFor, entityKey, linksTouching } from "../links/links";
 import { newId } from "../lib/ids";
-import { ViewEditor, IndexEditor, SequenceEditor, RawObjectEditor, SchemaEditor, SnowflakeObjectEditor, GovernanceObjectEditor } from "./DbObjectEditors";
+import { ViewEditor, IndexEditor, SequenceEditor, RawObjectEditor, SchemaEditor, SnowflakeObjectEditor, GovernanceObjectEditor, DomainEditor } from "./DbObjectEditors";
+import { DomainSelect } from "./DomainSelect";
 
 // An input for identifier-valued names (entity/field). Keeps a local draft so the
 // field can be freely erased and retyped; commits to the store only when the value
@@ -102,7 +103,9 @@ export function SidePanel({ onCollapse }: { onCollapse: () => void }) {
                   ? "Snowflake object"
                   : selection?.kind === "governanceObject"
                     ? "Governance object"
-                    : "Properties";
+                    : selection?.kind === "domain"
+                      ? "Domain"
+                      : "Properties";
 
   return (
     <aside className="side">
@@ -131,6 +134,8 @@ export function SidePanel({ onCollapse }: { onCollapse: () => void }) {
         <SnowflakeObjectEditor id={selection.id} onGone={clear} />
       ) : selection?.kind === "governanceObject" ? (
         <GovernanceObjectEditor id={selection.id} onGone={clear} />
+      ) : selection?.kind === "domain" ? (
+        <DomainEditor id={selection.id} onGone={clear} />
       ) : (
         <div className="side__empty">
           <p>Nothing selected.</p>
@@ -418,6 +423,11 @@ function FieldRow({
   const updateField = useModelStore((s) => s.updateField);
   const deleteField = useModelStore((s) => s.deleteField);
   const reorderField = useModelStore((s) => s.reorderField);
+  const bindFieldDomain = useModelStore((s) => s.bindFieldDomain);
+  // Select the stable ref; derive the list OUTSIDE the selector (never build a new
+  // value inside a selector — it breaks getSnapshot caching; see CLAUDE.md §5.1).
+  const domains = useModelStore((s) => s.model.domains);
+  const domainList = domains ?? [];
   const modelId = useModelStore((s) => s.model.id);
   const openLinkDraft = useModelStore((s) => s.openLinkDraft);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -556,6 +566,21 @@ function FieldRow({
               onChange={(e) =>
                 updateField(entity.id, field.id, { scale: Number(e.target.value) })
               }
+            />
+          </label>
+        </div>
+      )}
+
+      {/* Bind a reusable domain (Slice 1). Physical levels only, and only when the
+          model has domains — mirrors the modal inspector's selector. */}
+      {showPhysical && domainList.length > 0 && (
+        <div className="field-row__params">
+          <label>
+            domain
+            <DomainSelect
+              domains={domainList}
+              value={field.domainId}
+              onChange={(id) => bindFieldDomain(entity.id, field.id, id)}
             />
           </label>
         </div>
