@@ -5,6 +5,35 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — ETL Phase 3 Slice B2: canvas editing + per-node config inspector
+
+Makes the ETL Designer canvas editable. Pure edit ops (tested) + the React-Flow wiring
+and inspector UI (author-verified). Edits persist via `upsertPipeline` (consistent with
+the existing MappingEditor; no model undo — pipelines live in workspaceStore).
+
+- **`etl/graphEdit.ts` (pure):** `addGraphNode`, `removeGraphNode` (cascades incident
+  edges + layout entry), `updateGraphNode`, `connectNodes`/`connectError` (rejects
+  self-loops, duplicates, unknown nodes, and **cycles** via reachability), `removeGraphEdge`,
+  `moveNode` (layout). Each returns a new spec; caller-supplied ids keep them deterministic.
+- **`PipelineCanvas`:** now editable — draggable (→ `moveNode`), connectable (→
+  `connectNodes`, join left/right port auto-assigned by incoming count, errors surfaced),
+  deletable (Delete/Backspace → `removeGraphNode`/`removeGraphEdge`). Still reads only the
+  spec; each interaction yields a new spec via the pure ops, handed up through `onChange`.
+- **`etl/NodeInspector.tsx`:** per-kind config editor (source object, target object,
+  filters, select keep+renames, derive expression columns, cast, join kind+keys) with
+  input-schema-aware column pickers; emits a patch → `updateGraphNode` → save.
+- **`EtlDesigner`:** node palette (add any of the 7 kinds), the inspector + the selected
+  node's inferred output schema, live validation. Input schema for a node = union of its
+  upstream nodes' output schemas (from `inferNodeSchemas`).
+
+**Deferred:** Slice C graph-aware SQL generation; Slice D v2 migration (DAG authoritative);
+node-level undo (pipelines have none today — matches MappingEditor).
+
+- Tests +5 (`etl/graphEdit.test.ts`: node add/update/remove-cascade, connect valid +
+  self-loop/dup/unknown/cycle guards, no-op-on-error, edge removal). React-Flow canvas +
+  inspector are author-verified (repo has no RF render test). **523 TS tests pass; tsc +
+  build clean.**
+
 ## 2026-10-11 — ETL Phase 3 Slice B1: visual ETL Designer workspace (read-only canvas)
 
 The visual designer, built additively as a top-level workspace. Isolated from the

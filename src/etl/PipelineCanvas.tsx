@@ -1,20 +1,27 @@
-import { ReactFlow, ReactFlowProvider, Background, Controls, type Node, type Edge } from "@xyflow/react";
+import { ReactFlow, ReactFlowProvider, Background, Controls, type Node, type Edge, type Connection } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { PipelineSpec } from "../connectors/pipeline/spec";
 import { autoLayout } from "./graphBuild";
+import { moveNode, connectNodes, removeGraphNode, removeGraphEdge } from "./graphEdit";
+
+const uid = (p: string) => p + Math.random().toString(36).slice(2, 10);
 
 // The ETL Designer's visual pipeline canvas (Phase 3 Slice B). A SEPARATE React-Flow
 // instance (own provider) from the modeling canvas — it reads only the pipeline spec's
-// node/edge DAG, never the model store, so it can't destabilize modeling. Read-only in
-// this slice (select/pan/zoom/fit); node add/connect/configure arrive in Slice B2.
+// node/edge DAG, never the model store. Edits (drag/connect/delete) produce a new spec
+// via the pure graphEdit ops and are handed up through onChange for persistence.
 export function PipelineCanvas({
   spec,
   selectedId,
   onSelect,
+  onChange,
+  onError,
 }: {
   spec: PipelineSpec;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  onChange: (next: PipelineSpec) => void;
+  onError: (msg: string) => void;
 }) {
   const graphNodes = spec.nodes ?? [];
   const graphEdges = spec.edges ?? [];
@@ -30,19 +37,36 @@ export function PipelineCanvas({
   }));
   const edges: Edge[] = graphEdges.map((e) => ({ id: e.id, source: e.from, target: e.to }));
 
+  const onConnect = (c: Connection) => {
+    if (!c.source || !c.target) return;
+    // Assign a join's left/right port by current incoming count (first→left, second→right).
+    const target = graphNodes.find((n) => n.id === c.target);
+    let toPort: "left" | "right" | undefined;
+    if (target?.kind === "join") {
+      toPort = graphEdges.filter((e) => e.to === c.target).length === 0 ? "left" : "right";
+    }
+    const r = connectNodes(spec, { id: uid("ed_"), from: c.source, to: c.target, toPort });
+    if (r.error) onError(r.error);
+    else onChange(r.spec);
+  };
+
   return (
     <ReactFlowProvider>
       <div style={{ width: "100%", height: "100%" }}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          nodeTypes={undefined}
           fitView
-          nodesDraggable={false}
-          nodesConnectable={false}
+          nodesDraggable
+          nodesConnectable
           elementsSelectable
+          deleteKeyCode={["Delete", "Backspace"]}
           onNodeClick={(_, n) => onSelect(n.id)}
           onPaneClick={() => onSelect(null)}
+          onConnect={onConnect}
+          onNodeDragStop={(_, n) => onChange(moveNode(spec, n.id, Math.round(n.position.x), Math.round(n.position.y)))}
+          onNodesDelete={(deleted) => onChange(deleted.reduce((s, n) => removeGraphNode(s, n.id), spec))}
+          onEdgesDelete={(deleted) => onChange(deleted.reduce((s, e) => removeGraphEdge(s, e.id), spec))}
           proOptions={{ hideAttribution: true }}
         >
           <Background gap={16} />
