@@ -5,6 +5,32 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Standards hardening: invariant suites + idempotence fix (Phase 5+)
+
+Applied industry-standard hardening to the standards engine — property/invariant tests
+that a correct identifier-rewriting + apply pipeline must satisfy. **One real bug found
+and fixed.**
+
+- **Bug (fixed):** `applyNamingRule` recased the WHOLE name including a just-added
+  prefix/suffix, so a second application mangled it (`p_customerOrder_s` →
+  `p_pCustomerOrderS_s` for camel/pascal/screaming + affix). Fix: strip an already-present
+  affix, recase only the CORE, then re-add — the output is now a true fixed point. Existing
+  conditional-add tests still pass; apply is provably convergent.
+- **Engine invariants** (`model/namingHardening.test.ts`, +11): `applyNamingRule` is
+  idempotent across all 5 cases × affixes over a sample; `toWords` stable on its snake
+  output; a conformed model yields no further changes (convergence); empty-ruleset no-op;
+  length-only violations are reported but never auto-renamed (no silent truncation);
+  degenerate names that recase to empty are surfaced, never silently corrupt; 3-way
+  collisions mark all ids.
+- **Apply invariants** (`store/standardsHardening.test.ts`, +6): naming + type apply are
+  idempotent (2nd apply byte-identical no-op); **no new validation errors / no duplicate
+  names** after apply (a clean model stays clean — referential integrity + uniqueness);
+  undo restores byte-identically; composite-PK FK mirroring maps both columns positionally;
+  self-referencing relationships don't crash and stay valid.
+
+**477 TS tests pass; tsc + build clean.** Only production change: the `applyNamingRule`
+fix in `model/naming.ts`.
+
 ## 2026-10-11 — Standards integration & hardening + docs (Phase 5)
 
 Locked in Phases 1–4 with cross-feature tests and refreshed docs. No new feature code.

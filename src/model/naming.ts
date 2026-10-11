@@ -81,12 +81,16 @@ function recase(words: string[], c: NameCase): string {
   }
 }
 
-/** The name this rule would produce for `name`. Prefix/suffix are idempotent (added
- *  only when absent) so re-running an applied standard is a no-op. */
+/** The name this rule would produce for `name`. Idempotent: an already-present affix
+ *  is stripped before recasing (so only the CORE is recased) and then re-added, making
+ *  the output a fixed point — re-running an applied standard is a true no-op. */
 export function applyNamingRule(name: string, rule: NamingRule): string {
-  let out = rule.case === "preserve" ? name : recase(toWords(name), rule.case);
-  if (rule.prefix && !out.startsWith(rule.prefix)) out = rule.prefix + out;
-  if (rule.suffix && !out.endsWith(rule.suffix)) out = out + rule.suffix;
+  let core = name;
+  if (rule.prefix && core.startsWith(rule.prefix)) core = core.slice(rule.prefix.length);
+  if (rule.suffix && rule.suffix.length && core.endsWith(rule.suffix)) core = core.slice(0, core.length - rule.suffix.length);
+  let out = rule.case === "preserve" ? core : recase(toWords(core), rule.case);
+  if (rule.prefix) out = rule.prefix + out;
+  if (rule.suffix) out = out + rule.suffix;
   return out;
 }
 
