@@ -9,11 +9,20 @@
 
 ## NEXT SESSION — START HERE
 
-**Current status:** Branch `main`. Pushed: `44c0082` (Req 22 Fusion) and all prior Reqs
-17–21. **Fusion + "subject areas for all databases" just landed, uncommitted in the
-working tree.** Author commits/pushes explicitly, do not commit or push unless asked.
-**336 TS tests pass · typecheck clean · `npm run build` clean · `cargo build` clean.**
-See the top DECISIONS entries:
+**Current status:** Branch `main`. **erwin-style reusable-standards roadmap Phases 1–5
+complete + committed (not pushed): Domains end-to-end, Naming Standards, Data Type
+Standards, Copilot standards actions, integration/hardening.** Author commits/pushes
+explicitly, do not commit or push unless asked. **460 TS tests pass · typecheck clean ·
+`npm run build` clean** (no Rust changed this track). The standards work has its own
+reference: **`docs/STANDARDS.md`**. Newest `DECISIONS.md` entries cover each phase.
+Remaining standards backlog (deferred, see `docs/STANDARDS.md`): Postgres `CREATE DOMAIN`
+DDL + domain reverse-eng (opt-in), naming auto-apply-to-new-objects, reserved-word/
+per-dialect length rules, Explorer nodes for standards, Copilot domain apply/detach +
+standard update/delete, a real Copilot before/after diff.
+
+Older context (Reqs 17–23) follows below; the entries under here predate the standards
+roadmap.
+- See the top DECISIONS entries:
 - **Subject areas for ALL databases:** the standard Model Explorer now has a Subject
   areas section (create/rename/delete, add selected table, entity-context "New subject
   area from this") for any source — the EBS/Fusion "from product/family" stays as a

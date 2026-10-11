@@ -5,6 +5,23 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-11 — Standards integration & hardening + docs (Phase 5)
+
+Locked in Phases 1–4 with cross-feature tests and refreshed docs. No new feature code.
+
+- `store/standardsIntegration.test.ts` (+6): domains + naming + type standards coexist;
+  **precedence proven** (a type standard leaves a domain-bound column untouched — domain
+  governs); byte-identical round-trip with all three standards + a domain present; each
+  apply is a single undo step; **backward compat** (an older model JSON with no standards/
+  domains fields loads cleanly); standards present don't break DDL on any of the 7
+  dialects; lossy warnings are dialect-specific.
+- Docs: new **`docs/STANDARDS.md`** (the reference for Domains/Naming/Type/Copilot — shared
+  principles, per-feature API, deferred backlog). Refreshed the stale CLAUDE.md "NEXT
+  SESSION" status (was Req-22-era / 336 tests) to point at the standards roadmap + 460 tests.
+
+**460 TS tests pass; tsc + build clean.** Roadmap Phases 1–5 done; backlog catalogued in
+`docs/STANDARDS.md`.
+
 ## 2026-10-11 — Copilot standards actions + compliance context (Phase 4 Slice A)
 
 The Copilot can now create and apply Naming & Data Type Standards, and reason about
