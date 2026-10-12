@@ -9,7 +9,7 @@ import { generateMigration } from "./migrate";
 import { exportSemanticYaml } from "./semanticExport";
 import { parseDdl } from "../import/reverse";
 import { modelDialect, type Model } from "../model/model";
-import { joinPath, pickFile, readTextFile, writeFile } from "../persist/fs";
+import { baseName, joinPath, pickFile, readTextFile, writeFile } from "../persist/fs";
 
 type Scope = "model" | "workspace" | "semantic" | "migration";
 
@@ -58,7 +58,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     const content = await readTextFile(file);
     const { model } = parseDdl(content, "baseline", "2026-01-01T00:00:00Z");
     setSqlBaseline(model);
-    setSqlBaselineName(file.split("/").pop() ?? "baseline.sql");
+    setSqlBaselineName(baseName(file) || "baseline.sql");
     setBaselineSel("sql");
   };
 

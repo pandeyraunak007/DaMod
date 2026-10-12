@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useWorkspaceStore } from "../store/workspaceStore";
-import { pickFile, readTextFile } from "../persist/fs";
+import { baseName, pickFile, readTextFile } from "../persist/fs";
 import { validateIdentifier } from "../model/identifiers";
 import { parseDdl } from "./reverse";
 
@@ -27,7 +27,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
     const text = await readTextFile(path);
     setSql(text);
     // Default the model name to the file's base name when it is still the default.
-    const base = (path.split("/").pop() ?? "").replace(/\.sql$/i, "");
+    const base = baseName(path).replace(/\.sql$/i, "");
     if ((name === "imported" || !name) && !validateIdentifier(base)) setName(base);
   };
 

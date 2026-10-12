@@ -5,6 +5,25 @@ instead of the code (per the "Working context and verification" section of the
 requirements). Newest entries at the top. Each entry: what, why, and what was
 deliberately not done.
 
+## 2026-10-12 — Windows portability: separator-agnostic JS path helpers
+
+Goal: run DaMod on Windows as well as macOS. Audit found the framework is already portable —
+Tauri bundles for Windows (`"targets": "all"`), the Rust file layer uses `std::path`
+(`.join()`/`.parent()`, cross-platform), `keyring` uses the Windows Credential Manager
+automatically, and shortcuts already use `metaKey || ctrlKey`. The ONLY breakage was JS
+path-string handling hardcoded to POSIX `/`:
+
+- `persist/fs.ts`: `joinPath`/`baseName`/`dirName` now split/trim on both `/` and `\` and
+  `joinPath` matches the dir's own separator (backslash on Windows). macOS behaviour is
+  byte-identical (existing tests still pass).
+- Routed three inline `path.split("/").pop()` filename extractions through `baseName`
+  (`ImportDialog`, `ExportDialog`, `ConnectionsDialog`) — these returned the whole path on
+  Windows.
+- New `persist/paths.test.ts` covers both POSIX and Windows-style paths.
+
+No Rust/config change needed. 562 tests green, tsc/build clean. Build-on-Windows steps
+(prereqs + `npm run tauri build`) are the remaining author action; no code blockers remain.
+
 ## 2026-10-11 — ETL G-AI Phase 2: Copilot can add transform nodes to a pipeline
 
 Second ETL action, building on Phase 1:

@@ -17,22 +17,30 @@ export interface HistoryEntry {
   timestamp: number;
 }
 
-/** Join a directory and a file name with a POSIX separator (macOS target). */
+// Path helpers are separator-agnostic (POSIX "/" and Windows "\") so the app works on
+// macOS and Windows. The OS file dialogs return native paths (e.g. C:\Users\you\models on
+// Windows); the Rust file layer uses std::path and accepts either separator.
+
+/** Join a directory and a file name, matching the directory's own separator when it uses
+ *  backslashes (Windows), else "/". Avoids producing mixed separators. */
 export function joinPath(dir: string, name: string): string {
-  return `${dir.replace(/\/+$/, "")}/${name}`;
+  const sep = dir.includes("\\") && !dir.includes("/") ? "\\" : "/";
+  return `${dir.replace(/[/\\]+$/, "")}${sep}${name}`;
 }
 
-/** The folder name, used as a default workspace name. */
-export function baseName(dir: string): string {
-  const parts = dir.replace(/\/+$/, "").split("/");
-  return parts[parts.length - 1] || dir;
+/** The final path segment (folder or file name). Splits on "/" or "\". */
+export function baseName(p: string): string {
+  const parts = p.replace(/[/\\]+$/, "").split(/[/\\]/);
+  return parts[parts.length - 1] || p;
 }
 
-/** The parent directory of a path (everything before the last separator). */
+/** The parent directory of a path (everything before the last "/" or "\"). */
 export function dirName(filePath: string): string {
-  const trimmed = filePath.replace(/\/+$/, "");
-  const idx = trimmed.lastIndexOf("/");
-  return idx <= 0 ? "/" : trimmed.slice(0, idx);
+  const trimmed = filePath.replace(/[/\\]+$/, "");
+  const idx = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
+  if (idx < 0) return trimmed; // no separator → the path itself
+  if (idx === 0) return "/"; // POSIX root
+  return trimmed.slice(0, idx);
 }
 
 export async function pickWorkspaceFolder(): Promise<string | null> {

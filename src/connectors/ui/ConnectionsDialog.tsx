@@ -16,7 +16,7 @@ import type { Model } from "../../model/model";
 import { allObjects, type CanonicalMetadata, type CanonicalObject, type SourceSystemType } from "../metadata";
 import { filterMetadataToTables, tableKey } from "../browseFilter";
 import { parseMetadataFile, type SourceSnapshot } from "../snapshot";
-import { pickFile, readTextFile } from "../../persist/fs";
+import { baseName, pickFile, readTextFile } from "../../persist/fs";
 import type { Connector, DiscoveryResult } from "../connector";
 
 /** Resolve the connector for a profile's system type. */
@@ -788,7 +788,7 @@ function ImportFilePanel({ onBack, onClose }: { onBack: () => void; onClose: () 
         return;
       }
       setMetadata(parsed.value);
-      setFileName(path.split("/").pop() ?? "metadata.json");
+      setFileName(baseName(path) || "metadata.json");
       setModelName(validateIdentifier(parsed.value.source.name) ? "imported_ebs" : parsed.value.source.name);
     } catch (e) {
       setError((e as Error).message);
